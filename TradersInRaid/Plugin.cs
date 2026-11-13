@@ -52,8 +52,6 @@ namespace TradersInRaid
             CaptureKey = Config.Bind("General", "Capture position key", new KeyboardShortcut(KeyCode.F10),
                 "In raid: writes your current map and position to captured_positions.txt so a trader can be placed there.");
 
-            TestKitKey = Config.Bind("Testing", "Give test kit key", new KeyboardShortcut(KeyCode.F9),
-                "In raid: gives a backpack, rig, armour, helmet, rifle, ammo, meds and 500,000 roubles. For testing only.");
             Undying = Config.Bind("Testing", "Undying", false,
                 "In raid: heals you fully and switches off all damage to you. For testing only; turn off for real play.");
             SelfTestKey = Config.Bind("Testing", "Self-test key", new KeyboardShortcut(KeyCode.F8),
@@ -63,6 +61,8 @@ namespace TradersInRaid
 
             Seamless.Bind(Config);
             Death.Bind(Config);
+            TraderModelBundle.Bind(Config);
+            Metabolism.Bind(Config);
             ShowFigures = Config.Bind("General", "Show trader figures", true,
                 "Stand a character at each trader spot. The marker box is hidden once the figure has loaded.");
             _patches = new List<ModulePatch>
@@ -71,6 +71,7 @@ namespace TradersInRaid
                 new TraderExfilEnterPatch(), new TraderExfilExitPatch(),
                 new LocalPurchasePatch(), new LocalSellPatch(), new CarriedPaymentPatch(), new DrawPackItemsPatch(),
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
+                new EnergyDrainPatch(), new HydrationDrainPatch(),
             };
             foreach (var patch in _patches)
             {
@@ -172,14 +173,8 @@ namespace TradersInRaid
             }
         }
 
-        public static ConfigEntry<KeyboardShortcut> TestKitKey;
-
         private void Update()
         {
-            if (TestKitKey != null && TestKitKey.Value.IsDown() && GamePlayerOwner.MyPlayer != null)
-            {
-                TestKit.Give();
-            }
             if (SelfTestKey != null && SelfTestKey.Value.IsDown() && GamePlayerOwner.MyPlayer != null)
             {
                 SelfTest.Run();

@@ -22,17 +22,28 @@ namespace TradersInRaid
             public string Body, Feet, Head;
         }
 
-        // Scav clothing and heads from the game's own customization data.
+        // Clothing and heads picked from the game's own customization data, chosen to come as close
+        // to each trader as the catalogue allows. Only Savage-side pieces are used, because that is
+        // the side the figure is built on. The game's real trader models are not used: they belong
+        // to the game's makers and cannot be shipped with a mod.
         private static readonly Dictionary<string, Look> Looks = new Dictionary<string, Look>
         {
-            { TraderConfig.Prapor, new Look { Body = "5d28adfd86f774292364a6e5", Feet = "5d5e7f8986f7742798716582", Head = "5cc2e4d014c02e000d0115f8" } },
-            { TraderConfig.Therapist, new Look { Body = "5e9975c486f774382b6320cb", Feet = "5e99762586f77466320ff9a9", Head = "5cde9ff17d6c8b0474535daa" } },
-            { TraderConfig.Skier, new Look { Body = "5df8a10486f77412672a1e3a", Feet = "5f5e410c6bdad616ad46d60b", Head = "5d28afe786f774292668618d" } },
-            { TraderConfig.Peacekeeper, new Look { Body = "66bf6769f08c35734d4940c4", Feet = "66bf6885952b42739a5f2298", Head = "5f68c4c217d579077152a252" } },
-            { TraderConfig.Mechanic, new Look { Body = "5cc2e59214c02e000f16684e", Feet = "5cc2e5d014c02e15d53d9c03", Head = "5f68c4a7c174a17c0f4c8945" } },
-            { TraderConfig.Ragman, new Look { Body = "618d1af10a5a59657e5f56f3", Feet = "61922589bb2cea6f7a22d964", Head = "5cc2e4d014c02e000d0115f8" } },
-            { TraderConfig.Jaeger, new Look { Body = "5d5e7e7586f77427997cfb7f", Feet = "5d5e7f4986f7746956659f8a", Head = "5cde9ff17d6c8b0474535daa" } },
-            { TraderConfig.Fence, new Look { Body = "637df28ac22da5bb8d046935", Feet = "637df25a1e688345e1097bd4", Head = "5d28afe786f774292668618d" } },
+            // An army warrant officer, in the uniform the Gluhar character wears.
+            { TraderConfig.Prapor, new Look { Body = "5d5e7dd786f7744a7a274322", Feet = "5d5e7f2a86f77427997cfb80", Head = "5d5e805d86f77439eb4c2d0e" } },
+            // The doctor's whites from the Sanitar character; the catalogue has no women.
+            { TraderConfig.Therapist, new Look { Body = "5e9975c486f774382b6320cb", Feet = "5e99762586f77466320ff9a9", Head = "5e99767c86f7741ac7399393" } },
+            // A gangster's leathers for the smuggler.
+            { TraderConfig.Skier, new Look { Body = "65749b8fe32c4e3f7907bf42", Feet = "65749c05e0423b9ebe0c79c7", Head = "65749be133fdc9c0cf06d3c8" } },
+            // Western kit for the foreign serviceman.
+            { TraderConfig.Peacekeeper, new Look { Body = "628796f2af0a053a6672c29a", Feet = "628771f70828252c7a28b961", Head = "62875ad50828252c7a28b95c" } },
+            // A worker's bomber jacket and a hard, lined face.
+            { TraderConfig.Mechanic, new Look { Body = "619238266c614e6d15792bca", Feet = "6193be546e5968395b260157", Head = "5f68c4a7c174a17c0f4c8945" } },
+            // The yellow coat suits the man who sells clothes.
+            { TraderConfig.Ragman, new Look { Body = "618d1af10a5a59657e5f56f3", Feet = "61922589bb2cea6f7a22d964", Head = "65749bcce32c4e3f7907bf44" } },
+            // A woodsman, from the Partizan character.
+            { TraderConfig.Jaeger, new Look { Body = "66aa5d36f641b13ad238f8c3", Feet = "66aa5bba10d2d4006a3c4a84", Head = "66aa5ca23d22c9416c010be0" } },
+            // The scav the game itself calls the dealmaker.
+            { TraderConfig.Fence, new Look { Body = "5d28adcb86f77429242fc893", Feet = "5d28b3a186f7747f7e69ab8c", Head = "5d28b01486f77429242fc898" } },
         };
 
         private const string DefaultInventoryTpl = "55d7217a4bdc2d86028b456d";
@@ -47,6 +58,12 @@ namespace TradersInRaid
             {
                 var player = GamePlayerOwner.MyPlayer;
                 if (player == null)
+                {
+                    return;
+                }
+
+                // The trader's own model, when it has been built from the player's copy of the game.
+                if (TraderModelBundle.TryPlace(traderId, traderName, ground, rotationY, markerBox))
                 {
                     return;
                 }
@@ -113,6 +130,7 @@ namespace TradersInRaid
                 }
             }
             Loaders.Clear();
+            TraderModelBundle.DestroyAll();
             foreach (var anchor in Anchors)
             {
                 if (anchor != null)
