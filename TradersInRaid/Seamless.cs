@@ -45,6 +45,9 @@ namespace TradersInRaid
         /// <summary>Pass through the result screens of the raid that just ended.</summary>
         public static bool SkipResults;
 
+        /// <summary>The last raid ended in death: nothing continues automatically until the player starts a raid themself.</summary>
+        public static bool Died;
+
         private static bool _running;
 
         public static void Bind(ConfigFile config)
@@ -276,7 +279,11 @@ namespace TradersInRaid
                 bool toMenu = Seamless.SaveAndMenuRequested;
                 Seamless.SaveAndMenuRequested = false;
                 Seamless.SkipResults = Seamless.Enabled.Value && exitStatus != ExitStatus.Transit;
-                Seamless.Armed = Seamless.SkipResults && !toMenu;
+                // Dying (or going missing, or abandoning the raid) ends the run: stay in the menu.
+                bool died = exitStatus == ExitStatus.Killed || exitStatus == ExitStatus.MissingInAction || exitStatus == ExitStatus.Left;
+                Seamless.Died = died;
+                Seamless.Armed = Seamless.SkipResults && !toMenu && !died;
+                Death.Pending = died && Death.Ask.Value;
                 Seamless.LeftHideout = false;
                 Plugin.Log.LogInfo("Raid ended: " + exitStatus + " via '" + exitName + "' on " + Seamless.LastLocationId
                     + "; skip results: " + Seamless.SkipResults + ", continue automatically: " + Seamless.Armed);
@@ -338,6 +345,10 @@ namespace TradersInRaid
         public static void Postfix()
         {
             QuestSync.Send("menu");
+            if (Death.Pending && Plugin.Instance != null)
+            {
+                Plugin.Instance.StartCoroutine(Death.AskNow());
+            }
             if (Seamless.Enabled.Value && Seamless.Armed && Plugin.Instance != null)
             {
                 Plugin.Instance.StartCoroutine(Seamless.AfterMenuShown());
@@ -360,6 +371,11 @@ namespace TradersInRaid
             {
                 if (Seamless.Enabled.Value && EftScreenManager.Instance.RootScreenType == EEftScreenType.Hideout)
                 {
+                    if (Seamless.Died)
+                    {
+                        Plugin.Log.LogInfo("Left the hideout after a death; staying in the menu");
+                        return;
+                    }
                     Seamless.Armed = true;
                     Seamless.LeftHideout = true;
                     Plugin.Log.LogInfo("Left the hideout; no-menu armed");

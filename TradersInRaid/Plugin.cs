@@ -62,6 +62,7 @@ namespace TradersInRaid
                 "When Vagabond is installed traders stand at Vagabond's trader extracts. Turn this on to add the spots from traders.json as well.");
 
             Seamless.Bind(Config);
+            Death.Bind(Config);
             ShowFigures = Config.Bind("General", "Show trader figures", true,
                 "Stand a character at each trader spot. The marker box is hidden once the figure has loaded.");
             _patches = new List<ModulePatch>
@@ -183,6 +184,10 @@ namespace TradersInRaid
             {
                 SelfTest.Run();
             }
+            if (Input.GetKeyDown(KeyCode.F7) && GamePlayerOwner.MyPlayer != null)
+            {
+                InteractionProbe.Run();
+            }
             ApplyUndying();
             if (!CaptureKey.Value.IsDown())
             {
@@ -276,6 +281,7 @@ namespace TradersInRaid
                 controller.OnClose += () =>
                 {
                     LocalTrade.Active = false;
+                    LocalTrade.ForgetPackView();
                     if (lentStash)
                     {
                         inventory.Stash = null;

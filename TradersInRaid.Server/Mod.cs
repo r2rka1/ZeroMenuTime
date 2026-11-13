@@ -151,8 +151,33 @@ public class TradersInRaidRouter(
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(SyncQuests(sessionId, payload)) ?? "{}")
     ),
+    new RouteAction<DeathChoiceRequest>(
+        "/tradersinraid/death/goto",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(ApplyDeathChoice(sessionId, payload)) ?? "{}")
+    ),
 ])
 {
+    /// <summary>
+    /// After a death the player picks where to carry on: their hideout, or the place they died.
+    /// Vagabond has already moved them by then (its OnDeathGoTo setting), so this writes the
+    /// chosen place back into its state.
+    /// </summary>
+    private static DeathChoiceResponse ApplyDeathChoice(MongoId sessionId, DeathChoiceRequest request)
+    {
+        var response = new DeathChoiceResponse();
+        try
+        {
+            DeathChoiceBridge.Apply(sessionId.ToString(), request.Choice, response);
+        }
+        catch (Exception e)
+        {
+            // Vagabond not installed, or its API changed.
+            response.Error = e.GetType().Name + ": " + e.Message;
+        }
+        return response;
+    }
+
     /// <summary>
     /// Quests taken or finished at a trader inside a raid never pass through the server's normal
     /// accept/complete calls, so Vagabond does not learn about them and keeps quest extracts

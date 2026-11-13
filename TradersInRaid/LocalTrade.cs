@@ -42,21 +42,81 @@ namespace TradersInRaid
         /// </summary>
         public static Stash BuildPackStash(Player player)
         {
-            var equipment = player.Profile.Inventory.Equipment;
             var fake = Singleton<ItemFactory>.Instance.CreateFakeStash();
-            // Show the backpack if there is one, otherwise the rig. With neither, the player side is
-            // empty: buying still works (payment comes from anything carried), selling has nothing to show.
-            foreach (var slot in new[] { EquipmentSlot.Backpack, EquipmentSlot.TacticalVest })
+            fake.Grids[0] = BuildCarriedList(player, fake);
+            new ItemController(fake, player.ProfileId, player.Profile.Nickname);
+            _packStash = fake;
+            return fake;
+        }
+
+        private static Stash _packStash;
+
+        /// <summary>
+        /// One list of everything loose the player carries: the contents of the backpack, rig, pockets
+        /// and secure container. It is a reference list, the kind the trader's side of the screen uses:
+        /// items are shown in it without being moved out of the container they are really in.
+        /// </summary>
+        private static Grid BuildCarriedList(Player player, Stash owner)
+        {
+            var list = new ReferenceGrid("hideout", 10, 25, true, false, new ItemFilter[0], owner);
+            foreach (var grid in CarriedGrids(player))
             {
-                var container = equipment.GetSlot(slot).ContainedItem as CompoundItem;
-                if (container?.Grids != null && container.Grids.Length > 0)
+                foreach (var item in grid.Items.ToList())
                 {
-                    fake.Grids[0] = container.Grids[0];
-                    break;
+                    var added = list.AddAnywhere(item, EErrorHandlingType.Ignore);
+                    if (added.Failed)
+                    {
+                        Plugin.Log.LogWarning("Could not list " + item.TemplateId + " for trading: " + added.Error);
+                    }
                 }
             }
-            new ItemController(fake, player.ProfileId, player.Profile.Nickname);
-            return fake;
+            return list;
+        }
+
+        // The player-side grid view of the open trade screen and what it was shown with,
+        // kept so the list can be rebuilt after a trade changes what the player carries.
+        private static EFT.UI.DragAndDrop.TradingGridView _packView;
+        private static EFT.InventoryLogic.ItemContext _packContext;
+        private static Assortment _packAssortment;
+        private static InventoryController _packController;
+        private static ItemUiContext _packUi;
+
+        public static void RememberPackView(EFT.UI.DragAndDrop.TradingGridView view, EFT.InventoryLogic.ItemContext context,
+            Assortment assortment, InventoryController controller, ItemUiContext ui)
+        {
+            _packView = view;
+            _packContext = context;
+            _packAssortment = assortment;
+            _packController = controller;
+            _packUi = ui;
+        }
+
+        public static void ForgetPackView()
+        {
+            _packView = null;
+            _packStash = null;
+        }
+
+        /// <summary>After a purchase or sale, list what the player carries now.</summary>
+        public static void RefreshPackView()
+        {
+            try
+            {
+                var player = GamePlayerOwner.MyPlayer;
+                if (!Active || _packView == null || _packStash == null || player == null)
+                {
+                    return;
+                }
+                var list = BuildCarriedList(player, _packStash);
+                _packStash.Grids[0] = list;
+                var view = _packView;
+                view.Close();
+                view.Show(list, _packContext, _packAssortment, _packController, _packUi);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Refreshing the carried list failed: " + e);
+            }
         }
 
         /// <summary>Everything the player carries, including contents of containers.</summary>
@@ -338,6 +398,7 @@ namespace TradersInRaid
                     NotificationManager.DisplayWarningNotification("Ran out of room: " + delivered + " of " + goods.Count + " delivered.");
                 }
 
+                RefreshPackView();
                 Plugin.Log.LogInfo("Bought " + quantity + " x " + selected.TemplateId + ", paid with " + payment.Length + " item(s), delivered " + delivered + "/" + goods.Count);
                 selected.BuyRestrictionCurrent += quantity;
                 assortment.ClearPreparedItems();
@@ -426,6 +487,7 @@ namespace TradersInRaid
                     NotificationManager.DisplayWarningNotification("Some items could not be sold; no payment made.");
                 }
 
+                RefreshPackView();
                 Plugin.Log.LogInfo("Sold " + sold + "/" + originals.Count + " item(s) for " + price.Amount);
                 Singleton<GUISounds>.Instance.PlayUISound(EUISoundType.TradeOperationComplete);
             }
@@ -495,7 +557,7 @@ namespace TradersInRaid
         }
 
         [PatchPostfix]
-        public static void Postfix(EFT.UI.DragAndDrop.TradingGridView __instance, Grid grid, ItemUiContext itemUiContext)
+        public static void Postfix(EFT.UI.DragAndDrop.TradingGridView __instance, Grid grid, EFT.InventoryLogic.ItemContext sourceContext, Assortment assortment, InventoryController inventoryController, ItemUiContext itemUiContext)
         {
             if (!LocalTrade.Active || grid == null)
             {
@@ -503,6 +565,7 @@ namespace TradersInRaid
             }
             try
             {
+                LocalTrade.RememberPackView(__instance, sourceContext, assortment, inventoryController, itemUiContext);
                 Traverse.Create(__instance).Property("IsMagnified").SetValue(false);
                 int drawn = 0;
                 foreach (var entry in grid.ContainedItems.ToArray())

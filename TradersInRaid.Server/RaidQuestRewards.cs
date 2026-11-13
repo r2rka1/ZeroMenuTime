@@ -19,7 +19,18 @@ public sealed class TradersInRaidLoader : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        new RaidQuestRewardsPatch().Enable();
+        // One patch failing must not take the rest of the mod down with it.
+        foreach (var patch in new AbstractPatch[] { new RaidQuestRewardsPatch(), new RaidStartLocationPatch() })
+        {
+            try
+            {
+                patch.Enable();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[TradersInRaid] Could not enable " + patch.GetType().Name + ": " + e.Message);
+            }
+        }
         return Task.CompletedTask;
     }
 }
