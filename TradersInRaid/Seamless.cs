@@ -91,6 +91,27 @@ namespace TradersInRaid
             return app == null ? null : AccessTools.Field(typeof(TarkovApplication), "_menuOperation").GetValue(app) as MainMenuShowOperation;
         }
 
+        /// <summary>Continue, from the main menu: start a raid where the character is, at once.</summary>
+        public static IEnumerator ContinueNow()
+        {
+            if (_running)
+            {
+                yield break;
+            }
+            _running = true;
+            Armed = false;
+            LeftHideout = false;
+            var stateTask = FetchVagabondState();
+            while (!stateTask.IsCompleted)
+            {
+                yield return null;
+            }
+            var state = stateTask.Status == TaskStatus.RanToCompletion ? stateTask.Result : null;
+            Plugin.Log.LogInfo("Continue: map=" + (state?.CurrentMap ?? "?"));
+            StartRaid(state?.CurrentMap ?? LastLocationId);
+            _running = false;
+        }
+
         /// <summary>Runs when the main menu appears after a raid or after leaving the hideout.</summary>
         public static IEnumerator AfterMenuShown()
         {

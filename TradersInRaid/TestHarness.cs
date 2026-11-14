@@ -21,7 +21,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | save | undying on|off | die | recipes [STATION] | craft RECIPE_ID | collect STATION | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// from the menu: menu | continue | newgame | startraid | screenshot NAME; in a raid: save | undying on|off | die | recipes [STATION] | craft RECIPE_ID | collect STATION | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -133,6 +133,55 @@ namespace TradersInRaid
             var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             string verb = parts[0].ToLowerInvariant();
             var player = GamePlayerOwner.MyPlayer;
+            if (player == null && verb == "menu")
+            {
+                // What the main menu offers right now.
+                var screen = UnityEngine.Object.FindObjectOfType<MenuScreen>();
+                if (screen == null)
+                {
+                    Report("the main menu is not showing");
+                    yield break;
+                }
+                var shown = new List<string>();
+                foreach (var button in screen.GetComponentsInChildren<DefaultUIButton>(false))
+                {
+                    var label = button.GetComponentInChildren<TMPro.TMP_Text>();
+                    shown.Add(label != null ? label.text : button.name);
+                }
+                Report("menu buttons showing: " + string.Join(" | ", shown.ToArray()));
+                var bars = new List<string>();
+                foreach (var bar in UnityEngine.Object.FindObjectsOfType<MenuTaskBar>())
+                {
+                    foreach (var pair in bar._toggleButtons)
+                    {
+                        if (pair.Value != null && pair.Value.gameObject.activeInHierarchy)
+                        {
+                            bars.Add(pair.Key.ToString());
+                        }
+                    }
+                }
+                Report("bottom bar showing: " + string.Join(", ", bars.ToArray()));
+                yield break;
+            }
+            if (player == null && verb == "continue")
+            {
+                MainMenu.Continue();
+                Report("Continue pressed");
+                yield break;
+            }
+            if (player == null && verb == "newgame")
+            {
+                // What confirming New Game does. Replaces the character: only on a backed-up profile.
+                Report("New Game confirmed");
+                yield return MainMenu.NewGame();
+                yield break;
+            }
+            if (player == null && verb == "screenshot")
+            {
+                yield return new WaitForEndOfFrame();
+                Screenshot(parts.Length > 1 ? parts[1] : "shot");
+                yield break;
+            }
             if (verb == "startraid")
             {
                 // From the main menu: start a raid where the character is, as the no-menu flow does.

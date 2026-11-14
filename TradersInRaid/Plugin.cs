@@ -75,13 +75,23 @@ namespace TradersInRaid
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
-                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(),
+                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(),
             };
             foreach (var patch in _patches)
             {
                 patch.Enable();
             }
             Log.LogInfo("TradersInRaid loaded (" + BuildStamp + ")");
+
+            // Reloaded while the main menu is up: arrange it again.
+            try
+            {
+                MainMenu.Arrange(FindObjectOfType<MenuScreen>());
+            }
+            catch (Exception e)
+            {
+                Log.LogWarning("Menu not arranged on load: " + e.Message);
+            }
 
             // Reloaded in the middle of a raid (ScriptEngine): put the traders back straight away.
             try
@@ -214,6 +224,7 @@ namespace TradersInRaid
             RewardTable.Tick();
             WorldClock.Tick();
             HideoutBoosts.Tick();
+            MainMenu.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;
