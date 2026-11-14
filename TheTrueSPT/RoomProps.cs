@@ -104,6 +104,7 @@ namespace TheTrueSPT
                     }
                 }
             }
+            done += DressDoors();
             if (done > 0)
             {
                 Physics.SyncTransforms();
@@ -314,18 +315,9 @@ namespace TheTrueSPT
             return float.Parse(text, CultureInfo.InvariantCulture);
         }
 
-        /// <summary>
-        /// Stands a copy of a hideout object in a room. The place given is where the middle of its
-        /// footprint goes, measured on the floor from the middle of the room; a wall letter pushes
-        /// it flat against that wall instead.
-        /// </summary>
-        public static GameObject Place(Transform parent, string name, Vector3 local, float yaw, float scale, char against, bool solid)
+        /// <summary>A bare copy of a hideout object: what it draws, and nothing that acts.</summary>
+        private static GameObject Copy(Transform source, string name, Transform parent, float yaw, float scale)
         {
-            Transform source;
-            if (!Index() || !_byName.TryGetValue(name, out source))
-            {
-                return null;
-            }
             // Made inside something switched off, so nothing on the copy wakes up before it is stripped.
             var crib = new GameObject("crib");
             crib.SetActive(false);
@@ -367,11 +359,115 @@ namespace TheTrueSPT
 
             // Keep its own tilt (many models lie on their side as imported) but not the way it happened to face.
             var tilt = source.rotation.eulerAngles;
-            copy.transform.SetParent(parent, false);
+            if (parent != null)
+            {
+                copy.transform.SetParent(parent, false);
+            }
+            else
+            {
+                copy.transform.SetParent(null, false);
+            }
             copy.transform.localScale = source.lossyScale * scale;
             copy.transform.rotation = Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(tilt.x, 0f, tilt.z);
             copy.SetActive(true);
             UnityEngine.Object.Destroy(crib);
+            return copy;
+        }
+
+        /// <summary>
+        /// Stands a copy of a hideout object in the open world, its back flat against a wall: the
+        /// place given is the foot of the wall, the direction is the way the piece faces, out from it.
+        /// </summary>
+        public static GameObject Stand(string name, Vector3 wallFoot, float facing, float sink = 0f)
+        {
+            Transform source;
+            if (!Index() || !_byName.TryGetValue(name, out source))
+            {
+                return null;
+            }
+            var copy = Copy(source, name, null, 0f, 1f);
+            Bounds b;
+            if (!Measure(copy, out b))
+            {
+                UnityEngine.Object.Destroy(copy);
+                return null;
+            }
+            // Measured facing north, where its back is simply its lowest z; then turned and set down.
+            var back = new Vector3(b.center.x, b.min.y, b.min.z) - copy.transform.position;
+            var turn = Quaternion.Euler(0f, facing, 0f);
+            copy.transform.rotation = turn * copy.transform.rotation;
+            copy.transform.position = wallFoot + turn * new Vector3(0f, 0f, 0.01f - sink) - turn * back;
+            return copy;
+        }
+
+        /// <summary>
+        /// The doors on the map that lead into trader rooms take the look of a real door of the
+        /// game; the door made for this mod stays underneath as the thing that is used.
+        /// </summary>
+        public static int DressDoors()
+        {
+            if (Use == null || !Use.Value || !Index())
+            {
+                return 0;
+            }
+            int done = 0;
+            foreach (var room in TraderRoom.Rooms)
+            {
+                var door = room.OutsideDoor;
+                if (door == null || room.DoorDressed)
+                {
+                    continue;
+                }
+                room.DoorDressed = true;
+                var root = door.transform.root;
+                var drawn = root.GetComponentsInChildren<MeshRenderer>(true);
+                bool hidden = true;
+                foreach (var renderer in drawn)
+                {
+                    hidden &= !renderer.enabled;
+                }
+                if (hidden)
+                {
+                    continue;   // laid over a door that is part of the map already
+                }
+                // The mod's door stands a hand's width off the wall; the real one goes back against it.
+                var facing = root.eulerAngles.y;
+                var wallFoot = root.position - Quaternion.Euler(0f, facing, 0f) * Vector3.forward * 0.1f;
+                var prop = Stand(DoorPiece, wallFoot, facing);
+                if (prop == null)
+                {
+                    continue;
+                }
+                prop.name = "TheTrueSPT door look";
+                prop.transform.SetParent(root, true);
+                foreach (var renderer in drawn)
+                {
+                    renderer.enabled = false;
+                }
+                done++;
+            }
+            if (done > 0)
+            {
+                Plugin.Log.LogInfo("Room furniture: " + done + " trader door(s) on the map given a real door");
+            }
+            return done;
+        }
+
+        public const string DoorPiece = "Bunker_Door_B_01_R_hideout_220-110";
+
+        /// <summary>
+        /// Stands a copy of a hideout object in a room. The place given is where the middle of its
+        /// footprint goes, measured on the floor from the middle of the room; a wall letter pushes
+        /// it flat against that wall instead.
+        /// </summary>
+        public static GameObject Place(Transform parent, string name, Vector3 local, float yaw, float scale, char against, bool solid)
+        {
+            Transform source;
+            if (!Index() || !_byName.TryGetValue(name, out source))
+            {
+                return null;
+            }
+            var copy = Copy(source, name, parent, yaw, scale);
 
             Bounds b;
             if (!Measure(copy, out b))
@@ -404,6 +500,28 @@ namespace TheTrueSPT
                 block.transform.SetParent(copy.transform, true);
             }
             return copy;
+        }
+
+        /// <summary>Where things of a given name are inside the hideout, in its own coordinates.</summary>
+        public static List<string> Locate(string word)
+        {
+            var found = new List<string>();
+            foreach (var root in HideoutBunker.Roots())
+            {
+                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.name.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0 || found.Count >= 40)
+                    {
+                        continue;
+                    }
+                    Bounds b;
+                    bool drawn = Measure(t.gameObject, out b);
+                    found.Add(t.name + " at " + (t.position - HideoutBunker.Moved).ToString("F2") + " yaw " + t.eulerAngles.y.ToString("F0")
+                              + (drawn ? " centre " + (b.center - HideoutBunker.Moved).ToString("F2") + " size " + b.size.ToString("F2") : " (draws nothing)")
+                              + (t.gameObject.activeInHierarchy ? "" : " hidden") + " under " + Path(t));
+                }
+            }
+            return found;
         }
 
         /// <summary>The pieces a name search finds, for writing layouts.</summary>

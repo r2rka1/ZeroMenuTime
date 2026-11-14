@@ -246,6 +246,18 @@ namespace TheTrueSPT
             return spendable;
         }
 
+        /// <summary>An item's name in full, for where there is room for it.</summary>
+        public static string FullName(string tpl)
+        {
+            string name = (tpl + " Name").Localized();
+            if (string.IsNullOrEmpty(name) || name.EndsWith(" Name", StringComparison.Ordinal))
+            {
+                return ItemName(tpl);
+            }
+            name = System.Text.RegularExpressions.Regex.Replace(name, "<[^>]+>", "");
+            return name.Replace("★", "").Replace("☆", "").Trim();
+        }
+
         public static string ItemName(string tpl)
         {
             string name = (tpl + " ShortName").Localized();
@@ -327,59 +339,34 @@ namespace TheTrueSPT
 
         public static AvailableInteractionState ActionsFor(int stationArea, string stationName)
         {
-            var station = new { Area = stationArea, StationName = stationName };
-            if (HideoutCrafting.MenuArea == stationArea)
-            {
-                return HideoutCrafting.Menu(stationArea);
-            }
-            // Looking at another station closes a recipe list left open elsewhere.
-            HideoutCrafting.MenuArea = -1;
+            // One line opens the station's window, where building, crafting and resting are laid
+            // out in full. The two things done most often keep a line of their own.
             var state = new AvailableInteractionState();
-            var player = GamePlayerOwner.MyPlayer;
             int level;
-            Levels.TryGetValue(station.Area, out level);
-            HideoutCrafting.AddActions(state, station.Area, level);
-            if (player == null || !NextCosts.ContainsKey(station.Area))
-            {
-                if (station.Area == (int)EAreaType.Stash && HideoutStash.Current != null)
-                {
-                    state.Actions.Add(new InteractionAction { Name = "Open stash", Action = () => HideoutStash.Open(), Disabled = false });
-                }
-                AddSleep(state, station.Area, level);
-                state.Actions.Add(new InteractionAction
-                {
-                    Name = station.StationName + " (level " + level + ", fully built)",
-                    Action = () => { },
-                    Disabled = true,
-                });
-                return state;
-            }
-            if (station.Area == (int)EAreaType.Stash && HideoutStash.Current != null)
+            Levels.TryGetValue(stationArea, out level);
+            var craft = HideoutCrafting.Here.FirstOrDefault(c => c.Area == stationArea);
+            if (craft != null && craft.Due <= WorldClock.Now)
             {
                 state.Actions.Add(new InteractionAction
                 {
-                    Name = "Open stash",
-                    Action = () => HideoutStash.Open(),
+                    Name = "Collect " + (craft.Count > 1 ? craft.Count + " x " : "") + ItemName(craft.Product),
+                    Action = () => HideoutCrafting.Collect(stationArea),
                     Disabled = false,
                 });
             }
-            AddSleep(state, station.Area, level);
-            var tally = Tally(player, station.Area);
-            bool affordable = tally.All(pair => pair.Value >= pair.Key.Count);
-            string verb = level == 0 ? "Build " + station.StationName : "Upgrade " + station.StationName + " to level " + (level + 1);
-            int area = station.Area;
-            string name = station.StationName;
+            if (stationArea == (int)EAreaType.Stash && HideoutStash.Current != null)
+            {
+                state.Actions.Add(new InteractionAction { Name = "Open stash", Action = () => HideoutStash.Open(), Disabled = false });
+            }
+            string what = level == 0 ? stationName + " (not built)" : stationName;
+            if (craft != null && craft.Due > WorldClock.Now)
+            {
+                what += ", making " + ItemName(craft.Product) + ", " + WorldClock.Span(craft.Due - WorldClock.Now) + " left";
+            }
             state.Actions.Add(new InteractionAction
             {
-                Name = affordable ? verb : verb + " (missing " + CostText(tally, true) + ")",
-                Action = () => Build(area, name),
-                Disabled = !affordable,
-            });
-            state.Actions.Add(new InteractionAction
-            {
-                Name = "What it needs",
-                Action = () => NotificationManager.DisplayMessageNotification(
-                    verb + " needs: " + CostText(tally, false) + ". You are missing: " + CostText(tally, true) + ".", ENotificationDurationType.Long),
+                Name = what,
+                Action = () => HideoutPanel.Open(stationArea, stationName),
                 Disabled = false,
             });
             return state;

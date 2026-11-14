@@ -31,6 +31,7 @@ namespace TheTrueSPT
         /// <summary>True for the plain room made in code, which takes furniture from the game.</summary>
         public bool Shell;
         public bool Dressed;
+        public bool DoorDressed;
         public IndoorTrigger Indoor;
 
         /// <summary>Where the player stands after coming in, and the way they face.</summary>

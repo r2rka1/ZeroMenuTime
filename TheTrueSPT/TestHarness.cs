@@ -703,6 +703,43 @@ namespace TheTrueSPT
                     }
                     yield return HideoutDoors.Furnish();
                     break;
+                case "panel":
+                {
+                    // panel NUMBER: open a station's window; panel close; panel press WORDS; panel lines.
+                    string what = parts.Length > 1 ? parts[1].ToLowerInvariant() : "lines";
+                    int number;
+                    if (what == "close")
+                    {
+                        HideoutPanel.Close();
+                        Report("window closed");
+                    }
+                    else if (what == "press")
+                    {
+                        string words = string.Join(" ", parts, 2, parts.Length - 2);
+                        Report(HideoutPanel.Press(words) ? "pressed " + words : "FAILED no usable button starts with " + words);
+                    }
+                    else if (int.TryParse(what, out number))
+                    {
+                        HideoutPanel.Open(number, ((EAreaType)number).ToString());
+                        yield return null;
+                        Report(HideoutPanel.IsOpen ? "window open for station " + number : "FAILED window did not open");
+                    }
+                    if (what == "lines" || int.TryParse(what, out number))
+                    {
+                        foreach (var entry in HideoutPanel.Lines())
+                        {
+                            Report("  " + entry);
+                        }
+                    }
+                    break;
+                }
+                case "locate":
+                    // locate WORD: where hideout objects of that name are.
+                    foreach (var entry in RoomProps.Locate(parts.Length > 1 ? parts[1] : "door"))
+                    {
+                        Report("  " + entry);
+                    }
+                    break;
                 case "props":
                     // props WORD: hideout pieces whose name contains the word.
                     foreach (var entry in RoomProps.Find(parts.Length > 1 ? parts[1] : ""))

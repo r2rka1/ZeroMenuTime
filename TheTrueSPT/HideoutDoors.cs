@@ -37,6 +37,8 @@ namespace TheTrueSPT
 
         /// <summary>Where the player arrives, measured from the bunker's own origin.</summary>
         private static readonly Vector3 Arrival = new Vector3(0f, 0.05f, 2f);
+        private static readonly Vector3 ExitDoor = new Vector3(-12.88f, 3.95f, -18.49f);
+        private const float ExitDoorYaw = 135f;
 
         public static string FilePath => Path.Combine(TraderConfig.Dir, "hideouts.json");
 
@@ -299,14 +301,21 @@ namespace TheTrueSPT
             }
 
             var arrival = origin + Arrival;
-            Vector3 exitGround;
+            // Arriving, the player faces the way they always have: out from the nearest wall.
+            Vector3 wallGround;
             float exitYaw;
-            if (!RoomDoor.FindWall(arrival, out exitGround, out exitYaw))
+            if (!RoomDoor.FindWall(arrival, out wallGround, out exitYaw))
             {
-                exitGround = arrival + new Vector3(0f, 0f, -1.5f);
                 exitYaw = 0f;
             }
-            _exit = RoomDoor.SpawnOutside("Leave hideout", exitGround, exitYaw);
+            // The way out is the closed door at the end of the small room up the steps (the one
+            // the cultists' room lies behind): something to use, laid over that door and not drawn.
+            _exit = RoomDoor.Spawn("Leave hideout", origin + ExitDoor, ExitDoorYaw);
+            var exitDrawn = _exit.GetComponent<MeshRenderer>();
+            if (exitDrawn != null)
+            {
+                exitDrawn.enabled = false;
+            }
             _exit.OnUse = Leave;
 
             _returnTo = returnTo;
@@ -338,7 +347,7 @@ namespace TheTrueSPT
             yield return new WaitForSecondsRealtime(0.3f);
             RoomDoor.PlayDoorSound(false, arrival);
             yield return RoomDoor.FadeTo(0f);
-            Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + exitGround.ToString("F1") + "; boosts: " + HideoutBoosts.Describe());
+            Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + (origin + ExitDoor).ToString("F1") + "; boosts: " + HideoutBoosts.Describe());
             HideoutBoosts.Announce();
             HideoutCrafting.AnnounceDue();
             WorldClock.Send("entered a hideout");
@@ -385,6 +394,7 @@ namespace TheTrueSPT
         /// <summary>Puts the map back as it was and lets the bunker go. Safe to call at any time.</summary>
         public static async System.Threading.Tasks.Task Close()
         {
+            HideoutPanel.Close();
             if (Inside != null)
             {
                 HideoutStash.Send("raid ending");

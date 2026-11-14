@@ -26,9 +26,10 @@ namespace TheTrueSPT
         /// <summary>Framings the view moves between, in the interior's own coordinates.</summary>
         public static readonly List<Framing> Framings = new List<Framing>
         {
-            new Framing { Position = new Vector3(3f, 1.7f, 8f), Yaw = 200f, Pitch = 6f },
+            // Both stand in the main hall with walls and ceiling all round; a view from the unbuilt
+            // side rooms looks out through walls that are only drawn from the inside.
             new Framing { Position = new Vector3(-6f, 1.7f, 3f), Yaw = 120f, Pitch = 6f },
-            new Framing { Position = new Vector3(-3f, 1.7f, -4f), Yaw = 25f, Pitch = 4f },
+            new Framing { Position = new Vector3(0f, 1.7f, -3f), Yaw = 0f, Pitch = 4f },
         };
 
         private const string RigName = "TheTrueSPT menu camera";

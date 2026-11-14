@@ -61,6 +61,49 @@ namespace TheTrueSPT
         /// the wall and the way the door should face (out from the wall). False if nothing suitable
         /// is close by.
         /// </summary>
+        private static readonly string[] NotWalls = { "fence", "zabor", "setka", "rabic", "grid", "lattice", "grille", "gate", "vorota", "glass", "window", "net_", "mesh_fence", "container", "vehicle", "car_", "truck", "bus_" };
+
+        /// <summary>True for things a door cannot sensibly be in: fences, gates, glass, vehicles.</summary>
+        private static bool IsFence(Collider collider)
+        {
+            int up = 0;
+            for (var t = collider.transform; t != null && up < 4; t = t.parent, up++)
+            {
+                string name = t.name.ToLowerInvariant();
+                foreach (var word in NotWalls)
+                {
+                    if (name.Contains(word))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// A door placed by hand is given as where the player stood, back to the wall. Moves it
+        /// back onto that wall and squares it to the wall, if there is one within reach.
+        /// </summary>
+        public static void BackToWall(ref Vector3 ground, ref float yaw)
+        {
+            int mask = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain", "Default");
+            var back = Quaternion.Euler(0f, yaw, 0f) * Vector3.back;
+            RaycastHit hit;
+            if (Physics.Raycast(ground + Vector3.up * 1.1f, back, out hit, 2.0f, mask, QueryTriggerInteraction.Ignore) && Mathf.Abs(hit.normal.y) < 0.2f)
+            {
+                var outward = new Vector3(hit.normal.x, 0f, hit.normal.z).normalized;
+                var atWall = hit.point + outward * 0.1f;
+                ground = new Vector3(atWall.x, ground.y, atWall.z);
+                yaw = Quaternion.LookRotation(outward).eulerAngles.y;
+            }
+            RaycastHit floor;
+            if (Physics.Raycast(ground + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * 0.3f + Vector3.up * 1.2f, Vector3.down, out floor, 2.5f, mask, QueryTriggerInteraction.Ignore))
+            {
+                ground.y = floor.point.y;
+            }
+        }
+
         public static bool FindWall(Vector3 spot, out Vector3 ground, out float yaw)
         {
             ground = spot;
@@ -74,7 +117,7 @@ namespace TheTrueSPT
                 var direction = Quaternion.Euler(0f, step * 15f, 0f) * Vector3.forward;
                 RaycastHit hit;
                 if (!Physics.Raycast(chest, direction, out hit, 8f, mask, QueryTriggerInteraction.Ignore)
-                    || hit.distance < 0.7f || hit.distance >= best || Mathf.Abs(hit.normal.y) > 0.15f)
+                    || hit.distance < 0.7f || hit.distance >= best || Mathf.Abs(hit.normal.y) > 0.15f || IsFence(hit.collider))
                 {
                     continue;
                 }
@@ -84,7 +127,9 @@ namespace TheTrueSPT
                 var along = Vector3.Cross(Vector3.up, into);
                 var foot = hit.point - Vector3.up * 1.0f;
                 bool flat = true;
-                foreach (var offset in new[] { new Vector2(-0.55f, 0.25f), new Vector2(0.55f, 0.25f), new Vector2(-0.55f, 2.0f), new Vector2(0.55f, 2.0f), new Vector2(0f, 1.1f) })
+                foreach (var offset in new[] { new Vector2(-0.55f, 0.25f), new Vector2(0.55f, 0.25f), new Vector2(-0.55f, 2.0f), new Vector2(0.55f, 2.0f), new Vector2(0f, 1.1f),
+                             // A wall of a building goes on above a door; a fence or a parked container ends about here.
+                             new Vector2(-0.4f, 2.75f), new Vector2(0.4f, 2.75f) })
                 {
                     var from = foot - into * 0.6f + along * offset.x + Vector3.up * offset.y;
                     RaycastHit probe;

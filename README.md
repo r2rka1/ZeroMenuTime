@@ -65,6 +65,8 @@ Without it, or with "Also use traders.json spots" on, spots come from `BepInEx/p
 
 There are three hideouts, each behind an existing door on its map: a red metal double door near Prapor on Streets, the door of a metal cabin north of Skier on Customs, and a grey steel door in a red shed west of Peacekeeper on Shoreline. Looking at the door offers **Enter hideout**. Inside is the game's own hideout interior, loaded into the raid; bots cannot follow.
 
+Looking at a station and using it opens the station's window: what its next level needs and how much of that you have, what it can make, from what, how long that takes (in game time and in time played), and what is being made now. Esc closes it. The way out of a hideout is the shut door at the end of the small room up the steps.
+
 Each hideout is separate: its own stations, its own stash, its own crafts. The character's existing hideout and stash become the Streets one.
 
 - **Building.** Look at a station and choose **Build** or **Upgrade**. A level needs only its materials, taken from what you carry (pack, rig, pockets, secure container; never what you wear or hold) and then from that hideout's stash. Requirements for other stations, trader loyalty and skills are gone, and construction is instant.
@@ -82,7 +84,7 @@ A raid has no time limit; it lasts until you leave, extract, die or quit. The co
 
 ## Doors
 
-The door is stood against the nearest flat stretch of wall near the trader's spot, and on the spot itself if there is none. Where that choice looks wrong, put the door by hand: stand where it should be, facing the way it should face, press F10, and copy the line from `captured_positions.txt` into `BepInEx/plugins/TheTrueSPT/doors.json` (a list, same format as `traders.json`) with the trader's id filled in.
+The door is a real door of the game. Where a good one was picked by hand it is used (Prapor on Streets and Skier on Customs use doors that are part of the map). Elsewhere a door is stood against the nearest flat stretch of building wall near the trader's spot (fences, gates and low walls are passed over), and on the spot itself if there is none. Where that choice looks wrong, put the door by hand: stand where it should be, facing the way it should face, press F10, and copy the line from `captured_positions.txt` into `BepInEx/plugins/TheTrueSPT/doors.json` (a list, same format as `traders.json`) with the trader's id filled in.
 
 ## Known limits
 
@@ -92,7 +94,7 @@ The door is stood against the nearest flat stretch of wall near the trader's spo
 - Not built for the hideouts: generator fuel, the bitcoin farm, the scav case, the water collector's filter and the cultist circle. Skill and experience bonuses from stations are not applied.
 - Hideout bonuses apply only while you are inside; menus outside a raid show the hideout last entered.
 - Gear lost in a death is still reported to insurance by the game although the save brings it back, so insured items can return twice.
-- Inside a hideout you arrive in a bare corridor and leave through a door prop; waking up after a death puts you by the Rest Space.
+- Waking up after a death puts you by the Rest Space.
 - Over a very long raid bots may thin out, since the game spawns them on a schedule made for short raids.
 - If a raid is lost to a crash after a hand-in, the reward items you picked up are kept although the quest is not recorded as finished.
 - A room is bare for the first half minute of a raid, until the furniture has been fetched.
@@ -132,6 +134,7 @@ With "Test harness" on, the mod reads `BepInEx/plugins/TheTrueSPT/test/commands.
 | `startraid`, `menu`, `press NAME` | From the main menu: start a raid where the character is; list what the menu shows; click one of its items |
 | `backdrop X Y Z YAW PITCH`, `backdrop free`, `backdrop lamp POWER` | Hold the menu's view of the hideout at one spot; let it move again; set its lamp |
 | `hideout enter ID`, `hideout leave`, `use` | Go into a hideout (streets, customs, shoreline) and out; use the nearest door of ours |
+| `panel NUMBER`, `panel press WORDS`, `panel lines`, `panel close`, `locate WORD` | Open a station's window, press one of its buttons, read it, close it; find hideout objects by name |
 | `stations`, `build NUMBER`, `give TEMPLATE COUNT` | List stations with costs; build one; hand out materials |
 | `stash [open\|close\|put TPL N\|take TPL\|save]`, `carried [TPL]` | Work with the hideout stash; count carried items |
 | `recipes [STATION]`, `craft RECIPE_ID`, `collect STATION` | Crafting |

@@ -269,6 +269,7 @@ namespace TheTrueSPT
             WorldClock.Tick();
             HideoutBoosts.Tick();
             MainMenu.Tick();
+            HideoutPanel.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;
@@ -470,7 +471,11 @@ namespace TheTrueSPT
                         {
                             doorGround = new Vector3(chosen.Position[0], chosen.Position[1], chosen.Position[2]);
                             doorFacing = chosen.RotationY;
-                            how = "where doors.json says";
+                            how = "where it was placed by hand";
+                            if (!chosen.Hidden || chosen.AtFeet)
+                            {
+                                RoomDoor.BackToWall(ref doorGround, ref doorFacing);
+                            }
                         }
                         else if (RoomDoor.FindWall(exfil.transform.position, out doorGround, out doorFacing))
                         {

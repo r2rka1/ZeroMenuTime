@@ -17,6 +17,8 @@ namespace TheTrueSPT
         public bool Enabled = true;
         /// <summary>For doors: the map already has a door here, so use that one and draw nothing.</summary>
         public bool Hidden;
+        /// <summary>For doors: the position is where the player stood, back to the door or wall; move it back onto that.</summary>
+        public bool AtFeet;
     }
 
     public static class TraderConfig
@@ -70,6 +72,12 @@ namespace TheTrueSPT
                     // The wooden door in the corridor right at Prapor's spot.
                     Name = "Prapor", TraderId = Prapor, Maps = new List<string> { "TarkovStreets" },
                     Position = new[] { -32.50f, 6.60f, -108.74f }, RotationY = 0f, Hidden = true,
+                });
+                doors.Add(new TraderSpot
+                {
+                    // The shut door of the shed north of his spot; picked in game, standing with the back to it.
+                    Name = "Skier", TraderId = Skier, Maps = new List<string> { "bigmap" },
+                    Position = new[] { 88.95f, 1.33f, -106.78f }, RotationY = 140f, Hidden = true, AtFeet = true,
                 });
                 foreach (var door in doors)
                 {
