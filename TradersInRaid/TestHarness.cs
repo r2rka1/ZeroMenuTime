@@ -21,7 +21,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | recipes [STATION] | craft RECIPE_ID | collect STATION | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | save | undying on|off | die | recipes [STATION] | craft RECIPE_ID | collect STATION | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -442,6 +442,39 @@ namespace TradersInRaid
                     Report(job.IsFaulted ? "FAILED " + job.Exception.InnerException : job.Result);
                     break;
                 }
+                case "carried":
+                {
+                    // carried [TEMPLATE]: how many items the character carries, or how many of one kind.
+                    var all = LocalTrade.CarriedItems(player);
+                    Report(parts.Length > 1
+                        ? "carrying " + all.Where(x => x.TemplateId == parts[1]).Sum(x => Mathf.Max(1, x.StackObjectsCount)) + " " + HideoutStations.ItemName(parts[1])
+                        : "carrying " + all.Count + " item(s)");
+                    break;
+                }
+                case "save":
+                {
+                    var job = SaveGame.SaveNow("test");
+                    while (!job.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report(job.IsFaulted ? "FAILED " + job.Exception.InnerException : job.Result);
+                    break;
+                }
+                case "undying":
+                {
+                    Plugin.Undying.Value = parts.Length > 1 && parts[1].ToLowerInvariant() == "on";
+                    yield return new WaitForSecondsRealtime(1f);
+                    Report("undying is " + (Plugin.Undying.Value ? "on" : "off"));
+                    break;
+                }
+                case "die":
+                {
+                    // Kills the character, to test what a death does. Undying must be off.
+                    Report("killing the character");
+                    player.ActiveHealthController.Kill(EDamageType.Bullet);
+                    break;
+                }
                 case "sleep":
                 {
                     // sleep HOURS: what choosing a Sleep action at the Rest Space does.
@@ -458,8 +491,8 @@ namespace TradersInRaid
                         float amount = Number(parts[2]);
                         hc.ChangeEnergy(-amount);
                         hc.ChangeHydration(-amount);
-                        hc.ChangeHealth(EBodyPart.Chest, -amount / 2f, default);
-                        hc.ChangeHealth(EBodyPart.LeftLeg, -amount / 2f, default);
+                        hc.ChangeHealth(EBodyPart.Chest, -amount / 2f, new EFT.Ballistics.DamageInfo { DamageType = EDamageType.Existence });
+                        hc.ChangeHealth(EBodyPart.LeftLeg, -amount / 2f, new EFT.Ballistics.DamageInfo { DamageType = EDamageType.Existence });
                     }
                     Report("health " + hc.GetBodyPartHealth(EBodyPart.Common).Current.ToString("F1") + "/" + hc.GetBodyPartHealth(EBodyPart.Common).Maximum.ToString("F0")
                            + ", energy " + hc.Energy.Current.ToString("F1") + ", water " + hc.Hydration.Current.ToString("F1")

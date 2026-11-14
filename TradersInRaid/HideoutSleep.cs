@@ -88,22 +88,17 @@ namespace TradersInRaid
             HideoutCrafting.AnnounceDue();
 
             // Sleeping is also where the game is saved.
-            SaveGame.Save("slept");
+            var saving = SaveGame.SaveNow("slept");
+            while (!saving.IsCompleted)
+            {
+                yield return null;
+            }
 
             yield return new WaitForSecondsRealtime(1.0f);
             RoomDoor.FadeText = null;
             yield return RoomDoor.FadeTo(0f);
             NotificationManager.DisplayMessageNotification(outcome, ENotificationDurationType.Long);
             _sleeping = false;
-        }
-    }
-
-    /// <summary>Saving at a bed. Filled in with the save stage; until then it only says so in the log.</summary>
-    public static class SaveGame
-    {
-        public static void Save(string reason)
-        {
-            Plugin.Log.LogInfo("Save requested (" + reason + "); saving is not built yet");
         }
     }
 }

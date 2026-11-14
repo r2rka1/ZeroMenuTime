@@ -127,6 +127,11 @@ namespace TradersInRaid
 
         public static async void Send(string reason)
         {
+            await SendAsync(reason);
+        }
+
+        public static async System.Threading.Tasks.Task SendAsync(string reason)
+        {
             if (!_running)
             {
                 return;

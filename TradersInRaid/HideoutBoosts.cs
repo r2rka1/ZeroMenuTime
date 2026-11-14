@@ -94,7 +94,7 @@ namespace TradersInRaid
                 }
                 var hurt = health.GetBodyPartHealth(worst);
                 float given = Mathf.Min(pool, hurt.Maximum - hurt.Current);
-                health.ChangeHealth(worst, given, default);
+                health.ChangeHealth(worst, given, new EFT.Ballistics.DamageInfo { DamageType = EDamageType.Existence });
                 pool -= given;
             }
         }

@@ -43,6 +43,23 @@ namespace TradersInRaid
             // Let the menu finish building before putting a window on top of it.
             yield return new WaitForSecondsRealtime(1.5f);
 
+            // With a save, there is nothing to ask: the character wakes up at the bed it saved at.
+            var asking = SaveGame.Status(false);
+            while (!asking.IsCompleted)
+            {
+                yield return null;
+            }
+            var status = asking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? asking.Result : null;
+            if (status != null && ((bool?)status["Has"] ?? false))
+            {
+                string bed = (string)status["Hideout"];
+                Plugin.Log.LogInfo("Died with a save; the next raid begins at the bed of hideout '" + bed + "'");
+                NotificationManager.DisplayMessageNotification("You died. Your last save was put back; you will wake up at your bed in the "
+                    + char.ToUpper(bed[0]) + bed.Substring(1) + " hideout.", ENotificationDurationType.Long);
+                _asking = false;
+                yield break;
+            }
+
             var ui = ItemUiContext.Instance;
             if (ui == null)
             {

@@ -133,7 +133,8 @@ public class TradersInRaidRouter(
     HandbookHelper handbookHelper,
     SPTarkov.Server.Core.Helpers.Quest.QuestHelper questHelper,
     SPTarkov.Server.Core.Utils.Cloners.ICloner cloner,
-    HideoutsService hideouts) : StaticRouter(jsonUtil, [
+    HideoutsService hideouts,
+    SaveGameService saves) : StaticRouter(jsonUtil, [
     new RouteAction<TradeReport>(
         "/tradersinraid/trade",
         (_, payload, sessionId, _, _) =>
@@ -158,6 +159,14 @@ public class TradersInRaidRouter(
         "/tradersinraid/quest/rewards",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(TableRewards.Deliver(sessionId, payload, profileHelper, questHelper, cloner)) ?? "{}")
+    ),
+    new RouteAction<SaveRequest>(
+        "/tradersinraid/save",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.Save(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<SaveRequest>(
+        "/tradersinraid/save/status",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.Status(sessionId, payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/tradersinraid/clock",

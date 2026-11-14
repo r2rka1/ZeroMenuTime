@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Comfort.Common;
 using EFT;
 using EFT.InventoryLogic;
@@ -99,6 +100,11 @@ namespace TradersInRaid
 
         /// <summary>Tells the server what the stash holds now.</summary>
         public static async void Send(string reason)
+        {
+            await SendAsync(reason);
+        }
+
+        public static async Task SendAsync(string reason)
         {
             if (_stash == null || _hideout == null || _sending)
             {

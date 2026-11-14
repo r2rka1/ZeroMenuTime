@@ -43,6 +43,9 @@ namespace TradersInRaid
         /// <summary>The hideout the player is standing in, or null.</summary>
         public static string Inside;
 
+        /// <summary>For each hideout with a door on this map: where one stands in front of it, and the way one faces.</summary>
+        private static readonly Dictionary<string, KeyValuePair<Vector3, float>> Fronts = new Dictionary<string, KeyValuePair<Vector3, float>>();
+
         private static Vector3 _returnTo;
         private static float _returnYaw;
         private static bool _busy;
@@ -84,6 +87,7 @@ namespace TradersInRaid
         public static int Spawn(string map)
         {
             int placed = 0;
+            Fronts.Clear();
             foreach (var spot in Load())
             {
                 if (!spot.Enabled || spot.Position == null || spot.Position.Length < 3
@@ -113,6 +117,7 @@ namespace TradersInRaid
                 var back = ground + facing * new Vector3(0f, 0.05f, 1.0f);
                 float backYaw = spot.RotationY;
                 door.OnUse = () => Enter(id, back, backYaw);
+                Fronts[id] = new KeyValuePair<Vector3, float>(back, backYaw);
                 placed++;
                 Plugin.Log.LogInfo("Hideout door for '" + spot.Id + "' at " + ground.ToString("F1") + " facing " + spot.RotationY.ToString("F0"));
             }
@@ -136,6 +141,23 @@ namespace TradersInRaid
                 yield break;
             }
             yield return Prepare(false);
+
+            // After a death, or a crash since the last save, the raid begins at the bed.
+            var asking = SaveGame.Status(false);
+            while (!asking.IsCompleted)
+            {
+                yield return null;
+            }
+            var status = asking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? asking.Result : null;
+            string bed = status != null && ((bool?)status["Resume"] ?? false) ? (string)status["Hideout"] : null;
+            KeyValuePair<Vector3, float> front;
+            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null)
+            {
+                Plugin.Log.LogInfo("Waking up at the bed of hideout '" + bed + "'");
+                var consumed = SaveGame.Status(true);
+                Enter(bed, front.Key, front.Value);
+                NotificationManager.DisplayMessageNotification("You wake up at your bed.", ENotificationDurationType.Long);
+            }
         }
 
         /// <summary>Loads the interior if need be and puts it in place under the map.</summary>

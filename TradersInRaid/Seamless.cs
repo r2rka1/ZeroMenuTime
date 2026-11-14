@@ -273,6 +273,19 @@ namespace TradersInRaid
         public static void Prefix(ExitStatus exitStatus, string exitName)
         {
             // The hideout interior must not outlive the raid it was loaded into.
+            // A record the server cannot read would make it refuse the whole raid result.
+            try
+            {
+                var leaving = GamePlayerOwner.MyPlayer;
+                if (leaving != null)
+                {
+                    SaveGame.CleanDamageRecords(leaving.Profile);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Cleaning damage records failed: " + e.Message);
+            }
             WorldClock.End();
             HideoutDoors.Close();
             try
