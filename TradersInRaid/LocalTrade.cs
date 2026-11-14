@@ -142,6 +142,12 @@ namespace TradersInRaid
             }
         }
 
+        /// <summary>A free place for the item in what the player carries, or null.</summary>
+        public static ItemAddress RoomFor(Player player, Item item)
+        {
+            return FindRoom(player, item);
+        }
+
         private static ItemAddress FindRoom(Player player, Item item)
         {
             foreach (var grid in CarriedGrids(player))

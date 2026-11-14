@@ -227,6 +227,7 @@ namespace TradersInRaid
                 yield break;
             }
             HideoutStations.Read(reply);
+            HideoutStash.Read(id, reply);
 
             if (!HideoutBunker.Loaded)
             {
@@ -293,8 +294,10 @@ namespace TradersInRaid
         /// <summary>Puts the map's own light back. The interior stays loaded for the next visit.</summary>
         private static void StepOut()
         {
+            HideoutStash.Send("leaving");
             Inside = null;
             HideoutStations.Clear();
+            HideoutStash.Clear();
             HideoutBunker.Sun(true);
             if (HideoutBunker.RaidSettings != null)
             {
@@ -310,8 +313,13 @@ namespace TradersInRaid
         /// <summary>Puts the map back as it was and lets the bunker go. Safe to call at any time.</summary>
         public static async System.Threading.Tasks.Task Close()
         {
+            if (Inside != null)
+            {
+                HideoutStash.Send("raid ending");
+            }
             Inside = null;
             HideoutStations.Clear();
+            HideoutStash.Clear();
             try
             {
                 HideoutBunker.Sun(true);

@@ -3,9 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using BepInEx.Configuration;
 using EFT;
+using EFT.InventoryLogic;
+using Diz.Jobs;
+using EFT.UI;
+using EFT.Trading;
 using UnityEngine;
 
 namespace TradersInRaid
@@ -16,7 +21,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | use | target | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -270,6 +275,96 @@ namespace TradersInRaid
                     float y2 = player.Transform.position.y;
                     Report((Mathf.Abs(y2 - y1) < 0.05f ? "PASS" : "FAILED") + " standing still (y " + y1.ToString("F2") + " -> " + y2.ToString("F2") + "), inside hideout: " + (HideoutDoors.Inside ?? "none") + ", bunker loaded: " + HideoutBunker.Loaded);
                     Status(player);
+                    break;
+                }
+                case "stash":
+                {
+                    // stash | stash open | stash put TEMPLATE [COUNT] | stash take TEMPLATE | stash save
+                    string what = parts.Length > 1 ? parts[1].ToLowerInvariant() : "list";
+                    var stash = HideoutStash.Current;
+                    if (stash == null)
+                    {
+                        Report("FAILED no hideout stash (not inside a hideout?)");
+                        break;
+                    }
+                    if (what == "open")
+                    {
+                        Report(HideoutStash.Open() ? "stash screen asked for" : "FAILED could not open");
+                        yield return new WaitForSecondsRealtime(1.5f);
+                    }
+                    else if (what == "put" && parts.Length > 2)
+                    {
+                        // Moves carried items of that kind into the stash, the way dragging them would.
+                        int wanted = parts.Length > 3 ? (int)Number(parts[3]) : 1, moved = 0;
+                        foreach (var item in LocalTrade.CarriedItems(player).Where(x => x.TemplateId == parts[2]).ToList())
+                        {
+                            if (moved >= wanted)
+                            {
+                                break;
+                            }
+                            var place = stash.Grids[0].FindLocationForItem(item);
+                            if (place == null)
+                            {
+                                Report("FAILED no room in the stash");
+                                break;
+                            }
+                            var move = ItemManipulator.Move(item, place, player.InventoryController, false);
+                            if (move.Failed)
+                            {
+                                Report("FAILED move: " + move.Error);
+                                break;
+                            }
+                            move.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                            move.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                            moved++;
+                        }
+                        Report("moved " + moved + " into the stash");
+                    }
+                    else if (what == "take" && parts.Length > 2)
+                    {
+                        var item = HideoutStash.Items().FirstOrDefault(x => x.TemplateId == parts[2]);
+                        if (item == null)
+                        {
+                            Report("FAILED not in the stash");
+                        }
+                        else
+                        {
+                            // Moved, as dragging it out would; not created anew.
+                            var room = LocalTrade.RoomFor(player, item);
+                            var move = room == null ? default : ItemManipulator.Move(item, room, player.InventoryController, false);
+                            if (room == null || move.Failed)
+                            {
+                                Report("FAILED could not take it: " + (room == null ? "no room in carried gear" : move.Error.ToString()));
+                            }
+                            else
+                            {
+                                move.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                                move.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                                Report("took " + HideoutStations.ItemName(parts[2]) + " out of the stash");
+                            }
+                        }
+                    }
+                    else if (what == "close")
+                    {
+                        player.GetComponent<GamePlayerOwner>().CloseInventoryIfOpen();
+                        yield return new WaitForSecondsRealtime(1.5f);
+                        Report("gear screen closed");
+                    }
+                    else if (what == "save")
+                    {
+                        HideoutStash.Send("test");
+                        yield return new WaitForSecondsRealtime(1.5f);
+                    }
+                    var names = new Dictionary<string, int>();
+                    foreach (var item in HideoutStash.Items())
+                    {
+                        string name = HideoutStations.ItemName(item.TemplateId);
+                        int count;
+                        names.TryGetValue(name, out count);
+                        names[name] = count + Mathf.Max(1, item.StackObjectsCount);
+                    }
+                    Report("stash of '" + HideoutDoors.Inside + "': " + HideoutStash.Count() + " item(s): "
+                           + string.Join(", ", names.Select(pair => pair.Value + " " + pair.Key).Take(25).ToArray()));
                     break;
                 }
                 case "stations":

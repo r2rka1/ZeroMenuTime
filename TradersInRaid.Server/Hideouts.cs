@@ -358,11 +358,33 @@ public sealed class HideoutsService(
     {
         return Guarded(sessionId, request, true, (pmc, store) =>
         {
-            var items = request.Items ?? [];
             string? stashId = pmc.Inventory!.Stash?.ToString();
             if (stashId == null)
             {
                 return new HideoutResponse { Error = "The profile has no stash" };
+            }
+            // Only what really hangs off the stash is accepted. The stash itself, or anything
+            // attached to some other container, would damage the profile if it were written in.
+            var sent = request.Items ?? [];
+            var reach = new HashSet<string> { stashId };
+            var items = new List<Item>();
+            bool grew = true;
+            while (grew)
+            {
+                grew = false;
+                foreach (var item in sent)
+                {
+                    string id = item.Id.ToString();
+                    if (id != stashId && item.ParentId != null && reach.Contains(item.ParentId) && reach.Add(id))
+                    {
+                        items.Add(item);
+                        grew = true;
+                    }
+                }
+            }
+            if (items.Count != sent.Count)
+            {
+                Console.WriteLine("[TradersInRaid] Stash of hideout '" + request.Id + "': ignored " + (sent.Count - items.Count) + " item(s) that are not inside the stash.");
             }
             if (store.Active == request.Id)
             {

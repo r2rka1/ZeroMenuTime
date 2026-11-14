@@ -235,12 +235,15 @@ namespace TradersInRaid
 
         // ---------------------------------------------------------------- building
 
-        /// <summary>Carried items that may be spent: whatever sits in a pack, rig, pockets or case, not what is worn or held.</summary>
+        /// <summary>Items that may be spent: whatever sits in a carried pack, rig, pockets or case (not what is worn or held), and the hideout's stash.</summary>
         private static List<Item> Spendable(Player player)
         {
             var equipment = player.Profile.Inventory.Equipment;
             var worn = new HashSet<Item>(equipment.GetAllSlots().Select(slot => slot.ContainedItem).Where(item => item != null));
-            return LocalTrade.CarriedItems(player).Where(item => !worn.Contains(item) && item != equipment).ToList();
+            var spendable = LocalTrade.CarriedItems(player).Where(item => !worn.Contains(item) && item != equipment).ToList();
+            // Carried first, then whatever is in this hideout's stash.
+            spendable.AddRange(HideoutStash.Items());
+            return spendable;
         }
 
         public static string ItemName(string tpl)
@@ -331,6 +334,10 @@ namespace TradersInRaid
             Levels.TryGetValue(station.Area, out level);
             if (player == null || !NextCosts.ContainsKey(station.Area))
             {
+                if (station.Area == (int)EAreaType.Stash && HideoutStash.Current != null)
+                {
+                    state.Actions.Add(new InteractionAction { Name = "Open stash", Action = () => HideoutStash.Open(), Disabled = false });
+                }
                 state.Actions.Add(new InteractionAction
                 {
                     Name = station.StationName + " (level " + level + ", fully built)",
@@ -338,6 +345,15 @@ namespace TradersInRaid
                     Disabled = true,
                 });
                 return state;
+            }
+            if (station.Area == (int)EAreaType.Stash && HideoutStash.Current != null)
+            {
+                state.Actions.Add(new InteractionAction
+                {
+                    Name = "Open stash",
+                    Action = () => HideoutStash.Open(),
+                    Disabled = false,
+                });
             }
             var tally = Tally(player, station.Area);
             bool affordable = tally.All(pair => pair.Value >= pair.Key.Count);
@@ -387,7 +403,7 @@ namespace TradersInRaid
                 foreach (var pair in tally)
                 {
                     int left = pair.Key.Count;
-                    foreach (var item in Spendable(player).Where(item => item.TemplateId == pair.Key.Tpl).OrderBy(item => item.StackObjectsCount).ToList())
+                    foreach (var item in Spendable(player).Where(item => item.TemplateId == pair.Key.Tpl).ToList())
                     {
                         if (left <= 0)
                         {
@@ -412,6 +428,7 @@ namespace TradersInRaid
                     return "server refused: " + reply["Error"];
                 }
                 Read(reply);
+                HideoutStash.Send("after building");
                 int level;
                 Levels.TryGetValue(area, out level);
                 var controller = Controller();
