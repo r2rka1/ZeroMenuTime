@@ -50,9 +50,21 @@ namespace TheTrueSPT
             _name = name;
             _nextRedraw = Time.unscaledTime + 10f;
             Build();
+            Refresh();
             GamePlayerOwner.SetIgnoreInputInNPCDialog(true);
             // While the player walks about, the game keeps its interface deaf to the mouse.
             Listen(true);
+        }
+
+        /// <summary>Asks the server how things stand right now, and draws the window again with the answer.</summary>
+        private static async void Refresh()
+        {
+            int area = _area;
+            await WorldClock.SendAsync(null);
+            if (_canvas != null && _area == area && !_busy)
+            {
+                Build();
+            }
         }
 
         public static void Close()
@@ -106,11 +118,12 @@ namespace TheTrueSPT
                 CursorSwitcher.SetCursorLockMode(true, Screen.fullScreenMode);
                 Cursor.visible = true;
             }
-            if (Time.unscaledTime >= _nextRedraw && !_busy && (_area == HideoutPower.Generator || _area == HideoutPower.BitcoinFarm))
+            if (Time.unscaledTime >= _nextRedraw && !_busy && (_area == HideoutPower.Generator || _area == HideoutPower.BitcoinFarm
+                                                              || _area == HideoutPower.WaterCollector || (_area == HideoutPower.ScavCase && !string.IsNullOrEmpty(HideoutPower.ScavRecipe))))
             {
                 // Fuel and mining tick along with the clock.
                 _nextRedraw = Time.unscaledTime + 10f;
-                Build();
+                Refresh();
             }
             if (Time.unscaledTime >= _nextRefresh)
             {
@@ -256,6 +269,10 @@ namespace TheTrueSPT
             {
                 Space(left, 14f);
                 Heading(left, "FUEL");
+                if (HideoutPower.FuelFactor < 1)
+                {
+                    Text(left, "<color=" + Good + ">Solar Power is built: the generator burns half the fuel.</color>", 15f, Ink, false);
+                }
                 Text(left, HideoutPower.Powered ? "Running. The fuel lasts another " + WorldClock.Span(HideoutPower.FuelLasts) + "  <color=" + Faint + ">(" + Played(HideoutPower.FuelLasts) + ")</color>"
                     : HideoutPower.Fuel.Count == 0 ? "Off, and empty. Put a fuel can in." : "Off.", 17f, Ink, false);
                 for (int i = 0; i < HideoutPower.Fuel.Count; i++)
@@ -297,6 +314,39 @@ namespace TheTrueSPT
                     }
                     Button(left, lampLevel == 0 ? "PUT UP CANDLES" : lampLevel == 1 ? "FIT LIGHT BULBS" : "FIT FLUORESCENT LAMPS",
                         () => Do(() => HideoutStations.Build(lamps, "Illumination")), lampsAffordable && !_busy, 300f);
+                }
+            }
+            if (_area == HideoutPower.WaterCollector && level >= 1)
+            {
+                Space(left, 14f);
+                Heading(left, "CLEAN WATER");
+                if (level < 3)
+                {
+                    Text(left, "At level 3 the collector takes a water filter and fills bottles of clean water by itself.", 16f, Dim, false);
+                }
+                else
+                {
+                    var filter = HideoutPower.WaterFilter;
+                    if (filter != null)
+                    {
+                        var row = Node(left, "filter");
+                        Horizontal(row, 12f);
+                        Icon(row, filter.Tpl, 40f);
+                        Flexible(Text(row, HideoutStations.FullName(filter.Tpl) + "  <color=" + Faint + ">" + filter.Left.ToString("0") + " / " + filter.Max.ToString("0") + "</color>", 17f, Ink, false).gameObject, 1f, 0f);
+                        Button(row, "TAKE OUT", () => Do(HideoutPower.TakeFilter), !_busy, 120f);
+                    }
+                    else
+                    {
+                        int filters = HideoutStations.IsFree ? 1 : HideoutPower.FiltersAtHand(player).Count;
+                        Text(left, "No filter in. You have " + (HideoutStations.IsFree ? "free filters" : filters + " at hand") + ".", 16f, Ink, false);
+                        Button(left, "FIT A FILTER", () => Do(HideoutPower.AddFilter), filters > 0 && !_busy, 220f);
+                    }
+                    Row(left, HideoutPower.CleanWater, "Bottles ready", HideoutPower.Water + " / " + HideoutPower.WaterCap, 40f);
+                    Text(left, HideoutPower.Water >= HideoutPower.WaterCap ? "Full. Collect to carry on."
+                        : HideoutPower.NextWaterIn < 0 ? "Nothing is being collected."
+                        : "Next one in " + WorldClock.Span(HideoutPower.NextWaterIn) + "  <color=" + Faint + ">(" + Played(HideoutPower.NextWaterIn) + ")</color>", 16f, Ink, false);
+                    Button(left, "COLLECT", () => Do(HideoutPower.CollectWater), HideoutPower.Water > 0 && !_busy, 220f);
+                    Text(left, "It needs no power, only a filter, which wears out as it works.", 15f, Dim, false);
                 }
             }
             if (_area == HideoutPower.BitcoinFarm && level >= 1)
@@ -363,6 +413,13 @@ namespace TheTrueSPT
             var right = Node(body, "right");
             Vertical(right, 10f, new RectOffset(0, 0, 0, 0));
             Flexible(right.gameObject, 1f, 1f);
+            if (_area == HideoutPower.ScavCase && level >= 1)
+            {
+                ScavCase(right, player);
+                _note = Text(column, "", 16f, Gold, false);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_window);
+                return;
+            }
             Heading(right, "CRAFTING");
 
             var craft = HideoutCrafting.Here.FirstOrDefault(c => c.Area == _area);
@@ -440,6 +497,46 @@ namespace TheTrueSPT
 
             _note = Text(column, "", 16f, Gold, false);
             LayoutRebuilder.ForceRebuildLayoutImmediate(_window);
+        }
+
+        /// <summary>The scav case: pay, wait, and see what they bring back.</summary>
+        private static void ScavCase(RectTransform right, Player player)
+        {
+            Heading(right, "SCAV CASE");
+            _shownCraft = null;
+            _status = null;
+            if (!string.IsNullOrEmpty(HideoutPower.ScavRecipe))
+            {
+                double left = HideoutPower.ScavDue - WorldClock.Now;
+                var card = Card(right);
+                Text(card, "The scavs are out.", 22f, Ink, true);
+                Text(card, left <= 0 ? "<color=" + Good + ">They are back.</color>" : "Back in " + WorldClock.Span(left) + "  <color=" + Faint + ">(" + Played(left) + ")</color>", 18f, Ink, false);
+                Text(card, "What they bring goes into the stash.", 15f, Dim, false);
+                Button(card, "SEE WHAT THEY BROUGHT", () => Do(HideoutPower.CollectScavs), left <= 0 && !_busy, 320f);
+                return;
+            }
+            Text(right, "Pay the scavs and they go out looking. The more you pay, the better the finds.", 16f, Dim, false);
+            var spendable = HideoutStations.Spendable(player);
+            var list = Scroll(right);
+            foreach (var offer in HideoutPower.ScavOffers.OrderBy(o => o.Seconds))
+            {
+                var card = Card(list);
+                var top = Node(card, "top");
+                Horizontal(top, 14f);
+                bool affordable = true;
+                foreach (var cost in offer.Items)
+                {
+                    int have = spendable.Where(item => item.TemplateId == cost.Tpl).Sum(item => item.StackObjectsCount);
+                    have = HideoutStations.IsFree ? Mathf.Max(have, cost.Count) : have;
+                    affordable &= have >= cost.Count;
+                    Icon(top, cost.Tpl, 56f);
+                    Flexible(Text(top, cost.Count.ToString("N0") + " × " + HideoutStations.FullName(cost.Tpl) + "   " + Stock(have, cost.Count), 19f, Ink, true).gameObject, 1f, 0f);
+                }
+                Text(top, WorldClock.Span(offer.Seconds) + "  <color=" + Faint + ">" + Played(offer.Seconds) + "</color>", 16f, Ink, false).alignment = TextAlignmentOptions.MidlineRight;
+                Text(card, "Brings back: common " + offer.Common + ", rare " + offer.Rare + ", very rare " + offer.Superrare + ".", 16f, Dim, false);
+                var chosen = offer;
+                Button(card, "SEND THEM", () => Do(() => HideoutPower.SendScavs(chosen)), affordable && !_busy, 200f);
+            }
         }
 
         private static string Amount(string product, int count)

@@ -141,6 +141,13 @@ namespace TheTrueSPT
             try
             {
                 var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/thetruespt/clock", JsonConvert.SerializeObject(new { Seconds = seconds })));
+                // The answer says how the hideout stands at that time: fuel burnt, crafts and
+                // bottles finished. Inside the hideout that is what the windows must show.
+                if (HideoutDoors.Inside != null && ((bool?)reply["Ok"] ?? false))
+                {
+                    HideoutPower.Read(reply);
+                    HideoutCrafting.Read(reply);
+                }
                 if (reason != null)
                 {
                     Plugin.Log.LogInfo("World clock sent (" + reason + "): " + Describe(seconds) + ", server ok: " + ((bool?)reply["Ok"] ?? false));

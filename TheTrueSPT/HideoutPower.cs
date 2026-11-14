@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Comfort.Common;
 using EFT;
 using EFT.InventoryLogic;
+using JsonType;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SPT.Common.Http;
@@ -29,6 +30,24 @@ namespace TheTrueSPT
         public const int Generator = 4, BoozeGenerator = 19, BitcoinFarm = 20;
         public static readonly string[] FuelKinds = { "5d1b36a186f7742523398433", "5d1b371186f774253763a656" };
         public const string Card = "57347ca924597744596b4e71", Coin = "59faff1d86f7746c51718c9c";
+        public const int WaterCollector = 6, ScavCase = 14;
+        public const string WaterFilterKind = "5d1b385e86f774252167b98a", CleanWater = "5d1b33a686f7742523398398";
+
+        public class Offer
+        {
+            public string Id, Common, Rare, Superrare;
+            public double Seconds;
+            public List<HideoutStations.Cost> Items = new List<HideoutStations.Cost>();
+        }
+
+        public static Can WaterFilter;
+        public static int Water, WaterCap = 3;
+        public static double FuelFactor = 1;
+        private static double _nextWaterIn = -1;
+        public static double NextWaterIn => _nextWaterIn < 0 ? -1 : Math.Max(0, _nextWaterIn - (WorldClock.Now - _readAt));
+        public static readonly List<Offer> ScavOffers = new List<Offer>();
+        public static string ScavRecipe = "";
+        public static double ScavDue;
 
         public static bool On, Powered;
         public static readonly List<Can> Fuel = new List<Can>();
@@ -59,6 +78,28 @@ namespace TheTrueSPT
             _fuelLasts = (double?)power["FuelLasts"] ?? 0;
             _nextCoinIn = (double?)power["NextCoinIn"] ?? -1;
             _readAt = WorldClock.Now;
+            var filter = power["WaterFilter"] as JObject;
+            WaterFilter = filter == null ? null : new Can { Tpl = (string)filter["Tpl"], Left = (double?)filter["Left"] ?? 0, Max = (double?)filter["Max"] ?? 0 };
+            Water = (int?)power["Water"] ?? 0;
+            WaterCap = (int?)power["WaterCap"] ?? 3;
+            _nextWaterIn = (double?)power["NextWaterIn"] ?? -1;
+            FuelFactor = (double?)power["FuelFactor"] ?? 1;
+            ScavRecipe = (string)power["ScavRecipe"] ?? "";
+            ScavDue = (double?)power["ScavDue"] ?? 0;
+            ScavOffers.Clear();
+            foreach (var entry in power["ScavOffers"] as JArray ?? new JArray())
+            {
+                var offer = new Offer
+                {
+                    Id = (string)entry["Id"], Seconds = (double?)entry["Seconds"] ?? 0,
+                    Common = (string)entry["Common"], Rare = (string)entry["Rare"], Superrare = (string)entry["Superrare"],
+                };
+                foreach (var cost in entry["Items"] as JArray ?? new JArray())
+                {
+                    offer.Items.Add(new HideoutStations.Cost { Tpl = (string)cost["Tpl"], Count = (int)cost["Count"] });
+                }
+                ScavOffers.Add(offer);
+            }
             Fuel.Clear();
             foreach (var can in power["Fuel"] as JArray ?? new JArray())
             {
@@ -351,6 +392,146 @@ namespace TheTrueSPT
                 HideoutStash.Send("after removing a card");
             }
             return "Card taken out; it is in the stash.";
+        }
+
+        public static List<Item> FiltersAtHand(Player player)
+        {
+            return Carried(player, item => item.TemplateId == WaterFilterKind && Left(item) > 0.01f);
+        }
+
+        public static async Task<string> AddFilter()
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            if (player == null || HideoutDoors.Inside == null)
+            {
+                return "not possible right now";
+            }
+            string tpl = WaterFilterKind;
+            double left = 100, max = 100;
+            if (!HideoutStations.IsFree)
+            {
+                var filter = FiltersAtHand(player).OrderByDescending(Left).FirstOrDefault();
+                if (filter == null)
+                {
+                    return "You have no water filter at hand.";
+                }
+                var resource = filter.GetItemComponent<ResourceComponent>();
+                left = resource.Value;
+                max = resource.MaxResource;
+                if (!await LocalTrade.Take(player, filter, 1))
+                {
+                    return "Could not hand over the filter.";
+                }
+            }
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "filter", Tpl = tpl, Left = left, Max = max, Seconds = WorldClock.Now });
+            HideoutStash.Send("after fitting a filter");
+            return Refused(reply) ?? "Filter fitted.";
+        }
+
+        public static async Task<string> TakeFilter()
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "unfilter", Seconds = WorldClock.Now });
+            string refused = Refused(reply);
+            if (refused != null || player == null)
+            {
+                return refused;
+            }
+            var taken = reply["Power"]["Taken"] as JObject;
+            if (taken != null && !HideoutStations.IsFree)
+            {
+                var item = Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), (string)taken["Tpl"], null);
+                var resource = item.GetItemComponent<ResourceComponent>();
+                if (resource != null)
+                {
+                    resource.Value = (float)((double?)taken["Left"] ?? 0);
+                }
+                await HideoutCrafting.PutItem(player, item);
+                HideoutStash.Send("after taking the filter out");
+            }
+            return "Filter taken out; it is in the stash.";
+        }
+
+        public static async Task<string> CollectWater()
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "water", Seconds = WorldClock.Now });
+            string refused = Refused(reply);
+            if (refused != null || player == null)
+            {
+                return refused;
+            }
+            int bottles = (int?)reply["Power"]["WaterTaken"] ?? 0;
+            if (bottles > 0)
+            {
+                await HideoutCrafting.PutInStash(player, CleanWater, bottles);
+                HideoutStash.Send("after collecting water");
+            }
+            return bottles > 0 ? bottles + " bottle(s) of clean water put in the stash." : "Nothing to collect yet.";
+        }
+
+        public static async Task<string> SendScavs(Offer offer)
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            if (player == null || HideoutDoors.Inside == null)
+            {
+                return "not possible right now";
+            }
+            if (!HideoutStations.IsFree)
+            {
+                var spendable = HideoutStations.Spendable(player);
+                foreach (var cost in offer.Items)
+                {
+                    if (spendable.Where(item => item.TemplateId == cost.Tpl).Sum(item => item.StackObjectsCount) < cost.Count)
+                    {
+                        return "You do not have " + cost.Count + " " + HideoutStations.FullName(cost.Tpl) + ".";
+                    }
+                }
+            }
+            string failure = await HideoutStations.Pay(player, offer.Items);
+            if (failure != null)
+            {
+                return failure;
+            }
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "scav", Recipe = offer.Id, Seconds = WorldClock.Now });
+            HideoutStash.Send("after paying the scavs");
+            return Refused(reply) ?? "The scavs are out. Back in " + WorldClock.Span(offer.Seconds) + ".";
+        }
+
+        public static async Task<string> CollectScavs()
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "scavcollect", Seconds = WorldClock.Now });
+            string refused = Refused(reply);
+            if (refused != null || player == null)
+            {
+                return refused;
+            }
+            int finds = 0;
+            foreach (var find in reply["Power"]["ScavLoot"] as JArray ?? new JArray())
+            {
+                try
+                {
+                    var flat = find.ToString().ParseJsonTo<FlatItem[]>();
+                    if (flat.Length == 0)
+                    {
+                        continue;
+                    }
+                    var tree = Singleton<ItemFactory>.Instance.FlatItemsToTree(flat, true);
+                    Item root;
+                    // The find itself is the first of its list; the rest are its parts.
+                    if (tree.Items != null && tree.Items.TryGetValue(flat[0]._id, out root) && await HideoutCrafting.PutItem(player, root))
+                    {
+                        finds++;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning("A scav case find could not be made: " + e.Message);
+                }
+            }
+            HideoutStash.Send("after the scavs came back");
+            return "The scavs brought back " + finds + " thing(s); they are in the stash.";
         }
 
         public static async Task<string> CollectCoins()

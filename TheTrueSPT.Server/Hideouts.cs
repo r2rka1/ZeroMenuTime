@@ -81,6 +81,29 @@ public sealed class HideoutPower
     public double CoinProgress { get; set; }
     /// <summary>The clock reading this was last worked out at.</summary>
     public double Settled { get; set; }
+    /// <summary>The water collector's filter, the bottles of clean water waiting, and how far along the next is.</summary>
+    public FuelCan? WaterFilter { get; set; }
+    public int Water { get; set; }
+    public double WaterProgress { get; set; }
+    /// <summary>True once the water collector is at the level that works by itself.</summary>
+    public bool WaterWorks { get; set; }
+    /// <summary>How much of the usual fuel the generator burns: half with Solar Power built.</summary>
+    public double FuelFactor { get; set; } = 1;
+    /// <summary>The scav case run under way: which offer, and when the scavs are back.</summary>
+    public string ScavRecipe { get; set; } = "";
+    public double ScavDue { get; set; }
+}
+
+/// <summary>One thing the scav case can be sent out for.</summary>
+public sealed class ScavOffer
+{
+    public string Id { get; set; } = "";
+    public double Seconds { get; set; }
+    public List<HideoutCost> Items { get; set; } = [];
+    /// <summary>How many finds of each kind it brings back, as "least-most".</summary>
+    public string Common { get; set; } = "";
+    public string Rare { get; set; } = "";
+    public string Superrare { get; set; } = "";
 }
 
 /// <summary>What the client is told about the power of the hideout in use.</summary>
@@ -105,6 +128,18 @@ public sealed class PowerReport
     public FuelCan? Taken { get; set; }
     /// <summary>In answer to collecting: how many bitcoins were handed over.</summary>
     public int CoinsTaken { get; set; }
+    public FuelCan? WaterFilter { get; set; }
+    public int Water { get; set; }
+    public int WaterCap { get; set; }
+    /// <summary>Game seconds until the next bottle; below zero when nothing is being collected.</summary>
+    public double NextWaterIn { get; set; }
+    public int WaterTaken { get; set; }
+    public double FuelFactor { get; set; }
+    public List<ScavOffer> ScavOffers { get; set; } = [];
+    public string ScavRecipe { get; set; } = "";
+    public double ScavDue { get; set; }
+    /// <summary>In answer to collecting the scav case: what was brought back, each find with its parts.</summary>
+    public List<List<Item>> ScavLoot { get; set; } = [];
 }
 
 public sealed class HideoutStore
@@ -208,7 +243,8 @@ public sealed class HideoutsService(
     EventOutputHolder eventOutputHolder,
     HideoutTable hideoutTable,
     ICloner cloner,
-    JsonUtil jsonUtil)
+    JsonUtil jsonUtil,
+    SPTarkov.Server.Core.Generators.ScavCaseRewardGenerator scavCaseRewardGenerator)
 {
     public const string First = "streets";
     public static readonly string[] Known = ["streets", "customs", "shoreline"];
@@ -488,6 +524,12 @@ public sealed class HideoutsService(
                 var store = Load(sessionId.ToString());
                 // The three doors lead to the one hideout; whichever was named, it is that one.
                 request.Id = store.Active;
+                // What the stations' levels mean for the running count is noted before any of it
+                // is worked out: a solar panel halves the fuel burnt, a level 3 collector fills bottles.
+                var built = (pmc.Hideout.Areas ?? []).ToDictionary(a => (int)a.Type, a => a.Level ?? 0);
+                var running = PowerOf(store, store.Active);
+                running.FuelFactor = built.GetValueOrDefault(SolarPower) >= 1 ? 0.5 : 1;
+                running.WaterWorks = built.GetValueOrDefault(WaterCollector) >= 3;
                 return work(pmc, store);
             }
         }
@@ -582,7 +624,10 @@ public sealed class HideoutsService(
     private const double GpuBoost = 0.041225;
     private const double SecondsPerCoin = 145000;
     private const int CoinCap = 3;
-    public const int Generator = 4, BoozeGenerator = 19, BitcoinFarm = 20;
+    public const int Generator = 4, BoozeGenerator = 19, BitcoinFarm = 20, WaterCollector = 6, SolarPower = 18, ScavCase = 14;
+    private const double FilterPerSecond = 0.00333;
+    private const double SecondsPerWater = 19500;
+    private const int WaterCap = 3;
 
     private static HideoutPower PowerOf(HideoutStore store, string id)
     {
@@ -619,8 +664,9 @@ public sealed class HideoutsService(
             if (power.On)
             {
                 double fuel = power.Fuel.Sum(can => can.Left);
-                powered = Math.Min(elapsed, fuel / FuelPerSecond);
-                double burn = powered * FuelPerSecond;
+                double rate = FuelPerSecond * (power.FuelFactor > 0 ? power.FuelFactor : 1);
+                powered = Math.Min(elapsed, fuel / rate);
+                double burn = powered * rate;
                 foreach (var can in power.Fuel)
                 {
                     double from = Math.Min(can.Left, burn);
@@ -643,6 +689,26 @@ public sealed class HideoutsService(
                     {
                         craft.Due += dark - already;
                     }
+                }
+            }
+            // The water collector needs no power, only a filter, and wears the filter out as it goes.
+            if (power.WaterWorks && power.WaterFilter != null && power.WaterFilter.Left > 0 && power.Water < WaterCap)
+            {
+                double filtering = Math.Min(elapsed, power.WaterFilter.Left / FilterPerSecond);
+                power.WaterFilter.Left -= filtering * FilterPerSecond;
+                power.WaterProgress += filtering / SecondsPerWater;
+                while (power.WaterProgress >= 1 && power.Water < WaterCap)
+                {
+                    power.Water++;
+                    power.WaterProgress -= 1;
+                }
+                if (power.Water >= WaterCap)
+                {
+                    power.WaterProgress = 0;
+                }
+                if (power.WaterFilter.Left <= 0.0001)
+                {
+                    power.WaterFilter = null;
                 }
             }
             if (powered > 0 && power.Gpus > 0 && power.Coins < CoinCap)
@@ -668,26 +734,62 @@ public sealed class HideoutsService(
     private static int FuelSlots(int generatorLevel) => generatorLevel <= 0 ? 0 : generatorLevel + 1;
     private static int GpuSlots(int farmLevel) => farmLevel switch { <= 0 => 0, 1 => 10, 2 => 25, _ => 50 };
 
-    private static PowerReport Report(HideoutStore store, string id, Dictionary<int, int> levels)
+    private PowerReport Report(HideoutStore store, string id, Dictionary<int, int> levels)
     {
         var power = PowerOf(store, id);
+        // What the stations' levels mean for the count is noted here, where the levels are known.
+        power.FuelFactor = levels.GetValueOrDefault(SolarPower) >= 1 ? 0.5 : 1;
+        power.WaterWorks = levels.GetValueOrDefault(WaterCollector) >= 3;
         double fuel = power.Fuel.Sum(can => can.Left);
         bool powered = power.On && fuel > 0.0001;
         double rate = power.Gpus > 0 ? (1 + (power.Gpus - 1) * GpuBoost) / SecondsPerCoin : 0;
-        return new PowerReport
+        var report = new PowerReport
         {
             On = power.On,
             Powered = powered,
             Fuel = power.Fuel,
             FuelSlots = FuelSlots(levels.GetValueOrDefault(Generator)),
-            FuelLasts = fuel / FuelPerSecond,
+            FuelLasts = fuel / (FuelPerSecond * power.FuelFactor),
+            FuelFactor = power.FuelFactor,
             Gpus = power.Gpus,
             GpuSlots = GpuSlots(levels.GetValueOrDefault(BitcoinFarm)),
             Coins = power.Coins,
             CoinCap = CoinCap,
             NextCoinIn = powered && rate > 0 && power.Coins < CoinCap ? (1 - power.CoinProgress) / rate : -1,
             SlowFactor = 1,
+            WaterFilter = power.WaterFilter,
+            Water = power.Water,
+            WaterCap = WaterCap,
+            NextWaterIn = power.WaterWorks && power.WaterFilter != null && power.Water < WaterCap ? (1 - power.WaterProgress) * SecondsPerWater : -1,
+            ScavRecipe = power.ScavRecipe,
+            ScavDue = power.ScavDue,
         };
+        foreach (var recipe in hideoutTable.Production.ScavRecipes ?? [])
+        {
+            var offer = new ScavOffer { Id = recipe.Id.ToString(), Seconds = recipe.ProductionTime ?? 0 };
+            foreach (var need in recipe.Requirements ?? [])
+            {
+                if (need.TemplateId != null && (need.Count ?? 0) > 0)
+                {
+                    offer.Items.Add(new HideoutCost { Tpl = need.TemplateId.Value.ToString(), Count = need.Count ?? 0 });
+                }
+            }
+            offer.Common = Range(recipe.EndProducts?.Common);
+            offer.Rare = Range(recipe.EndProducts?.Rare);
+            offer.Superrare = Range(recipe.EndProducts?.Superrare);
+            report.ScavOffers.Add(offer);
+        }
+        return report;
+    }
+
+    private static string Range(dynamic? range)
+    {
+        if (range == null)
+        {
+            return "0";
+        }
+        int least = (int)range.Min, most = (int)range.Max;
+        return least == most ? least.ToString() : least + "-" + most;
     }
 
     /// <summary>The generator's switch and fuel, and the bitcoin farm's cards and coins. Items are settled on the client.</summary>
@@ -703,7 +805,8 @@ public sealed class HideoutsService(
             var levels = (pmc.Hideout?.Areas ?? []).ToDictionary(a => (int)a.Type, a => a.Level ?? 0);
             var power = PowerOf(store, request.Id);
             FuelCan? taken = null;
-            int coins = 0;
+            int coins = 0, water = 0;
+            var loot = new List<List<Item>>();
             switch ((request.Action ?? "").ToLowerInvariant())
             {
                 case "on":
@@ -761,6 +864,61 @@ public sealed class HideoutsService(
                     coins = power.Coins;
                     power.Coins = 0;
                     break;
+                case "filter":
+                    if (levels.GetValueOrDefault(WaterCollector) < 3)
+                    {
+                        return new HideoutResponse { Error = "The water collector takes a filter from level 3" };
+                    }
+                    if (power.WaterFilter != null)
+                    {
+                        return new HideoutResponse { Error = "There is a filter in already" };
+                    }
+                    if (request.Left <= 0 || string.IsNullOrEmpty(request.Tpl))
+                    {
+                        return new HideoutResponse { Error = "That filter is used up" };
+                    }
+                    power.WaterFilter = new FuelCan { Tpl = request.Tpl, Left = request.Left, Max = Math.Max(request.Max, request.Left) };
+                    break;
+                case "unfilter":
+                    if (power.WaterFilter == null)
+                    {
+                        return new HideoutResponse { Error = "There is no filter in" };
+                    }
+                    taken = power.WaterFilter;
+                    power.WaterFilter = null;
+                    break;
+                case "water":
+                    water = power.Water;
+                    power.Water = 0;
+                    break;
+                case "scav":
+                {
+                    if (levels.GetValueOrDefault(ScavCase) < 1)
+                    {
+                        return new HideoutResponse { Error = "There is no scav case here yet" };
+                    }
+                    if (!string.IsNullOrEmpty(power.ScavRecipe))
+                    {
+                        return new HideoutResponse { Error = "The scavs are out already" };
+                    }
+                    var offer = (hideoutTable.Production.ScavRecipes ?? []).FirstOrDefault(r => r.Id.ToString() == request.Recipe);
+                    if (offer == null)
+                    {
+                        return new HideoutResponse { Error = "No such offer" };
+                    }
+                    power.ScavRecipe = request.Recipe;
+                    power.ScavDue = store.ClockSeconds + (offer.ProductionTime ?? 0);
+                    break;
+                }
+                case "scavcollect":
+                    if (string.IsNullOrEmpty(power.ScavRecipe) || power.ScavDue > store.ClockSeconds)
+                    {
+                        return new HideoutResponse { Error = "The scavs are not back yet" };
+                    }
+                    loot = scavCaseRewardGenerator.Generate(new MongoId(power.ScavRecipe)).ToList();
+                    power.ScavRecipe = "";
+                    power.ScavDue = 0;
+                    break;
                 default:
                     return new HideoutResponse { Error = "Unknown power action '" + request.Action + "'" };
             }
@@ -770,6 +928,8 @@ public sealed class HideoutsService(
             var response = Describe(pmc, store);
             response.Power!.Taken = taken;
             response.Power.CoinsTaken = coins;
+            response.Power.WaterTaken = water;
+            response.Power.ScavLoot = loot;
             return response;
         });
     }
