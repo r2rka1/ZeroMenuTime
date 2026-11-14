@@ -52,6 +52,7 @@ In game, press F12 and open The True SPT.
 | No menus | Seconds before continuing | 4 | Length of the countdown in the main menu |
 | No menus | Stay in menu key | Backspace | Hold during the countdown to stay in the menu |
 | Testing | Undying | off | Heal fully and take no damage |
+| Testing | Free hideout | off | Building, upgrading and crafting in a hideout need no materials and no tools |
 | Testing | Self-test key | F8 | Run the inventory steps a trade is made of and report |
 | Testing | Test harness | off | Carry out commands from a file in the running raid (see "Testing") |
 

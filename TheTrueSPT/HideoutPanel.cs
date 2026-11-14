@@ -50,6 +50,8 @@ namespace TheTrueSPT
             _name = name;
             Build();
             GamePlayerOwner.SetIgnoreInputInNPCDialog(true);
+            // While the player walks about, the game keeps its interface deaf to the mouse.
+            Listen(true);
         }
 
         public static void Close()
@@ -63,12 +65,25 @@ namespace TheTrueSPT
             _status = _note = null;
             _area = -1;
             GamePlayerOwner.SetIgnoreInputInNPCDialog(false);
+            Listen(false);
             try
             {
                 CursorSwitcher.SetCursorLockMode(false, Screen.fullScreenMode);
             }
             catch (Exception)
             {
+            }
+        }
+
+        private static void Listen(bool on)
+        {
+            try
+            {
+                UIEventSystem.Instance.SetTemporaryStatus(on);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hideout panel: could not switch the interface's mouse on or off: " + e.Message);
             }
         }
 
@@ -214,7 +229,7 @@ namespace TheTrueSPT
                 {
                     Text(left, "Needs nothing.", 18f, Dim, false);
                 }
-                Text(left, "Taken from what you carry, then from this hideout's stash. Built at once.", 15f, Dim, false);
+                Text(left, HideoutStations.IsFree ? "Free hideout is switched on (F12, Testing): nothing is taken." : "Taken from what you carry, then from this hideout's stash. Built at once.", 15f, Dim, false);
                 int area = _area;
                 string name = _name;
                 Button(left, level == 0 ? "BUILD" : "UPGRADE", () => Do(() => HideoutStations.Build(area, name)), affordable && !_busy, 220f);
@@ -295,11 +310,12 @@ namespace TheTrueSPT
                     foreach (var cost in recipe.Items)
                     {
                         int have = spendable.Where(item => item.TemplateId == cost.Tpl).Sum(item => item.StackObjectsCount);
+                        have = HideoutStations.IsFree ? Mathf.Max(have, cost.Count) : have;
                         needs.Add(HideoutStations.FullName(cost.Tpl) + " " + Stock(have, cost.Count));
                     }
                     foreach (string tool in recipe.Tools)
                     {
-                        bool have = spendable.Any(item => item.TemplateId == tool);
+                        bool have = HideoutStations.IsFree || spendable.Any(item => item.TemplateId == tool);
                         needs.Add(HideoutStations.FullName(tool) + " <color=" + (have ? Good : Bad) + ">" + (have ? "tool, at hand" : "tool, missing") + "</color>");
                     }
                     Text(card, needs.Count == 0 ? "Needs nothing." : string.Join("   <color=" + Faint + ">|</color>   ", needs.ToArray()), 16f, Dim, false).enableWordWrapping = true;

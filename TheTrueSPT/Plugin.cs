@@ -95,6 +95,8 @@ namespace TheTrueSPT
             CaptureKey = Config.Bind("General", "Capture position key", new KeyboardShortcut(KeyCode.F10),
                 "In raid: writes your current map and position to captured_positions.txt so a trader can be placed there.");
 
+            HideoutStations.Free = Config.Bind("Testing", "Free hideout", false,
+                "In a hideout: building, upgrading and crafting need no materials and no tools. For testing only; turn off for real play.");
             Undying = Config.Bind("Testing", "Undying", false,
                 "In raid: heals you fully and switches off all damage to you. For testing only; turn off for real play.");
             SelfTestKey = Config.Bind("Testing", "Self-test key", new KeyboardShortcut(KeyCode.F8),

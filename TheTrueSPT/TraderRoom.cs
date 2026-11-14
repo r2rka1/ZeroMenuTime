@@ -194,12 +194,13 @@ namespace TheTrueSPT
             try
             {
                 var timer = System.Diagnostics.Stopwatch.StartNew();
-                var player = EFT.GamePlayerOwner.MyPlayer;
-                var centre = player != null ? player.Transform.position : Vector3.zero;
+                // Measured from the middle of the world, never from where the player happens to be:
+                // a player who has fallen out of the map must not drag the box away with them.
+                var centre = Vector3.zero;
                 var world = new Bounds(centre, Vector3.one);
                 // Anything further out than this is not part of the playable map (sky boxes, kill
                 // planes), and stretching the box over it would only make the engine's grid coarser.
-                var limit = new Bounds(centre, new Vector3(6000f, 2000f, 6000f));
+                var limit = new Bounds(centre, new Vector3(9000f, 3000f, 9000f));
                 int counted = 0;
                 foreach (var collider in UnityEngine.Object.FindObjectsOfType<Collider>())
                 {
@@ -214,6 +215,12 @@ namespace TheTrueSPT
                         world.Encapsulate(bounds);
                         counted++;
                     }
+                }
+                if (counted < 500)
+                {
+                    // A map has tens of thousands; this few means the map was not what got measured.
+                    Plugin.Log.LogWarning("Physics box left alone: only " + counted + " colliders found");
+                    return;
                 }
                 world.Expand(20f);
                 Physics.RebuildBroadphaseRegions(world, 8);

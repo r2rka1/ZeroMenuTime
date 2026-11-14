@@ -175,6 +175,10 @@ namespace TheTrueSPT
         /// <summary>What a recipe still lacks, in words, or null if everything is at hand.</summary>
         public static string Missing(Player player, Recipe recipe)
         {
+            if (HideoutStations.IsFree)
+            {
+                return null;
+            }
             var spendable = HideoutStations.Spendable(player);
             var parts = new List<string>();
             foreach (var cost in recipe.Items)

@@ -42,6 +42,10 @@ namespace TheTrueSPT
         }
 
         /// <summary>Station number to level, and to what the next level costs, for the hideout in use.</summary>
+        /// <summary>Testing aid: everything in the hideout is had for nothing.</summary>
+        public static BepInEx.Configuration.ConfigEntry<bool> Free;
+        public static bool IsFree => Free != null && Free.Value;
+
         public static readonly Dictionary<int, int> Levels = new Dictionary<int, int>();
         public static readonly Dictionary<int, List<Cost>> NextCosts = new Dictionary<int, List<Cost>>();
 
@@ -283,7 +287,7 @@ namespace TheTrueSPT
             foreach (var cost in costs)
             {
                 int have = carried.Where(item => item.TemplateId == cost.Tpl).Sum(item => item.StackObjectsCount);
-                result.Add(new KeyValuePair<Cost, int>(cost, have));
+                result.Add(new KeyValuePair<Cost, int>(cost, IsFree ? Mathf.Max(have, cost.Count) : have));
             }
             return result;
         }
@@ -378,6 +382,10 @@ namespace TheTrueSPT
         /// </summary>
         public static async Task<string> Pay(Player player, List<Cost> costs)
         {
+            if (IsFree)
+            {
+                return null;
+            }
             foreach (var cost in costs)
             {
                 int left = cost.Count;
