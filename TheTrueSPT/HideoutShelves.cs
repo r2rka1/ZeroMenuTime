@@ -189,6 +189,7 @@ namespace TheTrueSPT
             Plugin.Log.LogInfo("Station storage screen: fitting '" + inner.name + "' " + inner.rect.size.ToString("F0") + " into the panel " + scroll.rect.size.ToString("F0"));
             var corners = new Vector3[4];
             var own = new Vector3[4];
+            float nextLook = 0f;
             // The screen lays itself out again whenever something in it changes (an item picked up
             // or put down) and puts the container back where it was; so it is held for as long
             // as the screen is open.
@@ -199,7 +200,26 @@ namespace TheTrueSPT
                 scroll.GetWorldCorners(corners);   // bottom left, top left, top right, bottom right
                 // Its pivot may be at its bottom or its top; place it by where its own top left ends up.
                 inner.GetWorldCorners(own);
-                inner.position += new Vector3(corners[1].x + 36f - own[1].x, corners[1].y - own[1].y, 0f);
+                var shift = new Vector3(corners[1].x + 36f - own[1].x, corners[1].y - own[1].y, 0f);
+                inner.position += shift;
+                // The game draws only the cells and items that were inside the panel when it last
+                // looked, and it looked while the container was still out of view. Have it look
+                // again whenever the container has been moved, and now and then besides.
+                if (shift.sqrMagnitude > 0.25f || Time.unscaledTime >= nextLook)
+                {
+                    nextLook = Time.unscaledTime + 0.5f;
+                    var seen = new Rect(corners[0], corners[2] - corners[0]);
+                    foreach (var grid in inner.GetComponentsInChildren<EFT.UI.DragAndDrop.GridView>(true))
+                    {
+                        try
+                        {
+                            grid.MagnifyIfPossible(seen, true);
+                        }
+                        catch (Exception)
+                        {
+                        }
+                    }
+                }
                 yield return null;
             }
         }
@@ -244,6 +264,49 @@ namespace TheTrueSPT
             {
                 _sending = false;
             }
+        }
+
+        /// <summary>For the test harness: what each station's container really holds, and where.</summary>
+        public static List<string> Describe()
+        {
+            var lines = new List<string>();
+            foreach (var pair in Shelves)
+            {
+                var shelf = pair.Value;
+                var grids = shelf.Grids != null ? shelf.Grids.Length : 0;
+                var slots = shelf is CompoundItem ? shelf.Containers.Count() : 0;
+                lines.Add((EAreaType)pair.Key + ": id " + shelf.Id + ", grids " + grids + ", containers " + slots + ", items " + Count(pair.Key));
+                foreach (var item in shelf.GetAllItems())
+                {
+                    if (item.Id != shelf.Id && item.Parent != null && item.Parent.Container.ParentItem == shelf)
+                    {
+                        lines.Add("   " + item.ShortName.Localized() + " in container '" + item.Parent.Container.ID + "' (" + item.Parent.Container.GetType().Name + ")");
+                    }
+                }
+            }
+            foreach (var grid in UnityEngine.Object.FindObjectsOfType<EFT.UI.DragAndDrop.GridView>())
+            {
+                if (!grid.isActiveAndEnabled || grid.Grid == null || ((RectTransform)grid.transform).rect.width < 500f)
+                {
+                    continue;
+                }
+                string whose = "nobody's";
+                foreach (var pair in Shelves)
+                {
+                    if (pair.Value.Grids != null && pair.Value.Grids.Length > 0 && ReferenceEquals(grid.Grid, pair.Value.Grids[0]))
+                    {
+                        whose = ((EAreaType)pair.Key).ToString();
+                    }
+                }
+                int inRect = 0;
+                foreach (var _ in grid.Grid.GetItemsInRect(new IntRect(0, 0, 20, 20)))
+                {
+                    inRect++;
+                }
+                lines.Add("on screen: grid '" + grid.Grid.ID + "' of " + whose + ", parent item " + (grid.Grid.ParentItem != null ? grid.Grid.ParentItem.Id.ToString() : "none")
+                          + ", items by rect " + inRect + ", pictures " + grid.GetComponentsInChildren<EFT.UI.DragAndDrop.ItemView>(true).Length);
+            }
+            return lines;
         }
 
         public static void Clear()

@@ -733,6 +733,12 @@ namespace TheTrueSPT
                     }
                     break;
                 }
+                case "shelves":
+                    foreach (var entry in HideoutShelves.Describe())
+                    {
+                        Report(entry);
+                    }
+                    break;
                 case "uigrid":
                 {
                     // Every item grid on screen, biggest first, with where it sits: for fixing a screen's layout.
@@ -743,6 +749,8 @@ namespace TheTrueSPT
                         {
                             continue;
                         }
+                        Report("grid magnified " + grid.IsMagnified + ", has grid " + (grid.Grid != null) + ", items in it " + (grid.Grid != null ? grid.Grid.ItemCollection.Count : -1)
+                               + ", pictures " + grid.GetComponentsInChildren<EFT.UI.DragAndDrop.ItemView>(true).Length + ", children " + grid.transform.childCount);
                         Report("grid " + rect.rect.size.ToString("F0") + " at " + rect.position.ToString("F0") + " anchors " + rect.anchorMin + "-" + rect.anchorMax + " pivot " + rect.pivot + " scale " + rect.lossyScale.x.ToString("F2"));
                         var up = rect.parent;
                         for (int i = 0; i < 6 && up != null; i++, up = up.parent)
