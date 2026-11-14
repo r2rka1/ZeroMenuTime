@@ -266,6 +266,31 @@ namespace TheTrueSPT
             }
         }
 
+        /// <summary>For the test harness: lays a made-up item in a station's container.</summary>
+        public static string PutTest(int area, string template)
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            CompoundItem shelf;
+            if (player == null || !Shelves.TryGetValue(area, out shelf) || shelf.Grids == null || shelf.Grids.Length == 0)
+            {
+                return "FAILED that station has no grid to lay things in";
+            }
+            var item = Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), template, null);
+            var place = shelf.Grids[0].FindLocationForItem(item);
+            if (place == null)
+            {
+                return "FAILED no room";
+            }
+            var add = ItemManipulator.Add(item, place, player.InventoryController, false);
+            if (add.Failed)
+            {
+                return "FAILED " + add.Error;
+            }
+            add.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+            add.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+            return "laid " + item.ShortName.Localized() + " in " + (EAreaType)area;
+        }
+
         /// <summary>For the test harness: what each station's container really holds, and where.</summary>
         public static List<string> Describe()
         {

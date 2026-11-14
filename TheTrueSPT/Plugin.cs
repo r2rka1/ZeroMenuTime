@@ -121,7 +121,7 @@ namespace TheTrueSPT
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
-                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(),
+                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(),
             };
             foreach (var patch in _patches)
             {
@@ -580,6 +580,12 @@ namespace TheTrueSPT
             if (interactive is RoomDoor door)
             {
                 __result = door.GetActions();
+                return false;
+            }
+            var rangeActions = HideoutRange.ActionsFor(interactive);
+            if (rangeActions != null)
+            {
+                __result = rangeActions;
                 return false;
             }
             var stationActions = HideoutStations.ActionsForObject(interactive);

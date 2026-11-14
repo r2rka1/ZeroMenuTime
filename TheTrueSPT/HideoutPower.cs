@@ -45,6 +45,11 @@ namespace TheTrueSPT
         public static double FuelFactor = 1;
         private static double _nextWaterIn = -1;
         public static double NextWaterIn => _nextWaterIn < 0 ? -1 : Math.Max(0, _nextWaterIn - (WorldClock.Now - _readAt));
+        public const int Gym = 23, Circle = 27;
+        public static double CircleDue;
+        private static double _workoutIn;
+        /// <summary>Game seconds until the gym can be used again.</summary>
+        public static double WorkoutIn => Math.Max(0, _workoutIn - (WorldClock.Now - _readAt));
         public static readonly List<Offer> ScavOffers = new List<Offer>();
         public static string ScavRecipe = "";
         public static double ScavDue;
@@ -84,6 +89,8 @@ namespace TheTrueSPT
             WaterCap = (int?)power["WaterCap"] ?? 3;
             _nextWaterIn = (double?)power["NextWaterIn"] ?? -1;
             FuelFactor = (double?)power["FuelFactor"] ?? 1;
+            _workoutIn = (double?)power["WorkoutIn"] ?? 0;
+            CircleDue = (double?)power["CircleDue"] ?? 0;
             ScavRecipe = (string)power["ScavRecipe"] ?? "";
             ScavDue = (double?)power["ScavDue"] ?? 0;
             ScavOffers.Clear();
@@ -242,6 +249,7 @@ namespace TheTrueSPT
             // The lamps come on over a second or two; the list is taken afresh after that.
             _lamps = null;
             _nextLamps = Time.unscaledTime + 0.2f;
+            HideoutRange.Power(Powered);
             _lookKnown = true;
             _lookPowered = Powered;
         }
@@ -532,6 +540,69 @@ namespace TheTrueSPT
             }
             HideoutStash.Send("after the scavs came back");
             return "The scavs brought back " + finds + " thing(s); they are in the stash.";
+        }
+
+        /// <summary>How many points of Strength and of Endurance one training gives at a skill's level (the game's own steps).</summary>
+        public static float WorkoutPoints(int level)
+        {
+            return 3f * (level >= 25 ? 4f : level >= 10 ? 5f : 6f);
+        }
+
+        public const float WorkoutCost = 30f;
+
+        /// <summary>A set in the gym: tiring, thirsty work that builds Strength and Endurance, once a day.</summary>
+        public static async Task<string> Workout()
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            if (player == null || HideoutDoors.Inside == null)
+            {
+                return "not possible right now";
+            }
+            var health = player.ActiveHealthController;
+            if (health.Energy.Current < WorkoutCost + 5f || health.Hydration.Current < WorkoutCost + 5f)
+            {
+                return "You are too tired or too thirsty to train. Eat and drink first.";
+            }
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "workout", Seconds = WorldClock.Now });
+            string refused = Refused(reply);
+            if (refused != null)
+            {
+                return refused;
+            }
+            health.ChangeEnergy(-WorkoutCost);
+            health.ChangeHydration(-WorkoutCost);
+            var gained = new List<string>();
+            foreach (var id in new[] { ESkillId.Strength, ESkillId.Endurance })
+            {
+                var skill = player.Skills.GetSkill(id);
+                if (skill != null && !skill.IsEliteLevel)
+                {
+                    float points = WorkoutPoints(skill.Level);
+                    skill.AddPointsEarnedForWorkout(points);
+                    gained.Add(id + " +" + points.ToString("0"));
+                }
+            }
+            Plugin.Log.LogInfo("Trained in the gym: " + string.Join(", ", gained.ToArray()));
+            return "Trained: " + string.Join(", ", gained.ToArray()) + ". Your muscles will ache for a day.";
+        }
+
+        /// <summary>Gives what lies in the circle to the cultists. What they give back lies there when the wait is over.</summary>
+        public static async Task<string> Sacrifice()
+        {
+            if (HideoutDoors.Inside == null)
+            {
+                return "not possible right now";
+            }
+            await HideoutShelves.SendAsync(Circle);
+            var reply = await Ask(new { Id = HideoutDoors.Inside, Action = "sacrifice", Seconds = WorldClock.Now });
+            string refused = Refused(reply);
+            if (refused != null)
+            {
+                return refused;
+            }
+            HideoutShelves.Read(reply);
+            HideoutShelves.ShowAll();
+            return "The sacrifice is made. Come back in " + WorldClock.Span(CircleDue - WorldClock.Now) + ".";
         }
 
         public static async Task<string> CollectCoins()

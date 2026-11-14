@@ -92,6 +92,10 @@ public sealed class HideoutPower
     /// <summary>The scav case run under way: which offer, and when the scavs are back.</summary>
     public string ScavRecipe { get; set; } = "";
     public double ScavDue { get; set; }
+    /// <summary>When the character last trained in the gym; muscles ache for a day after.</summary>
+    public double LastWorkout { get; set; } = -1e12;
+    /// <summary>When the cultists' circle gives up what it made of the last sacrifice.</summary>
+    public double CircleDue { get; set; }
 }
 
 /// <summary>One thing the scav case can be sent out for.</summary>
@@ -140,6 +144,9 @@ public sealed class PowerReport
     public double ScavDue { get; set; }
     /// <summary>In answer to collecting the scav case: what was brought back, each find with its parts.</summary>
     public List<List<Item>> ScavLoot { get; set; } = [];
+    /// <summary>Game seconds until the gym can be used again; zero when it can.</summary>
+    public double WorkoutIn { get; set; }
+    public double CircleDue { get; set; }
 }
 
 public sealed class HideoutStore
@@ -244,7 +251,8 @@ public sealed class HideoutsService(
     HideoutTable hideoutTable,
     ICloner cloner,
     JsonUtil jsonUtil,
-    SPTarkov.Server.Core.Generators.ScavCaseRewardGenerator scavCaseRewardGenerator)
+    SPTarkov.Server.Core.Generators.ScavCaseRewardGenerator scavCaseRewardGenerator,
+    SPTarkov.Server.Core.Services.Hideout.CircleOfCultistService circleOfCultistService)
 {
     public const string First = "streets";
     public static readonly string[] Known = ["streets", "customs", "shoreline"];
@@ -628,6 +636,8 @@ public sealed class HideoutsService(
     private const double FilterPerSecond = 0.00333;
     private const double SecondsPerWater = 19500;
     private const int WaterCap = 3;
+    private const double SecondsOfMusclePain = 86400;
+    public const int Gym = 23, CircleOfCultists = 27;
 
     private static HideoutPower PowerOf(HideoutStore store, string id)
     {
@@ -763,6 +773,8 @@ public sealed class HideoutsService(
             NextWaterIn = power.WaterWorks && power.WaterFilter != null && power.Water < WaterCap ? (1 - power.WaterProgress) * SecondsPerWater : -1,
             ScavRecipe = power.ScavRecipe,
             ScavDue = power.ScavDue,
+            WorkoutIn = Math.Max(0, power.LastWorkout + SecondsOfMusclePain - store.ClockSeconds),
+            CircleDue = power.CircleDue,
         };
         foreach (var recipe in hideoutTable.Production.ScavRecipes ?? [])
         {
@@ -908,6 +920,44 @@ public sealed class HideoutsService(
                     }
                     power.ScavRecipe = request.Recipe;
                     power.ScavDue = store.ClockSeconds + (offer.ProductionTime ?? 0);
+                    break;
+                }
+                case "workout":
+                    if (levels.GetValueOrDefault(Gym) < 1)
+                    {
+                        return new HideoutResponse { Error = "There is no gym here yet" };
+                    }
+                    if (power.LastWorkout + SecondsOfMusclePain > store.ClockSeconds)
+                    {
+                        return new HideoutResponse { Error = "Your muscles still ache from the last time" };
+                    }
+                    power.LastWorkout = store.ClockSeconds;
+                    break;
+                case "sacrifice":
+                {
+                    if (levels.GetValueOrDefault(CircleOfCultists) < 1)
+                    {
+                        return new HideoutResponse { Error = "There is no circle here yet" };
+                    }
+                    if (power.CircleDue > store.ClockSeconds)
+                    {
+                        return new HideoutResponse { Error = "The circle is still at work" };
+                    }
+                    // The game's own rite: it prices what lies in the circle, takes it, and lays what
+                    // it gives in return in the same place. Only its waiting is kept here, on the
+                    // world clock, so its own timer entry is taken out again.
+                    var before = new HashSet<string>((pmc.Hideout?.Production ?? []).Keys.Select(k => k.ToString()));
+                    circleOfCultistService.StartSacrifice(sessionId, pmc, new SPTarkov.Server.Core.Models.Eft.Hideout.HideoutCircleOfCultistProductionStartRequestData());
+                    double wait = 43200;
+                    foreach (var entry in (pmc.Hideout?.Production ?? []).ToList())
+                    {
+                        if (!before.Contains(entry.Key.ToString()))
+                        {
+                            wait = entry.Value?.ProductionTime ?? wait;
+                            pmc.Hideout!.Production!.Remove(entry.Key);
+                        }
+                    }
+                    power.CircleDue = store.ClockSeconds + wait;
                     break;
                 }
                 case "scavcollect":

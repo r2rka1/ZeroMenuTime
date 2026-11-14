@@ -498,6 +498,9 @@ namespace TheTrueSPT
                 Plugin.Log.LogInfo(name + " built to level " + level + " in hideout '" + HideoutDoors.Inside + "'");
                 HideoutDoors.RefreshExits();
                 HideoutPower.ApplyLook();
+                // A station built for the first time may have brought a container of its own.
+                HideoutShelves.Read(reply);
+                HideoutShelves.ShowAll();
                 // The wall comes down in several stages in the game's data; here it is one job.
                 if (area == (int)EAreaType.EmergencyWall && NextCosts.ContainsKey(area))
                 {

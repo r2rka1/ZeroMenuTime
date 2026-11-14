@@ -369,7 +369,37 @@ namespace TheTrueSPT
                 Text(left, "More cards mine faster. It works only while the generator runs.", 15f, Dim, false);
             }
 
-            if (HideoutShelves.Has(_area) && level >= 1)
+            if (_area == HideoutPower.Gym && level >= 1)
+            {
+                Space(left, 14f);
+                Heading(left, "TRAINING");
+                var strength = player.Skills.GetSkill(ESkillId.Strength);
+                var endurance = player.Skills.GetSkill(ESkillId.Endurance);
+                Text(left, "A set builds Strength (level " + strength.Level + ", +" + HideoutPower.WorkoutPoints(strength.Level).ToString("0") + " points) and Endurance (level " + endurance.Level + ", +"
+                    + HideoutPower.WorkoutPoints(endurance.Level).ToString("0") + " points). It costs " + HideoutPower.WorkoutCost.ToString("0") + " energy and " + HideoutPower.WorkoutCost.ToString("0") + " water.", 16f, Ink, false);
+                double ache = HideoutPower.WorkoutIn;
+                Text(left, ache > 0 ? "<color=" + Bad + ">Your muscles ache.</color> You can train again in " + WorldClock.Span(ache) + "." : "<color=" + Good + ">You are rested.</color>", 16f, Ink, false);
+                Button(left, "TRAIN", () => Do(HideoutPower.Workout), ache <= 0 && !_busy, 220f);
+            }
+            if (_area == HideoutPower.Circle && level >= 1 && HideoutShelves.Has(_area))
+            {
+                Space(left, 14f);
+                Heading(left, "THE CIRCLE");
+                double wait = HideoutPower.CircleDue - WorldClock.Now;
+                int lying = HideoutShelves.Count(_area);
+                if (wait > 0)
+                {
+                    Text(left, "The circle is at work. Come back in " + WorldClock.Span(wait) + "  <color=" + Faint + ">(" + Played(wait) + ")</color>", 16f, Ink, false);
+                }
+                else
+                {
+                    Text(left, lying == 0 ? "Nothing lies in the circle." : lying + " thing(s) lie in the circle.", 16f, Ink, false);
+                    Button(left, "OPEN THE CIRCLE", () => { Close(); HideoutShelves.Open(HideoutPower.Circle); }, true, 260f);
+                    Button(left, "SACRIFICE", () => Do(HideoutPower.Sacrifice), lying > 0 && !_busy, 220f);
+                    Text(left, "Lay things in the circle and sacrifice them. The more they are worth, the more comes back, after half a day or so. What comes back lies in the circle.", 15f, Dim, false);
+                }
+            }
+            else if (HideoutShelves.Has(_area) && level >= 1)
             {
                 Space(left, 14f);
                 Heading(left, _area == (int)EAreaType.PlaceOfFame ? "TROPHIES" : _area == (int)EAreaType.EquipmentPresetsStand ? "OUTFITS" : "ON THE STAND");
