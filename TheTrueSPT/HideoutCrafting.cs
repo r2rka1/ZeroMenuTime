@@ -329,7 +329,7 @@ namespace TheTrueSPT
                 HideoutStash.Send("after starting a craft");
                 MenuArea = -1;
                 Refresh();
-                string text = "Making " + Label(recipe.Product, recipe.Count) + ", ready in " + WorldClock.Span(recipe.Seconds) + " of game time.";
+                string text = "Making " + Label(recipe.Product, recipe.Count) + ", ready in " + WorldClock.Span(HideoutPower.Takes(recipe.Seconds)) + " of game time.";
                 Plugin.Log.LogInfo(text + " (hideout '" + HideoutDoors.Inside + "', station " + recipe.Area + ")");
                 NotificationManager.DisplayMessageNotification(text, ENotificationDurationType.Long);
                 return text;
@@ -394,7 +394,25 @@ namespace TheTrueSPT
         }
 
         /// <summary>Makes the finished items and puts them in the stash, or failing that in carried gear. Returns how many were placed.</summary>
-        private static async Task<int> PutInStash(Player player, string template, int count)
+        /// <summary>Puts one made-up item into the hideout's stash, or into the player's gear if the stash is full.</summary>
+        public static async Task<bool> PutItem(Player player, Item item)
+        {
+            var stash = HideoutStash.Current;
+            var address = stash != null ? stash.Grids[0].FindLocationForItem(item) : null;
+            if (address != null)
+            {
+                var add = ItemManipulator.Add(item, address, player.InventoryController, false);
+                if (!add.Failed)
+                {
+                    add.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                    add.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                    return true;
+                }
+            }
+            return await LocalTrade.Give(player, item);
+        }
+
+        public static async Task<int> PutInStash(Player player, string template, int count)
         {
             var factory = Singleton<ItemFactory>.Instance;
             var stash = HideoutStash.Current;

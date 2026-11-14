@@ -190,6 +190,10 @@ public class TheTrueSPTRouter(
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Collect(sessionId, payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
+        "/thetruespt/hideout/power",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Power(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
         "/thetruespt/hideout/list",
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(sessionId, payload)) ?? "{}")
     ),

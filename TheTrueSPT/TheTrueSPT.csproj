@@ -38,6 +38,7 @@
     <Reference Include="spt-common"><HintPath>$(SptPlugins)spt-common.dll</HintPath></Reference>
     <Reference Include="spt-custom"><HintPath>$(SptPlugins)spt-custom.dll</HintPath></Reference>
     <Reference Include="spt-reflection"><HintPath>$(SptPlugins)spt-reflection.dll</HintPath></Reference>
+    <Reference Include="ItemComponent.Types"><HintPath>$(Managed)ItemComponent.Types.dll</HintPath></Reference>
     <Reference Include="Assembly-CSharp"><HintPath>$(Managed)Assembly-CSharp.dll</HintPath></Reference>
     <Reference Include="DissonanceVoip"><HintPath>$(Managed)DissonanceVoip.dll</HintPath></Reference>
     <Reference Include="Comfort"><HintPath>$(Managed)Comfort.dll</HintPath></Reference>

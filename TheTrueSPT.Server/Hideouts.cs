@@ -59,8 +59,56 @@ public sealed class HideoutRecipe
     public List<string> Tools { get; set; } = [];
 }
 
+/// <summary>A fuel can standing in a generator.</summary>
+public sealed class FuelCan
+{
+    public string Tpl { get; set; } = "";
+    public double Left { get; set; }
+    public double Max { get; set; }
+}
+
+/// <summary>A hideout's generator and what runs off it. Settled against the world clock whenever that moves.</summary>
+public sealed class HideoutPower
+{
+    public bool On { get; set; }
+    public List<FuelCan> Fuel { get; set; } = [];
+    /// <summary>Graphics cards in the bitcoin farm.</summary>
+    public int Gpus { get; set; }
+    /// <summary>Bitcoins waiting to be collected, and how far along the next one is (0 to 1).</summary>
+    public int Coins { get; set; }
+    public double CoinProgress { get; set; }
+    /// <summary>The clock reading this was last worked out at.</summary>
+    public double Settled { get; set; }
+}
+
+/// <summary>What the client is told about the power of the hideout in use.</summary>
+public sealed class PowerReport
+{
+    public bool On { get; set; }
+    /// <summary>On, and with fuel left.</summary>
+    public bool Powered { get; set; }
+    public List<FuelCan> Fuel { get; set; } = [];
+    public int FuelSlots { get; set; }
+    /// <summary>Game seconds the fuel lasts with the generator running.</summary>
+    public double FuelLasts { get; set; }
+    public int Gpus { get; set; }
+    public int GpuSlots { get; set; }
+    public int Coins { get; set; }
+    public int CoinCap { get; set; }
+    /// <summary>Game seconds of power until the next bitcoin; below zero when the farm is not working.</summary>
+    public double NextCoinIn { get; set; }
+    /// <summary>How many times longer a craft takes when started without power.</summary>
+    public double SlowFactor { get; set; }
+    /// <summary>In answer to taking a can out: the can.</summary>
+    public FuelCan? Taken { get; set; }
+    /// <summary>In answer to collecting: how many bitcoins were handed over.</summary>
+    public int CoinsTaken { get; set; }
+}
+
 public sealed class HideoutStore
 {
+    /// <summary>Each hideout's generator, fuel and bitcoin farm.</summary>
+    public Dictionary<string, HideoutPower> Power { get; set; } = [];
     /// <summary>What is being made in each hideout, in use or put away. They all run on the one clock.</summary>
     public Dictionary<string, List<HideoutCraft>> Crafts { get; set; } = [];
     /// <summary>The hideout whose state is in the profile right now.</summary>
@@ -86,6 +134,13 @@ public sealed class HideoutRequest : IRequestData
     public double Seconds { get; set; }
     /// <summary>For crafting: the recipe to start.</summary>
     public string Recipe { get; set; } = "";
+    /// <summary>For power: on, off, fuel, unfuel, gpu, ungpu, coins.</summary>
+    public string Action { get; set; } = "";
+    /// <summary>For power: the fuel can put in (its item, what is left in it, what it holds full), or which can to take out.</summary>
+    public string Tpl { get; set; } = "";
+    public double Left { get; set; }
+    public double Max { get; set; }
+    public int Index { get; set; }
 }
 
 /// <summary>One kind of material a station level needs.</summary>
@@ -122,6 +177,8 @@ public sealed class HideoutResponse
     public List<HideoutRecipe> Recipes { get; set; } = [];
     /// <summary>Only in answer to "collect": the finished crafts handed over.</summary>
     public List<HideoutCraft> Collected { get; set; } = [];
+    /// <summary>The generator, fuel and bitcoin farm of the hideout in use.</summary>
+    public PowerReport? Power { get; set; }
 }
 
 /// <summary>
@@ -321,6 +378,7 @@ public sealed class HideoutsService(
                     .ToList();
             }
         }
+        response.Power = Report(store, store.Active, response.Levels);
         foreach (string id in Known)
         {
             response.StashCounts[id] = id == store.Active
@@ -381,6 +439,11 @@ public sealed class HideoutsService(
             {
                 continue;
             }
+            // The bitcoin farm and the water collector run by themselves; they are not started like a craft.
+            if (recipe.Continuous == true)
+            {
+                continue;
+            }
             var entry = new HideoutRecipe
             {
                 Id = recipe.Id.ToString(),
@@ -428,6 +491,178 @@ public sealed class HideoutsService(
         {
             store.ClockSeconds = seconds;
         }
+        SettlePower(store);
+    }
+
+    // The game's own figures (hideout settings and the bitcoin recipe), counted on the world clock.
+    private const double FuelPerSecond = 0.0013194444444444445;
+    private const double SpeedWithoutPower = 0.07;
+    private const double GpuBoost = 0.041225;
+    private const double SecondsPerCoin = 145000;
+    private const int CoinCap = 3;
+    public const int Generator = 4, BoozeGenerator = 19, BitcoinFarm = 20;
+
+    private static HideoutPower PowerOf(HideoutStore store, string id)
+    {
+        if (!store.Power.TryGetValue(id, out var power))
+        {
+            power = new HideoutPower { Settled = store.ClockSeconds };
+            store.Power[id] = power;
+        }
+        return power;
+    }
+
+    /// <summary>
+    /// Brings every hideout's generator and bitcoin farm up to the clock: fuel burnt for as long
+    /// as the generator ran, bitcoins mined for as long as there was power. They keep going while
+    /// the character is elsewhere or asleep, as crafts do.
+    /// </summary>
+    private static void SettlePower(HideoutStore store)
+    {
+        foreach (var power in store.Power.Values)
+        {
+            double elapsed = store.ClockSeconds - power.Settled;
+            power.Settled = store.ClockSeconds;
+            if (elapsed <= 0 || !power.On)
+            {
+                continue;
+            }
+            double fuel = power.Fuel.Sum(can => can.Left);
+            double powered = Math.Min(elapsed, fuel / FuelPerSecond);
+            double burn = powered * FuelPerSecond;
+            foreach (var can in power.Fuel)
+            {
+                double from = Math.Min(can.Left, burn);
+                can.Left -= from;
+                burn -= from;
+            }
+            if (power.Fuel.Sum(can => can.Left) <= 0.0001)
+            {
+                power.On = false;
+            }
+            if (power.Gpus > 0 && power.Coins < CoinCap)
+            {
+                power.CoinProgress += powered * (1 + (power.Gpus - 1) * GpuBoost) / SecondsPerCoin;
+                while (power.CoinProgress >= 1 && power.Coins < CoinCap)
+                {
+                    power.Coins++;
+                    power.CoinProgress -= 1;
+                }
+                if (power.Coins >= CoinCap)
+                {
+                    power.CoinProgress = 0;
+                }
+            }
+        }
+    }
+
+    private static int FuelSlots(int generatorLevel) => generatorLevel <= 0 ? 0 : generatorLevel + 1;
+    private static int GpuSlots(int farmLevel) => farmLevel switch { <= 0 => 0, 1 => 10, 2 => 25, _ => 50 };
+
+    private static PowerReport Report(HideoutStore store, string id, Dictionary<int, int> levels)
+    {
+        var power = PowerOf(store, id);
+        double fuel = power.Fuel.Sum(can => can.Left);
+        bool powered = power.On && fuel > 0.0001;
+        double rate = power.Gpus > 0 ? (1 + (power.Gpus - 1) * GpuBoost) / SecondsPerCoin : 0;
+        return new PowerReport
+        {
+            On = power.On,
+            Powered = powered,
+            Fuel = power.Fuel,
+            FuelSlots = FuelSlots(levels.GetValueOrDefault(Generator)),
+            FuelLasts = fuel / FuelPerSecond,
+            Gpus = power.Gpus,
+            GpuSlots = GpuSlots(levels.GetValueOrDefault(BitcoinFarm)),
+            Coins = power.Coins,
+            CoinCap = CoinCap,
+            NextCoinIn = powered && rate > 0 && power.Coins < CoinCap ? (1 - power.CoinProgress) / rate : -1,
+            SlowFactor = 1 / SpeedWithoutPower,
+        };
+    }
+
+    /// <summary>The generator's switch and fuel, and the bitcoin farm's cards and coins. Items are settled on the client.</summary>
+    public HideoutResponse Power(MongoId sessionId, HideoutRequest request)
+    {
+        return Guarded(sessionId, request, true, (pmc, store) =>
+        {
+            if (store.Active != request.Id)
+            {
+                return new HideoutResponse { Error = "Hideout '" + request.Id + "' is not the one in use; enter it first" };
+            }
+            Advance(store, request.Seconds);
+            var levels = (pmc.Hideout?.Areas ?? []).ToDictionary(a => (int)a.Type, a => a.Level ?? 0);
+            var power = PowerOf(store, request.Id);
+            FuelCan? taken = null;
+            int coins = 0;
+            switch ((request.Action ?? "").ToLowerInvariant())
+            {
+                case "on":
+                    if (levels.GetValueOrDefault(Generator) < 1)
+                    {
+                        return new HideoutResponse { Error = "There is no generator here yet" };
+                    }
+                    if (power.Fuel.Sum(can => can.Left) <= 0.0001)
+                    {
+                        return new HideoutResponse { Error = "The generator has no fuel" };
+                    }
+                    power.On = true;
+                    break;
+                case "off":
+                    power.On = false;
+                    break;
+                case "fuel":
+                    if (power.Fuel.Count >= FuelSlots(levels.GetValueOrDefault(Generator)))
+                    {
+                        return new HideoutResponse { Error = "There is no room for another can" };
+                    }
+                    if (request.Left <= 0 || string.IsNullOrEmpty(request.Tpl))
+                    {
+                        return new HideoutResponse { Error = "That can is empty" };
+                    }
+                    power.Fuel.Add(new FuelCan { Tpl = request.Tpl, Left = request.Left, Max = Math.Max(request.Max, request.Left) });
+                    break;
+                case "unfuel":
+                    if (request.Index < 0 || request.Index >= power.Fuel.Count)
+                    {
+                        return new HideoutResponse { Error = "There is no such can" };
+                    }
+                    taken = power.Fuel[request.Index];
+                    power.Fuel.RemoveAt(request.Index);
+                    if (power.Fuel.Sum(can => can.Left) <= 0.0001)
+                    {
+                        power.On = false;
+                    }
+                    break;
+                case "gpu":
+                    if (power.Gpus >= GpuSlots(levels.GetValueOrDefault(BitcoinFarm)))
+                    {
+                        return new HideoutResponse { Error = "There is no room for another card" };
+                    }
+                    power.Gpus++;
+                    break;
+                case "ungpu":
+                    if (power.Gpus <= 0)
+                    {
+                        return new HideoutResponse { Error = "There are no cards in the farm" };
+                    }
+                    power.Gpus--;
+                    break;
+                case "coins":
+                    coins = power.Coins;
+                    power.Coins = 0;
+                    break;
+                default:
+                    return new HideoutResponse { Error = "Unknown power action '" + request.Action + "'" };
+            }
+            Save(sessionId.ToString(), store);
+            Console.WriteLine("[TheTrueSPT] Hideout '" + request.Id + "' power: " + request.Action + "; on " + power.On + ", fuel "
+                              + power.Fuel.Sum(can => can.Left).ToString("0.#") + " in " + power.Fuel.Count + " can(s), cards " + power.Gpus + ", bitcoins waiting " + power.Coins + ".");
+            var response = Describe(pmc, store);
+            response.Power!.Taken = taken;
+            response.Power.CoinsTaken = coins;
+            return response;
+        });
     }
 
     public HideoutResponse Recipes(MongoId sessionId, HideoutRequest request)
@@ -468,6 +703,14 @@ public sealed class HideoutsService(
                 return new HideoutResponse { Error = "That station is busy" };
             }
             Advance(store, request.Seconds);
+            var power = PowerOf(store, request.Id);
+            bool powered = power.On && power.Fuel.Sum(can => can.Left) > 0.0001;
+            if (recipe.Area == BoozeGenerator && !powered)
+            {
+                return new HideoutResponse { Error = "The booze generator needs the generator running" };
+            }
+            // As in the game: without power the work still gets done, at a crawl. Settled when it is started.
+            double takes = powered ? recipe.Seconds : recipe.Seconds / SpeedWithoutPower;
             crafts.Add(new HideoutCraft
             {
                 Recipe = recipe.Id,
@@ -475,11 +718,11 @@ public sealed class HideoutsService(
                 Product = recipe.Product,
                 Count = recipe.Count,
                 Started = store.ClockSeconds,
-                Due = store.ClockSeconds + recipe.Seconds,
+                Due = store.ClockSeconds + takes,
             });
             Save(sessionId.ToString(), store);
             Console.WriteLine("[TheTrueSPT] Craft started in hideout '" + request.Id + "' at station " + recipe.Area + ": " + recipe.Count + " x " + recipe.Product
-                              + ", due in " + (recipe.Seconds / 3600.0).ToString("0.##") + " game hours.");
+                              + ", due in " + (takes / 3600.0).ToString("0.##") + " game hours" + (powered ? "." : " (no power)."));
             return Describe(pmc, store);
         });
     }
@@ -514,7 +757,7 @@ public sealed class HideoutsService(
         {
             if (request.Seconds > store.ClockSeconds)
             {
-                store.ClockSeconds = request.Seconds;
+                Advance(store, request.Seconds);
                 Save(sessionId.ToString(), store);
             }
             return Describe(pmc, store);

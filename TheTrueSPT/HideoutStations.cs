@@ -55,6 +55,7 @@ namespace TheTrueSPT
         /// <summary>Takes levels and costs from any of the server's hideout answers.</summary>
         public static void Read(JObject reply)
         {
+            HideoutPower.Read(reply);
             Levels.Clear();
             NextCosts.Clear();
             var levels = reply["Levels"] as JObject;
