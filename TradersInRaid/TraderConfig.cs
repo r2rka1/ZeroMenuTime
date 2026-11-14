@@ -15,6 +15,8 @@ namespace TradersInRaid
         public float[] Position = { 0f, 0f, 0f };
         public float RotationY = 0f;
         public bool Enabled = true;
+        /// <summary>For doors: the map already has a door here, so use that one and draw nothing.</summary>
+        public bool Hidden;
     }
 
     public static class TraderConfig
@@ -59,11 +61,16 @@ namespace TradersInRaid
         {
             try
             {
-                if (!File.Exists(DoorsPath))
+                var doors = File.Exists(DoorsPath)
+                    ? JsonConvert.DeserializeObject<List<TraderSpot>>(File.ReadAllText(DoorsPath)) ?? new List<TraderSpot>()
+                    : new List<TraderSpot>();
+                // Doors picked by hand; an entry in doors.json for the same trader and map comes first.
+                doors.Add(new TraderSpot
                 {
-                    return null;
-                }
-                var doors = JsonConvert.DeserializeObject<List<TraderSpot>>(File.ReadAllText(DoorsPath)) ?? new List<TraderSpot>();
+                    // The wooden door in the corridor right at Prapor's spot.
+                    Name = "Prapor", TraderId = Prapor, Maps = new List<string> { "TarkovStreets" },
+                    Position = new[] { -32.50f, 6.60f, -108.74f }, RotationY = 0f, Hidden = true,
+                });
                 foreach (var door in doors)
                 {
                     if (door.Enabled && door.TraderId == traderId && door.Position != null && door.Position.Length >= 3

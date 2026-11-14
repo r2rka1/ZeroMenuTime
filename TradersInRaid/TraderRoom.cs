@@ -89,7 +89,7 @@ namespace TradersInRaid
                     }
                 }
             }
-            return null;
+            return HideoutDoors.IndoorAt(position);
         }
 
         /// <summary>Builds the room for a trader whose door is at the given spot on the map.</summary>
@@ -176,7 +176,7 @@ namespace TradersInRaid
         /// </summary>
         public static void ExtendPhysics()
         {
-            if (Rooms.Count == 0)
+            if (Rooms.Count == 0 && !HideoutBunker.Loaded)
             {
                 return;
             }
@@ -184,7 +184,7 @@ namespace TradersInRaid
             {
                 var timer = System.Diagnostics.Stopwatch.StartNew();
                 var player = EFT.GamePlayerOwner.MyPlayer;
-                var centre = player != null ? player.Transform.position : Rooms[0].Root.transform.position + Vector3.up * Mathf.Abs(Depth.Value);
+                var centre = player != null ? player.Transform.position : Vector3.zero;
                 var world = new Bounds(centre, Vector3.one);
                 // Anything further out than this is not part of the playable map (sky boxes, kill
                 // planes), and stretching the box over it would only make the engine's grid coarser.
@@ -445,7 +445,7 @@ namespace TradersInRaid
         [PatchPostfix]
         public static void Postfix(Vector3 pos, ref IndoorTrigger __result)
         {
-            if (__result == null && TraderRoom.Rooms.Count > 0)
+            if (__result == null)
             {
                 __result = TraderRoom.IndoorAt(pos);
             }
@@ -464,7 +464,7 @@ namespace TradersInRaid
         [PatchPostfix]
         public static void Postfix(Vector3 pos, ref IndoorTrigger __result)
         {
-            if (__result == null && TraderRoom.Rooms.Count > 0)
+            if (__result == null)
             {
                 __result = TraderRoom.IndoorAt(pos);
             }

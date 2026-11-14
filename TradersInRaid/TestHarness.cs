@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using BepInEx.Configuration;
 using EFT;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | use | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -127,6 +128,18 @@ namespace TradersInRaid
             var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             string verb = parts[0].ToLowerInvariant();
             var player = GamePlayerOwner.MyPlayer;
+            if (verb == "startraid")
+            {
+                // From the main menu: start a raid where the character is, as the no-menu flow does.
+                if (player != null)
+                {
+                    Report("already in a raid");
+                    yield break;
+                }
+                Report("starting a raid from the menu");
+                yield return Seamless.AfterMenuShown();
+                yield break;
+            }
             if (player == null && verb != "wait")
             {
                 Report("not in a raid");
@@ -177,6 +190,226 @@ namespace TradersInRaid
                     Report("leave requested at " + keeper.Exfil.name + "; extract status " + keeper.Exfil.Status);
                     yield return new WaitForSecondsRealtime(3f);
                     Report("three seconds on: extract status " + keeper.Exfil.Status + ", player still in raid " + (GamePlayerOwner.MyPlayer != null));
+                    break;
+                }
+                case "bunker":
+                {
+                    // Stage 1 of the hideout work: load the game's hideout interior into the raid and look at it.
+                    string what = parts.Length > 1 ? parts[1].ToLowerInvariant() : "where";
+                    Task<string> job = null;
+                    if (what == "load")
+                    {
+                        job = HideoutBunker.Load();
+                    }
+                    else if (what == "unload")
+                    {
+                        job = HideoutBunker.Unload();
+                    }
+                    else if (what == "move")
+                    {
+                        Report(HideoutBunker.Move(new Vector3(Number(parts[2]), Number(parts[3]), Number(parts[4]))));
+                    }
+                    else if (what == "sun")
+                    {
+                        Report(HideoutBunker.Sun(parts.Length > 2 && parts[2] == "on"));
+                    }
+                    else if (what == "settings")
+                    {
+                        var use = parts.Length > 2 && parts[2] == "bunker" ? HideoutBunker.BunkerSettings : HideoutBunker.RaidSettings;
+                        if (use != null)
+                        {
+                            use.ApplySettings();
+                        }
+                        Report(use != null ? "applied the " + (use == HideoutBunker.BunkerSettings ? "bunker's" : "map's") + " level settings" : "FAILED no such settings");
+                    }
+                    else
+                    {
+                        foreach (var entry in HideoutBunker.Describe())
+                        {
+                            Report(entry);
+                        }
+                    }
+                    if (job != null)
+                    {
+                        while (!job.IsCompleted)
+                        {
+                            yield return null;
+                        }
+                        Report(job.IsFaulted ? "FAILED " + job.Exception.InnerException : job.Result);
+                    }
+                    break;
+                }
+                case "post":
+                {
+                    // Calls one of the server's routes: post ROUTE {json}
+                    string body = parts.Length > 2 ? line.Substring(line.IndexOf(parts[1], StringComparison.Ordinal) + parts[1].Length).Trim() : "{}";
+                    var call = SPT.Common.Http.RequestHandler.PostJsonAsync(parts[1], body);
+                    while (!call.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    string reply = call.IsFaulted ? "FAILED " + call.Exception.InnerException.Message : call.Result;
+                    Report(reply.Length > 1500 ? reply.Substring(0, 1500) + " ... (" + reply.Length + " characters)" : reply);
+                    break;
+                }
+                case "hideout":
+                {
+                    // hideout enter ID | hideout leave: the trip through a hideout door, without the door.
+                    string what = parts.Length > 1 ? parts[1].ToLowerInvariant() : "";
+                    if (what == "enter" && parts.Length > 2)
+                    {
+                        HideoutDoors.Enter(parts[2].ToLowerInvariant(), player.Transform.position, player.Rotation.x);
+                    }
+                    else if (what == "leave")
+                    {
+                        HideoutDoors.Leave();
+                    }
+                    yield return new WaitForSecondsRealtime(5f);
+                    float y1 = player.Transform.position.y;
+                    yield return new WaitForSecondsRealtime(2f);
+                    float y2 = player.Transform.position.y;
+                    Report((Mathf.Abs(y2 - y1) < 0.05f ? "PASS" : "FAILED") + " standing still (y " + y1.ToString("F2") + " -> " + y2.ToString("F2") + "), inside hideout: " + (HideoutDoors.Inside ?? "none") + ", bunker loaded: " + HideoutBunker.Loaded);
+                    Status(player);
+                    break;
+                }
+                case "doors":
+                {
+                    // Door objects near the player, nearest first: candidates for a hideout door.
+                    float radius = parts.Length > 1 ? Number(parts[1]) : 60f;
+                    var found = new List<KeyValuePair<float, string>>();
+                    foreach (var door in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.WorldInteractiveObject>())
+                    {
+                        float distance = Vector3.Distance(door.transform.position, player.Transform.position);
+                        if (distance <= radius)
+                        {
+                            found.Add(new KeyValuePair<float, string>(distance, distance.ToString("F0") + " m  " + door.GetType().Name + " " + door.name + " id " + door.Id
+                                + " at " + door.transform.position.ToString("F1") + " yaw " + door.transform.eulerAngles.y.ToString("F0") + " state " + door.DoorState
+                                + (string.IsNullOrEmpty(door.KeyId) ? "" : " key " + door.KeyId) + (door.Operatable ? "" : " NOT OPERATABLE")));
+                        }
+                    }
+                    found.Sort((a, b) => a.Key.CompareTo(b.Key));
+                    Report("door objects within " + radius + " m: " + found.Count);
+                    for (int i = 0; i < found.Count && i < 60; i++)
+                    {
+                        Report("  " + found[i].Value);
+                    }
+                    break;
+                }
+                case "scenery":
+                {
+                    // Drawn objects near the player whose name contains a word (default "door") and that
+                    // are about the size of a door: doors that are part of the map and never open.
+                    float radius = parts.Length > 1 ? Number(parts[1]) : 60f;
+                    string word = parts.Length > 2 ? parts[2].ToLowerInvariant() : "door";
+                    var found = new List<KeyValuePair<float, string>>();
+                    foreach (var renderer in UnityEngine.Object.FindObjectsOfType<MeshRenderer>())
+                    {
+                        if (!renderer.enabled || renderer.name.ToLowerInvariant().IndexOf(word, StringComparison.Ordinal) < 0)
+                        {
+                            continue;
+                        }
+                        var b = renderer.bounds;
+                        float distance = Vector3.Distance(b.center, player.Transform.position);
+                        float wide = Mathf.Max(b.size.x, b.size.z);
+                        if (distance > radius || b.size.y < 1.7f || b.size.y > 2.8f || wide < 0.6f || wide > 1.6f
+                            || renderer.GetComponentInParent<EFT.Interactive.WorldInteractiveObject>() != null)
+                        {
+                            continue;
+                        }
+                        found.Add(new KeyValuePair<float, string>(distance, distance.ToString("F0") + " m  " + renderer.name + " centre " + b.center.ToString("F1")
+                            + " foot " + new Vector3(b.center.x, b.min.y, b.center.z).ToString("F1") + " size " + b.size.ToString("F1")));
+                    }
+                    found.Sort((a, b) => a.Key.CompareTo(b.Key));
+                    Report("door-sized '" + word + "' objects within " + radius + " m: " + found.Count);
+                    for (int i = 0; i < found.Count && i < 60; i++)
+                    {
+                        Report("  " + found[i].Value);
+                    }
+                    break;
+                }
+                case "shot":
+                {
+                    // shot X Y Z NAME: stand a couple of metres from a point with a clear view, look at it, take a picture.
+                    var target = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3])) + Vector3.up * 1.0f;
+                    int solid = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain", "Default");
+                    bool placed = false;
+                    foreach (float reach in new[] { 2.6f, 1.8f, 3.6f })
+                    {
+                        for (int step = 0; step < 16 && !placed; step++)
+                        {
+                            var direction = Quaternion.Euler(0f, step * 22.5f, 0f) * Vector3.forward;
+                            var eye = target + direction * reach + Vector3.up * 0.5f;
+                            RaycastHit floor;
+                            if (Physics.Linecast(target + direction * 0.25f, eye, solid, QueryTriggerInteraction.Ignore)
+                                || !Physics.Raycast(eye, Vector3.down, out floor, 3f, solid, QueryTriggerInteraction.Ignore))
+                            {
+                                continue;
+                            }
+                            player.Teleport(floor.point + Vector3.up * 0.05f, false);
+                            var to = target - (floor.point + Vector3.up * 1.6f);
+                            player.Rotation = new Vector2(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, -Mathf.Asin(Mathf.Clamp(to.normalized.y, -1f, 1f)) * Mathf.Rad2Deg);
+                            placed = true;
+                            Report("viewing from " + floor.point.ToString("F1") + ", looking " + player.Rotation.x.ToString("F0"));
+                        }
+                        if (placed)
+                        {
+                            break;
+                        }
+                    }
+                    if (!placed)
+                    {
+                        Report("FAILED no clear place to stand near that point");
+                        break;
+                    }
+                    yield return new WaitForSecondsRealtime(1.2f);
+                    yield return new WaitForEndOfFrame();
+                    Screenshot(parts.Length > 4 ? parts[4] : "shot");
+                    break;
+                }
+                case "aim":
+                {
+                    // What the player is looking at: the exact point and the way the surface faces.
+                    var eyes = player.Transform.position + Vector3.up * 1.6f;
+                    var forward = Quaternion.Euler(-player.Rotation.y, player.Rotation.x, 0f) * Vector3.forward;
+                    RaycastHit hit;
+                    if (Physics.Raycast(eyes, forward, out hit, 30f, LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain", "Default"), QueryTriggerInteraction.Ignore))
+                    {
+                        Report("looking at " + hit.collider.name + " at " + hit.point.ToString("F2") + ", " + hit.distance.ToString("F1") + " m away, surface faces yaw "
+                               + Quaternion.LookRotation(new Vector3(hit.normal.x, 0f, hit.normal.z)).eulerAngles.y.ToString("F0"));
+                    }
+                    else
+                    {
+                        Report("looking at nothing within 30 m");
+                    }
+                    break;
+                }
+                case "use":
+                {
+                    // Uses the nearest door of ours, as pressing the action key while looking at it would.
+                    RoomDoor nearest = null;
+                    float best = 6f;
+                    foreach (var door in UnityEngine.Object.FindObjectsOfType<RoomDoor>())
+                    {
+                        float distance = Vector3.Distance(door.transform.position, player.Transform.position);
+                        if (distance < best)
+                        {
+                            best = distance;
+                            nearest = door;
+                        }
+                    }
+                    if (nearest == null)
+                    {
+                        Report("FAILED no door of ours within 6 m");
+                        break;
+                    }
+                    Report("using '" + nearest.Label + "' " + best.ToString("F1") + " m away at " + nearest.transform.position.ToString("F1"));
+                    nearest.Use();
+                    yield return new WaitForSecondsRealtime(5f);
+                    float y1 = player.Transform.position.y;
+                    yield return new WaitForSecondsRealtime(2f);
+                    float y2 = player.Transform.position.y;
+                    Report((Mathf.Abs(y2 - y1) < 0.05f ? "PASS" : "FAILED") + " standing still (y " + y1.ToString("F2") + " -> " + y2.ToString("F2") + "), inside hideout: " + (HideoutDoors.Inside ?? "none"));
+                    Status(player);
                     break;
                 }
                 case "lookat":

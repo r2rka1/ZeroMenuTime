@@ -16,11 +16,16 @@ namespace TradersInRaid
         public const float Height = 2.1f, DoorWidth = 1.0f, Thickness = 0.12f;
 
         public string Label;
+
+        /// <summary>What using the door does, when it is not a plain step to a fixed place.</summary>
+        public System.Action OnUse;
         public Vector3 Destination;
         public float DestinationYaw;
 
         /// <summary>How dark the screen is right now, 0 to 1. Drawn by the plugin.</summary>
         public static float Fade;
+        /// <summary>Shown on the dark screen while something slow happens behind it.</summary>
+        public static string FadeText;
         private static bool _travelling;
 
         private static readonly List<GameObject> Spawned = new List<GameObject>();
@@ -164,6 +169,11 @@ namespace TradersInRaid
 
         public void Use()
         {
+            if (OnUse != null)
+            {
+                OnUse();
+                return;
+            }
             if (_travelling || Plugin.Instance == null)
             {
                 return;
@@ -178,7 +188,7 @@ namespace TradersInRaid
         /// Borrows the open and shut sounds of a door already on this map, so ours sounds like the
         /// doors around it. Maps without doors stay silent.
         /// </summary>
-        private static void PlayDoorSound(bool opening, Vector3 at)
+        public static void PlayDoorSound(bool opening, Vector3 at)
         {
             try
             {
@@ -208,6 +218,18 @@ namespace TradersInRaid
             {
                 Plugin.Log.LogWarning("Door sound failed: " + e.Message);
             }
+        }
+
+        /// <summary>Darkens or clears the screen over about a third of a second.</summary>
+        public static IEnumerator FadeTo(float target)
+        {
+            float from = Fade;
+            for (float t = 0f; t < 0.35f; t += Time.unscaledDeltaTime)
+            {
+                Fade = Mathf.Lerp(from, target, t / 0.35f);
+                yield return null;
+            }
+            Fade = target;
         }
 
         private static IEnumerator Travel(Vector3 destination, float yaw)

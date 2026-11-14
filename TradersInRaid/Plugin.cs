@@ -75,6 +75,7 @@ namespace TradersInRaid
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
+                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(),
             };
             foreach (var patch in _patches)
             {
@@ -168,6 +169,7 @@ namespace TradersInRaid
                     }
                 }
                 TraderInteractable.DestroyAll();
+                HideoutDoors.Close();
                 RoomBundle.Unload();
                 Log.LogInfo("TradersInRaid unloaded");
             }
@@ -188,6 +190,12 @@ namespace TradersInRaid
             GUI.depth = -1000;
             GUI.color = new Color(0f, 0f, 0f, Mathf.Clamp01(RoomDoor.Fade));
             GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+            if (!string.IsNullOrEmpty(RoomDoor.FadeText))
+            {
+                GUI.color = new Color(0.8f, 0.8f, 0.8f, Mathf.Clamp01(RoomDoor.Fade));
+                var style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(18, Screen.height / 40) };
+                GUI.Label(new Rect(0f, Screen.height * 0.45f, Screen.width, Screen.height * 0.1f), RoomDoor.FadeText, style);
+            }
             GUI.color = before;
         }
 
@@ -412,7 +420,22 @@ namespace TradersInRaid
                             how = "against the nearest wall";
                         }
                         Plugin.Log.LogInfo("Door for " + name + " " + how + ": " + doorGround.ToString("F1") + " facing " + doorFacing.ToString("F0"));
-                        var door = RoomDoor.SpawnOutside("Enter " + name + "'s room", doorGround, doorFacing);
+                        RoomDoor door;
+                        if (chosen != null && chosen.Hidden)
+                        {
+                            // Laid over a door that is already part of the map, and not drawn.
+                            door = RoomDoor.Spawn("Enter " + name + "'s room", doorGround + Vector3.up * (RoomDoor.Height / 2f)
+                                + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0f, 0.08f), doorFacing);
+                            var drawn = door.GetComponent<MeshRenderer>();
+                            if (drawn != null)
+                            {
+                                drawn.enabled = false;
+                            }
+                        }
+                        else
+                        {
+                            door = RoomDoor.SpawnOutside("Enter " + name + "'s room", doorGround, doorFacing);
+                        }
                         room.OutsideDoor = door;
                         door.Destination = room.Entry;
                         door.DestinationYaw = room.EntryYaw;
@@ -450,6 +473,7 @@ namespace TradersInRaid
                     count++;
                     Plugin.Log.LogInfo("Placed " + spot.Name + " on " + map + " at " + string.Join(", ", spot.Position));
                 }
+                int hideoutDoors = HideoutDoors.Spawn(map);
                 TraderRoom.ExtendPhysics();
                 Plugin.Log.LogInfo("Raid started on '" + map + "', traders placed: " + count);
                 QuestSync.Send("raid start");

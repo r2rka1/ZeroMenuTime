@@ -132,7 +132,8 @@ public class TradersInRaidRouter(
     TraderHelper traderHelper,
     HandbookHelper handbookHelper,
     SPTarkov.Server.Core.Helpers.Quest.QuestHelper questHelper,
-    SPTarkov.Server.Core.Utils.Cloners.ICloner cloner) : StaticRouter(jsonUtil, [
+    SPTarkov.Server.Core.Utils.Cloners.ICloner cloner,
+    HideoutsService hideouts) : StaticRouter(jsonUtil, [
     new RouteAction<TradeReport>(
         "/tradersinraid/trade",
         (_, payload, sessionId, _, _) =>
@@ -157,6 +158,22 @@ public class TradersInRaidRouter(
         "/tradersinraid/quest/rewards",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(TableRewards.Deliver(sessionId, payload, profileHelper, questHelper, cloner)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/list",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/enter",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Enter(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/build",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Build(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/stash",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetStash(sessionId, payload)) ?? "{}")
     ),
     new RouteAction<DeathChoiceRequest>(
         "/tradersinraid/death/goto",

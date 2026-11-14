@@ -1,0 +1,345 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using EFT;
+using EFT.Communications;
+using EFT.EnvironmentEffect;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SPT.Common.Http;
+using UnityEngine;
+
+namespace TradersInRaid
+{
+    /// <summary>One hideout: which map its door is on, and where.</summary>
+    public class HideoutSpot
+    {
+        public string Id = "";
+        /// <summary>Map id as the game reports it (TarkovStreets, bigmap, Shoreline).</summary>
+        public string Map = "";
+        /// <summary>The middle of the door on the map, at floor level.</summary>
+        public float[] Position = { 0f, 0f, 0f };
+        /// <summary>The way the door faces, out from its wall.</summary>
+        public float RotationY;
+        public bool Enabled = true;
+    }
+
+    /// <summary>
+    /// The doors on the maps that lead into the player's hideouts, and the trip through them. Each
+    /// hideout is a separate one on the server (its own stations and stash); they share the game's
+    /// one bunker interior, which is loaded on the way in and unloaded on the way out.
+    /// </summary>
+    public static class HideoutDoors
+    {
+        /// <summary>How far under the map the bunker is put.</summary>
+        private const float Depth = 600f;
+
+        /// <summary>Where the player arrives, measured from the bunker's own origin.</summary>
+        private static readonly Vector3 Arrival = new Vector3(0f, 0.05f, 2f);
+
+        public static string FilePath => Path.Combine(TraderConfig.Dir, "hideouts.json");
+
+        /// <summary>The hideout the player is standing in, or null.</summary>
+        public static string Inside;
+        /// <summary>Station number to level for that hideout, as the server last reported them.</summary>
+        public static readonly Dictionary<int, int> Levels = new Dictionary<int, int>();
+
+        private static Vector3 _returnTo;
+        private static float _returnYaw;
+        private static bool _busy;
+        private static GameObject _indoorBox;
+        private static IndoorTrigger _indoor;
+        private static RoomDoor _exit;
+
+        /// <summary>Doors picked by hand on each map. hideouts.json, if present, replaces the list.</summary>
+        private static List<HideoutSpot> Defaults()
+        {
+            return new List<HideoutSpot>
+            {
+                // A rust-red metal double door in a tiled wall, at street level a few steps from Prapor.
+                new HideoutSpot { Id = "streets", Map = "TarkovStreets", Position = new[] { -15.30f, 3.00f, -108.65f }, RotationY = 0f },
+                // The door of one of the metal cabins north of Skier.
+                new HideoutSpot { Id = "customs", Map = "bigmap", Position = new[] { 75.00f, 1.40f, -109.75f }, RotationY = 345f },
+                // A grey steel door in a red corrugated shed, west of Peacekeeper.
+                new HideoutSpot { Id = "shoreline", Map = "Shoreline", Position = new[] { -1005.70f, -60.15f, 391.60f }, RotationY = 0f },
+            };
+        }
+
+        public static List<HideoutSpot> Load()
+        {
+            try
+            {
+                if (File.Exists(FilePath))
+                {
+                    return JsonConvert.DeserializeObject<List<HideoutSpot>>(File.ReadAllText(FilePath)) ?? new List<HideoutSpot>();
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Could not read hideouts.json: " + e);
+            }
+            return Defaults();
+        }
+
+        /// <summary>Puts this map's hideout doors in place. Called when the raid starts.</summary>
+        public static int Spawn(string map)
+        {
+            int placed = 0;
+            foreach (var spot in Load())
+            {
+                if (!spot.Enabled || spot.Position == null || spot.Position.Length < 3
+                    || !string.Equals(spot.Map, map, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                // The door itself is part of the map already; this is only something to look at and use,
+                // laid over it and not drawn.
+                var ground = new Vector3(spot.Position[0], spot.Position[1], spot.Position[2]);
+                var facing = Quaternion.Euler(0f, spot.RotationY, 0f);
+                var door = RoomDoor.Spawn("Enter hideout", ground + Vector3.up * (RoomDoor.Height / 2f) + facing * new Vector3(0f, 0f, 0.08f), spot.RotationY);
+                var renderer = door.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = false;
+                }
+                string id = spot.Id;
+                var back = ground + facing * new Vector3(0f, 0.05f, 1.0f);
+                float backYaw = spot.RotationY;
+                door.OnUse = () => Enter(id, back, backYaw);
+                placed++;
+                Plugin.Log.LogInfo("Hideout door for '" + spot.Id + "' at " + ground.ToString("F1") + " facing " + spot.RotationY.ToString("F0"));
+            }
+            if (placed > 0 && Plugin.Instance != null)
+            {
+                Plugin.Instance.StartCoroutine(Preload());
+            }
+            return placed;
+        }
+
+        /// <summary>
+        /// On a map with a hideout door, brings the interior in ahead of time, once the map itself
+        /// has finished streaming in. Loading it at the moment the door is used can take the better
+        /// part of a minute on a large map; loaded beforehand, stepping through is immediate.
+        /// </summary>
+        private static IEnumerator Preload()
+        {
+            yield return new WaitForSecondsRealtime(25f);
+            if (GamePlayerOwner.MyPlayer == null || _busy || HideoutBunker.Loaded || HideoutBunker.Loading)
+            {
+                yield break;
+            }
+            yield return Prepare(false);
+        }
+
+        /// <summary>Loads the interior if need be and puts it in place under the map.</summary>
+        private static IEnumerator Prepare(bool waited)
+        {
+            if (!HideoutBunker.Loaded)
+            {
+                var loading = HideoutBunker.Load();
+                while (!loading.IsCompleted)
+                {
+                    yield return null;
+                }
+                if (loading.IsFaulted || !HideoutBunker.Loaded)
+                {
+                    Plugin.Log.LogError("Hideout interior did not load: " + (loading.Exception != null ? loading.Exception.InnerException.ToString() : "?"));
+                    yield break;
+                }
+                Plugin.Log.LogInfo("Hideout interior " + (waited ? "(at the door): " : "(ahead of time): ") + loading.Result);
+            }
+            if (HideoutBunker.Moved == Vector3.zero)
+            {
+                HideoutBunker.Move(new Vector3(0f, -Depth, 0f));
+            }
+            if (_indoorBox == null)
+            {
+                // Indoors as far as the game is concerned, and inside the physics engine's reach.
+                var bounds = HideoutBunker.VisibleBounds();
+                _indoorBox = new GameObject("TradersInRaid hideout indoor area");
+                _indoorBox.transform.position = bounds.center;
+                _indoorBox.transform.localScale = bounds.size + Vector3.one * 4f;
+                _indoor = _indoorBox.AddComponent<IndoorTrigger>();
+                _indoor.IsBunker = true;
+                _indoor.Reinit();
+                TraderRoom.ExtendPhysics();
+            }
+        }
+
+        public static IndoorTrigger IndoorAt(Vector3 position)
+        {
+            return _indoor != null ? _indoor.Check(position) : null;
+        }
+
+        public static void Enter(string id, Vector3 returnTo, float returnYaw)
+        {
+            if (_busy || Inside != null || Plugin.Instance == null)
+            {
+                return;
+            }
+            Plugin.Instance.StartCoroutine(Going(id, returnTo, returnYaw));
+        }
+
+        public static void Leave()
+        {
+            if (_busy || Inside == null || Plugin.Instance == null)
+            {
+                return;
+            }
+            Plugin.Instance.StartCoroutine(Leaving());
+        }
+
+        private static IEnumerator Going(string id, Vector3 returnTo, float returnYaw)
+        {
+            _busy = true;
+            var player = GamePlayerOwner.MyPlayer;
+            RoomDoor.PlayDoorSound(true, player.Transform.position);
+            yield return RoomDoor.FadeTo(1f);
+
+            // Tell the server which hideout this is; it brings that one's stations and stash forward.
+            var call = RequestHandler.PostJsonAsync("/tradersinraid/hideout/enter", JsonConvert.SerializeObject(new { Id = id }));
+            while (!call.IsCompleted)
+            {
+                yield return null;
+            }
+            JObject reply = null;
+            try
+            {
+                reply = JObject.Parse(call.Result);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Hideout enter: " + e.Message);
+            }
+            if (reply == null || !((bool?)reply["Ok"] ?? false))
+            {
+                Plugin.Log.LogWarning("Hideout '" + id + "' could not be entered: " + (reply != null ? reply["Error"] : "no answer"));
+                NotificationManager.DisplayWarningNotification("The hideout could not be opened.");
+                yield return RoomDoor.FadeTo(0f);
+                _busy = false;
+                yield break;
+            }
+            Levels.Clear();
+            var levels = reply["Levels"] as JObject;
+            if (levels != null)
+            {
+                foreach (var pair in levels)
+                {
+                    Levels[int.Parse(pair.Key)] = (int)pair.Value;
+                }
+            }
+
+            if (!HideoutBunker.Loaded)
+            {
+                RoomDoor.FadeText = "Opening the hideout...";
+            }
+            yield return Prepare(true);
+            RoomDoor.FadeText = null;
+            if (!HideoutBunker.Loaded)
+            {
+                NotificationManager.DisplayWarningNotification("The hideout could not be opened.");
+                yield return RoomDoor.FadeTo(0f);
+                _busy = false;
+                yield break;
+            }
+            var origin = HideoutBunker.Moved;
+
+            HideoutBunker.Sun(false);
+            if (HideoutBunker.BunkerSettings != null)
+            {
+                HideoutBunker.BunkerSettings.ApplySettings();
+            }
+
+            var arrival = origin + Arrival;
+            Vector3 exitGround;
+            float exitYaw;
+            if (!RoomDoor.FindWall(arrival, out exitGround, out exitYaw))
+            {
+                exitGround = arrival + new Vector3(0f, 0f, -1.5f);
+                exitYaw = 0f;
+            }
+            _exit = RoomDoor.SpawnOutside("Leave hideout", exitGround, exitYaw);
+            _exit.OnUse = Leave;
+
+            _returnTo = returnTo;
+            _returnYaw = returnYaw;
+            Inside = id;
+            player.Teleport(arrival, false);
+            player.Rotation = new Vector2(exitYaw, 0f);
+            yield return new WaitForSecondsRealtime(0.3f);
+            RoomDoor.PlayDoorSound(false, arrival);
+            yield return RoomDoor.FadeTo(0f);
+            Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + exitGround.ToString("F1"));
+            _busy = false;
+        }
+
+        private static IEnumerator Leaving()
+        {
+            _busy = true;
+            var player = GamePlayerOwner.MyPlayer;
+            RoomDoor.PlayDoorSound(true, player.Transform.position);
+            yield return RoomDoor.FadeTo(1f);
+            player.Teleport(_returnTo, false);
+            player.Rotation = new Vector2(_returnYaw, 0f);
+            string was = Inside;
+            StepOut();
+            yield return new WaitForSecondsRealtime(0.2f);
+            RoomDoor.PlayDoorSound(false, _returnTo);
+            yield return RoomDoor.FadeTo(0f);
+            Plugin.Log.LogInfo("Left hideout '" + was + "'");
+            _busy = false;
+        }
+
+        /// <summary>Puts the map's own light back. The interior stays loaded for the next visit.</summary>
+        private static void StepOut()
+        {
+            Inside = null;
+            Levels.Clear();
+            HideoutBunker.Sun(true);
+            if (HideoutBunker.RaidSettings != null)
+            {
+                HideoutBunker.RaidSettings.ApplySettings();
+            }
+            if (_exit != null)
+            {
+                UnityEngine.Object.Destroy(_exit.transform.root.gameObject);
+                _exit = null;
+            }
+        }
+
+        /// <summary>Puts the map back as it was and lets the bunker go. Safe to call at any time.</summary>
+        public static async System.Threading.Tasks.Task Close()
+        {
+            Inside = null;
+            Levels.Clear();
+            try
+            {
+                HideoutBunker.Sun(true);
+                if (HideoutBunker.RaidSettings != null)
+                {
+                    HideoutBunker.RaidSettings.ApplySettings();
+                }
+                if (_exit != null)
+                {
+                    UnityEngine.Object.Destroy(_exit.transform.root.gameObject);
+                    _exit = null;
+                }
+                if (_indoorBox != null)
+                {
+                    UnityEngine.Object.Destroy(_indoorBox);
+                    _indoorBox = null;
+                    _indoor = null;
+                }
+                if (HideoutBunker.Loaded)
+                {
+                    await HideoutBunker.Unload();
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Closing the hideout failed: " + e);
+            }
+        }
+    }
+}
