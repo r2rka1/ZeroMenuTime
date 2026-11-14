@@ -367,6 +367,33 @@ namespace TradersInRaid
                            + string.Join(", ", names.Select(pair => pair.Value + " " + pair.Key).Take(25).ToArray()));
                     break;
                 }
+                case "hideoutdata":
+                {
+                    // Stage 6 probe: is the game's own hideout data alive during a raid, and what does it hold?
+                    if (!Comfort.Common.Singleton<EFT.Hideout.HideoutRepresentation>.Instantiated)
+                    {
+                        Report("the game's hideout data is NOT available in a raid");
+                        break;
+                    }
+                    var data = Comfort.Common.Singleton<EFT.Hideout.HideoutRepresentation>.Instance;
+                    int schemes = 0;
+                    try
+                    {
+                        schemes = data.ProductionSchemesCollection.ProductionSchemes.Count();
+                    }
+                    catch (Exception e)
+                    {
+                        Report("recipes could not be read: " + e.Message);
+                    }
+                    Report("the game's hideout data is available: " + data.AreaDatas.Count + " station record(s), " + schemes + " crafting recipe(s)");
+                    foreach (var area in data.AreaDatas.Take(6))
+                    {
+                        Report("  " + area.Template.Type + " level " + area.CurrentLevel + ", status " + area.Status);
+                    }
+                    Report("hideout screen objects present: overlay " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenOverlay != null)
+                           + ", rear " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenRear != null));
+                    break;
+                }
                 case "stations":
                 {
                     // Every station of the hideout the player is in: level, where it is, what the next level costs.
