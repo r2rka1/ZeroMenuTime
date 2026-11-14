@@ -88,6 +88,24 @@ public sealed class TraderSuppliesLoader(TraderHelper traderHelper, HandbookHelp
                 added += Stock(new MongoId(traderId), supplies);
             }
             Console.WriteLine("[TradersInRaid] Put " + added + " field supply offers on the traders.");
+
+            int maps = 0;
+            try
+            {
+                foreach (var (traderId, map) in LocalMaps.ForEachTrader())
+                {
+                    if (Traders.Contains(traderId))
+                    {
+                        maps += Stock(new MongoId(traderId), [map]);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                // Vagabond not installed, or its API changed: nobody stands anywhere, so no local maps.
+                Console.WriteLine("[TradersInRaid] Local maps not stocked: " + e.Message);
+            }
+            Console.WriteLine("[TradersInRaid] Put " + maps + " local map offers on the traders.");
         }
         catch (Exception e)
         {
@@ -119,7 +137,13 @@ public sealed class TraderSuppliesLoader(TraderHelper traderHelper, HandbookHelp
                 continue;
             }
 
-            double price = Math.Max(100, Math.Round(handbookHelper.GetTemplatePrice(tpl) * Markup));
+            double handbookPrice = handbookHelper.GetTemplatePrice(tpl);
+            if (handbookPrice <= 1)
+            {
+                // No price means no such item here, for instance a map another mod would have added.
+                continue;
+            }
+            double price = Math.Max(100, Math.Round(handbookPrice * Markup));
             var offerId = new MongoId();
             assort.Items.Add(new Item
             {
@@ -141,5 +165,47 @@ public sealed class TraderSuppliesLoader(TraderHelper traderHelper, HandbookHelp
             added++;
         }
         return added;
+    }
+}
+
+/// <summary>
+/// A trader sells the map of the place they stand on, so a player who arrives somewhere blind can
+/// buy their bearings from the local trader. Where each trader stands comes from Vagabond. Kept
+/// apart so a missing Vagabond only fails this one call.
+/// </summary>
+internal static class LocalMaps
+{
+    /// <summary>
+    /// The map item for each location. The maps for the newer locations are added by Dynamic Maps;
+    /// without it they have no price and are skipped.
+    /// </summary>
+    private static readonly Dictionary<string, Supply> Maps = new()
+    {
+        { "FactoryDay", new Supply("Factory plan map", "574eb85c245977648157eec3", 2) },
+        { "FactoryNight", new Supply("Factory plan map", "574eb85c245977648157eec3", 2) },
+        { "Woods", new Supply("Woods plan map", "5900b89686f7744e704a8747", 2) },
+        { "Customs", new Supply("Customs plan map", "5798a2832459774b53341029", 2) },
+        { "Interchange", new Supply("Interchange plan map", "5be4038986f774527d3fae60", 2) },
+        { "Shoreline", new Supply("Shoreline plan map", "5a8036fb86f77407252ddc02", 2) },
+        { "Reserve", new Supply("Reserve map", "6738034a9713b5f42b4a8b78", 2) },
+        { "Labs", new Supply("Labs map", "6738034e9d22459ad7cd1b81", 2) },
+        { "Lighthouse", new Supply("Lighthouse map", "6738035350b24a4ae4a57997", 2) },
+        { "Streets", new Supply("Streets map", "673803448cb3819668d77b1b", 2) },
+        { "GroundZero", new Supply("Ground Zero map", "6738033eb7305d3bdafe9518", 2) },
+        { "Labyrinth", new Supply("Labyrinth map", "68f1ad32317cc52f4c0b6fae", 2) },
+    };
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static List<(string TraderId, Supply Map)> ForEachTrader()
+    {
+        var result = new List<(string, Supply)>();
+        foreach (var spot in Vagabond.Common.Api.Api.GetTraderExtractions())
+        {
+            if (Maps.TryGetValue(spot.Raid.ToString(), out var map))
+            {
+                result.Add((spot.TraderId, map));
+            }
+        }
+        return result;
     }
 }
