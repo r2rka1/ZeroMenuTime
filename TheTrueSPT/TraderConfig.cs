@@ -79,6 +79,12 @@ namespace TheTrueSPT
                     Name = "Skier", TraderId = Skier, Maps = new List<string> { "bigmap" },
                     Position = new[] { 88.95f, 1.33f, -106.78f }, RotationY = 140f, Hidden = true, AtFeet = true,
                 });
+                doors.Add(new TraderSpot
+                {
+                    // A shut door by his spot on Streets; picked in game, standing with the back to it.
+                    Name = "Fence", TraderId = Fence, Maps = new List<string> { "TarkovStreets" },
+                    Position = new[] { 73.89f, -2.05f, 48.81f }, RotationY = 90f, Hidden = true, AtFeet = true,
+                });
                 foreach (var door in doors)
                 {
                     if (door.Enabled && door.TraderId == traderId && door.Position != null && door.Position.Length >= 3
