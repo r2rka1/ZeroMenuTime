@@ -202,12 +202,12 @@ namespace TheTrueSPT
             Item(panel, "Continue", font, new Vector2(left0, y), Continue);
             _whereLabel = Text(panel, "where", Where, font, 17f, Dim, new Vector2(left0 + 2f, y - 50f), new Vector2(700f, 26f));
             y -= 96f;
-            Item(panel, "New Game", font, new Vector2(left0, y), AskNewGame);
+            Item(panel, "Reset", font, new Vector2(left0, y), AskNewGame);
             y -= 66f;
             Item(panel, "Settings", font, new Vector2(left0, y), () => Open(EMenuType.Settings));
             y -= 66f;
             Item(panel, "Exit", font, new Vector2(left0, y), () => Open(EMenuType.Exit));
-            Plugin.Log.LogInfo("Main menu built: Continue, New Game, Settings, Exit");
+            Plugin.Log.LogInfo("Main menu built: Continue, Reset, Settings, Exit");
         }
 
         private static TextMeshProUGUI Text(RectTransform parent, string name, string words, TextMeshProUGUI like, float size, Color colour, Vector2 at, Vector2 box)
@@ -351,7 +351,7 @@ namespace TheTrueSPT
                 return;
             }
             ui.ShowMessageWindow(
-                "Start a new game?\n\nYour character, all three hideouts and your save are replaced by a fresh start. "
+                "Reset the game?\n\nYour character, the hideout and your save are replaced by a fresh start: a small kit, waking in the hideout. "
                 + "A backup of everything is kept on disk.\n\nThe game closes afterwards; start it again to play.",
                 () =>
                 {
@@ -361,14 +361,14 @@ namespace TheTrueSPT
                     }
                 },
                 () => { },
-                "New game");
+                "Reset");
         }
 
         /// <summary>Has the server make the character afresh, then restarts the game so it reads it.</summary>
         public static IEnumerator NewGame()
         {
             _working = true;
-            NotificationManager.DisplayMessageNotification("Starting a new game...", ENotificationDurationType.Long);
+            NotificationManager.DisplayMessageNotification("Resetting the game...", ENotificationDurationType.Long);
             var call = RequestHandler.PostJsonAsync("/thetruespt/newgame", "{\"Confirm\":\"yes\"}");
             while (!call.IsCompleted)
             {
@@ -387,7 +387,7 @@ namespace TheTrueSPT
             {
                 string why = reply != null ? (string)reply["Error"] : "no answer from the server";
                 Plugin.Log.LogWarning("New game failed: " + why);
-                NotificationManager.DisplayWarningNotification("A new game could not be started: " + why);
+                NotificationManager.DisplayWarningNotification("The game could not be reset: " + why);
                 _working = false;
                 yield break;
             }
@@ -396,8 +396,8 @@ namespace TheTrueSPT
             var ui = ItemUiContext.Instance;
             if (ui != null)
             {
-                ui.ShowMessageWindow("Your new game is ready.\n\nThe game will now close. Start it again and choose Continue.",
-                    () => acknowledged = true, () => acknowledged = true, "New game");
+                ui.ShowMessageWindow("The game is reset.\n\nIt will now close. Start it again and choose Continue.",
+                    () => acknowledged = true, () => acknowledged = true, "Reset");
             }
             // Close anyway after a while, in case the window could not be shown or answered.
             for (float waited = 0f; waited < 12f && !acknowledged; waited += Time.unscaledDeltaTime)
