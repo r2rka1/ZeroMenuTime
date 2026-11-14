@@ -81,6 +81,23 @@ namespace TheTrueSPT
             return _indexedFrom != null;
         }
 
+        /// <summary>True while a trader's room is still waiting for its furniture.</summary>
+        public static bool AnyBare()
+        {
+            if (Use == null || !Use.Value)
+            {
+                return false;
+            }
+            foreach (var room in TraderRoom.Rooms)
+            {
+                if (room.Shell && !room.Dressed)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>Furnishes every room that is still bare. Safe to call again and again.</summary>
         public static int DressAll(bool again = false)
         {

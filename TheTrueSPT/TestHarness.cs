@@ -737,6 +737,12 @@ namespace TheTrueSPT
                     // shelfput STATION TEMPLATE: lay a made-up item in a station's container.
                     Report(HideoutShelves.PutTest((int)Number(parts[1]), parts[2]));
                     break;
+                case "photo":
+                    // Takes a clean picture, as the picture key does.
+                    Photo.Take();
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    Report("picture asked for; see " + Photo.Folder);
+                    break;
                 case "shelves":
                     foreach (var entry in HideoutShelves.Describe())
                     {

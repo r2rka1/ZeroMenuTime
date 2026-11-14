@@ -232,6 +232,17 @@ namespace TheTrueSPT
             }
         }
 
+        /// <summary>Brings the interior in now, if it is not there yet, and furnishes the rooms still bare.</summary>
+        public static IEnumerator FurnishNow()
+        {
+            while (_busy || HideoutBunker.Loading)
+            {
+                yield return null;
+            }
+            yield return Prepare(false);
+            RoomProps.DressAll();
+        }
+
         /// <summary>Testing aid: bring the interior in now and furnish the rooms again.</summary>
         public static IEnumerator Furnish()
         {

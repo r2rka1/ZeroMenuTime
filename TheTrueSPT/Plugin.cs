@@ -110,6 +110,7 @@ namespace TheTrueSPT
             Metabolism.Bind(Config);
             TraderRoom.Bind(Config);
             RoomProps.Bind(Config);
+            Photo.Bind(Config);
             TestHarness.Bind(Config);
             ShowFigures = Config.Bind("General", "Show trader figures", true,
                 "Stand a character at each trader spot. The marker box is hidden once the figure has loaded.");
@@ -216,6 +217,7 @@ namespace TheTrueSPT
         {
             IndoorLight.Restore();
             HideoutPanel.Close();
+            Photo.Restore();
             try
             {
                 LocalTrade.Active = false;
@@ -278,6 +280,7 @@ namespace TheTrueSPT
             MapMarkers.Tick();
             HideoutPower.Tick();
             BotFreeze.Tick();
+            Photo.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;

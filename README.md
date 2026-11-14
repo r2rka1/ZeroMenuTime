@@ -48,6 +48,9 @@ In game, press F12 and open The True SPT.
 | Trader rooms | Put traders in rooms | on | Give each trader a room behind a door; off puts them back in the open |
 | Trader rooms | Furnish rooms from the game | on | Build the rooms from the game's own furniture and wall materials; off uses the mod's own simple rooms |
 | Trader rooms | Room depth below the door | 300 | How far under the map the rooms are built, in metres |
+| Pictures | Take a picture key | F11 | Save what is on screen, without the interface, to `BepInEx/plugins/TheTrueSPT/screenshots` |
+| Pictures | Hide the interface key | F9 | Hide the whole interface until pressed again |
+| Pictures | Picture size | 2 | How many times the screen's size a saved picture is |
 | No menus | Enabled | on | Skip result screens and continue automatically |
 | No menus | Seconds before continuing | 4 | Length of the countdown in the main menu |
 | No menus | Stay in menu key | Backspace | Hold during the countdown to stay in the menu |

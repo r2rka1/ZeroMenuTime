@@ -294,6 +294,15 @@ namespace TheTrueSPT
                 }
                 Fade = 1f;
 
+                // The furniture is fetched half a minute into a raid. Someone who steps through a
+                // trader's door before that waits here, behind the dark screen, until it is in.
+                if (RoomProps.AnyBare())
+                {
+                    FadeText = "Opening the door...";
+                    yield return HideoutDoors.FurnishNow();
+                    FadeText = null;
+                }
+
                 var player = GamePlayerOwner.MyPlayer;
                 if (player != null)
                 {
