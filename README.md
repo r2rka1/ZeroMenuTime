@@ -79,6 +79,8 @@ All three doors lead to the same hideout: the same stations, stash and crafts. I
 - **Sleeping.** A built Rest Space offers sleeping for 2, 4 or 8 hours, or until morning. The clock jumps, you heal 20, 40 or 70 health per hour by Rest Space level, and you use up energy and water as if the time had passed.
 - **Saving.** Sleeping saves the game, and the Rest Space also offers **Save**. If you die, the save is put back (gear, health, skills, quests, all three hideouts and the clock) and the next raid begins beside that bed. The same happens if the game stops without the raid ending. Leaving a raid in the ordinary way carries on from where you left.
 
+With the Dynamic Maps mod installed, the hideout's door and the traders' doors on the map you are on are marked on its map. Without that mod there are no markers and nothing else changes.
+
 ### Time
 
 The character has one world clock. It runs at the raid's pace (seven game hours to a real hour) while a raid runs, jumps when you sleep and stands still while the game is closed. The time of day carries over from raid to raid, and crafts in every hideout are timed on it, so they keep going while you are elsewhere.

@@ -187,6 +187,15 @@ namespace TheTrueSPT
             }
         }
 
+        /// <summary>Where this map's hideout doors are, for the map.</summary>
+        public static IEnumerable<Vector3> DoorPlaces()
+        {
+            foreach (var front in Fronts.Values)
+            {
+                yield return front.Key;
+            }
+        }
+
         private static RoomDoor _securityExit;
         // Where the Security station puts its door, across the way to the steps.
         private static readonly Vector3 SecurityDoor = new Vector3(-8.7f, 1.1f, -8.5f);

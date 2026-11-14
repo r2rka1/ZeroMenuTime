@@ -275,6 +275,7 @@ namespace TheTrueSPT
             MainMenu.Tick();
             HideoutPanel.Tick();
             IndoorLight.Tick();
+            MapMarkers.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;
