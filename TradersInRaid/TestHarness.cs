@@ -654,6 +654,26 @@ namespace TradersInRaid
                     }
                     break;
                 }
+                case "layout":
+                    // layout [STYLE]: furnish the rooms again from test/layout.txt, in a trader's style if one is named.
+                    if (parts.Length > 1)
+                    {
+                        TraderRoom.LookOverride = parts[1].ToLowerInvariant() == "none" ? null : parts[1];
+                    }
+                    yield return HideoutDoors.Furnish();
+                    break;
+                case "props":
+                    // props WORD: hideout pieces whose name contains the word.
+                    foreach (var entry in RoomProps.Find(parts.Length > 1 ? parts[1] : ""))
+                    {
+                        Report("  " + entry);
+                    }
+                    break;
+                case "survey":
+                    // Catalogue of everything drawn in the hideout interior, for choosing room furniture.
+                    Report(RoomProps.Survey(System.IO.Path.Combine(Dir, "bunker-objects.txt")));
+                    Report(RoomProps.SurveyMaterials(System.IO.Path.Combine(Dir, "bunker-materials.txt")));
+                    break;
                 case "scenery":
                 {
                     // Drawn objects near the player whose name contains a word (default "door") and that

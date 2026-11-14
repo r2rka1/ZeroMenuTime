@@ -121,7 +121,10 @@ namespace TradersInRaid
                 placed++;
                 Plugin.Log.LogInfo("Hideout door for '" + spot.Id + "' at " + ground.ToString("F1") + " facing " + spot.RotationY.ToString("F0"));
             }
-            if (placed > 0 && Plugin.Instance != null)
+            // The interior is wanted for its own sake where there is a hideout door, and for its
+            // furniture wherever a trader has a room.
+            bool rooms = RoomProps.Use != null && RoomProps.Use.Value && TraderRoom.Rooms.Count > 0;
+            if ((placed > 0 || rooms) && Plugin.Instance != null)
             {
                 Plugin.Instance.StartCoroutine(Preload());
             }
@@ -141,6 +144,18 @@ namespace TradersInRaid
                 yield break;
             }
             yield return Prepare(false);
+            RoomProps.DressAll();
+            if (Fronts.Count == 0)
+            {
+                // No hideout on this map: the furniture has been copied out, so the interior can go.
+                var closing = Close();
+                while (!closing.IsCompleted)
+                {
+                    yield return null;
+                }
+                Plugin.Log.LogInfo("Hideout interior let go after furnishing the rooms");
+                yield break;
+            }
 
             // After a death, or a crash since the last save, the raid begins at the bed.
             var asking = SaveGame.Status(false);
@@ -158,6 +173,14 @@ namespace TradersInRaid
                 Enter(bed, front.Key, front.Value, true);
                 NotificationManager.DisplayMessageNotification("You wake up at your bed.", ENotificationDurationType.Long);
             }
+        }
+
+        /// <summary>Testing aid: bring the interior in now and furnish the rooms again.</summary>
+        public static IEnumerator Furnish()
+        {
+            yield return Prepare(false);
+            int done = RoomProps.DressAll(true);
+            TestHarness.Report(done > 0 ? "furnished " + done + " room(s)" : "FAILED no room furnished");
         }
 
         /// <summary>Loads the interior if need be and puts it in place under the map.</summary>

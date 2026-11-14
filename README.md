@@ -12,6 +12,8 @@ Built and tested against SPT 4.1.6 (client 0.16.9.5) together with the open-worl
 - **Collect deliveries** drops everything waiting in your mail (quest rewards, insurance returns, from every sender) on the table in the room. An item leaves the mail only when you pick it up, so whatever you leave on the table is there again next visit.
 - **Save and go to menu** ends the raid at that spot and returns to the main menu.
 
+The rooms are furnished from the game itself: walls, floor, tables, shelves, crates and the door are copies of pieces of the game's hideout interior, laid out differently for each trader. The layouts are plain text in `TradersInRaid/RoomLayouts.cs`.
+
 **Quests work at those traders.** Accept and hand in quests through the trader's Tasks tab. On hand-in the reward items land on the table at once; experience, standing and follow-up quests are paid when the raid ends. Trader sales totals and loyalty levels grow from in-raid trades.
 
 With "Put traders in rooms" switched off, traders stand in the open at their spots as figures, and deliveries go straight into your gear.
@@ -42,6 +44,7 @@ In game, press F12 and open TradersInRaid.
 | General | Capture position key | F10 | Write your current position to `captured_positions.txt` |
 | (no setting) | Hideouts, crafting, sleep, saving | on | Always on when the hideout doors exist on the map; `hideouts.json` next to the plugin can move or disable a door |
 | Trader rooms | Put traders in rooms | on | Give each trader a room behind a door; off puts them back in the open |
+| Trader rooms | Furnish rooms from the game | on | Build the rooms from the game's own furniture and wall materials; off uses the mod's own simple rooms |
 | Trader rooms | Room depth below the door | 300 | How far under the map the rooms are built, in metres |
 | No menus | Enabled | on | Skip result screens and continue automatically |
 | No menus | Seconds before continuing | 4 | Length of the countdown in the main menu |
@@ -90,7 +93,7 @@ The door is stood against the nearest flat stretch of wall near the trader's spo
 - Inside a hideout you arrive in a bare corridor and leave through a door prop; waking up after a death puts you by the Rest Space.
 - Over a very long raid bots may thin out, since the game spawns them on a schedule made for short raids.
 - If a raid is lost to a crash after a hand-in, the reward items you picked up are kept although the quest is not recorded as finished.
-- The rooms are made of simple shapes with generated textures.
+- A room is bare for the first half minute of a raid, until the furniture has been fetched.
 - Trader figures are dressed stand-ins built from the game's own clothing; the game has no trader character models.
 - Post-raid healing is skipped along with the other result screens.
 
@@ -122,6 +125,7 @@ With "Test harness" on, the mod reads `BepInEx/plugins/TradersInRaid/test/comman
 | `deliveries`, `table` | Ask for deliveries; list what lies on the tables |
 | `quests`, `handin [QUEST_ID]` | List quests; hand one in whether or not it is done |
 | `style NAME` | Rebuild the rooms in another trader's style |
+| `layout [NAME]`, `props WORD`, `survey` | Furnish the rooms again (from `test/layout.txt` if it exists); search the hideout's pieces; write the full catalogue to `test/` |
 | `savequit` | Choose "Save and go to menu" at the room's trader |
 | `startraid` | From the main menu: start a raid where the character is |
 | `hideout enter ID`, `hideout leave`, `use` | Go into a hideout (streets, customs, shoreline) and out; use the nearest door of ours |

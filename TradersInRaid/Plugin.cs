@@ -64,6 +64,7 @@ namespace TradersInRaid
             TraderModelBundle.Bind(Config);
             Metabolism.Bind(Config);
             TraderRoom.Bind(Config);
+            RoomProps.Bind(Config);
             TestHarness.Bind(Config);
             ShowFigures = Config.Bind("General", "Show trader figures", true,
                 "Stand a character at each trader spot. The marker box is hidden once the figure has loaded.");

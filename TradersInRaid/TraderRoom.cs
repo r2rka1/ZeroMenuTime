@@ -25,7 +25,12 @@ namespace TradersInRaid
         private const float TableHeight = 0.8f;
 
         public string TraderId;
+        public string TraderName;
         public GameObject Root;
+
+        /// <summary>True for the plain room made in code, which takes furniture from the game.</summary>
+        public bool Shell;
+        public bool Dressed;
         public IndoorTrigger Indoor;
 
         /// <summary>Where the player stands after coming in, and the way they face.</summary>
@@ -98,7 +103,10 @@ namespace TradersInRaid
             // Rooms on the same map are kept well apart so one cannot be seen or heard from another.
             var origin = doorGround + new Vector3(Rooms.Count * 40f, -Mathf.Abs(Depth.Value), 0f);
             // Each trader has a room of their own in the bundle; anyone without one gets the plain shop.
-            var prefab = RoomBundle.Prefab("TraderRoom_" + (LookOverride ?? traderName)) ?? RoomBundle.Prefab("TraderRoom_Base");
+            // With furniture from the game, the room is a plain shell made here and filled in once the
+            // hideout interior is at hand; otherwise it is one of the rooms built in Unity.
+            bool shell = RoomProps.Use != null && RoomProps.Use.Value;
+            var prefab = shell ? null : RoomBundle.Prefab("TraderRoom_" + (LookOverride ?? traderName)) ?? RoomBundle.Prefab("TraderRoom_Base");
             if (prefab != null)
             {
                 try
@@ -128,7 +136,7 @@ namespace TradersInRaid
             Box(root, "wall north", new Vector3(0f, Height / 2f, (Length + Wall) / 2f), new Vector3(Width, Height, Wall), wallColour, solid);
 
             // The table stands against the east wall, to the player's right as they come in.
-            var tableCentre = new Vector3(Width / 2f - 0.6f, TableHeight / 2f, 0.3f);
+            var tableCentre = new Vector3(Width / 2f - 0.6f, TableHeight / 2f, -0.4f);
             Box(root, "table", tableCentre, new Vector3(0.8f, TableHeight, 1.6f), woodColour, solid);
 
             var lamp = new GameObject("lamp");
@@ -153,6 +161,8 @@ namespace TradersInRaid
             var room = new TraderRoom
             {
                 TraderId = traderId,
+                TraderName = traderName,
+                Shell = true,
                 Root = root,
                 Indoor = indoor,
                 Entry = origin + new Vector3(0f, 0.05f, -Length / 2f + 1.2f),
@@ -232,7 +242,7 @@ namespace TradersInRaid
             return box;
         }
 
-        private static int SolidLayer()
+        public static int SolidLayer()
         {
             int solid = LayerMask.NameToLayer("HighPolyCollider");
             if (solid < 0)
@@ -342,6 +352,7 @@ namespace TradersInRaid
             var room = new TraderRoom
             {
                 TraderId = traderId,
+                TraderName = traderName,
                 Root = root,
                 Indoor = indoor,
                 Entry = entry.position,

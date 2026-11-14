@@ -26,7 +26,60 @@ namespace TradersInRaid
 
         /// <summary>True while the hideout's scenes are being loaded; its level settings must not take over then.</summary>
         public static bool Loading;
-        public static bool Loaded => _token != null;
+        public static bool Loaded => _token != null || _adopted;
+
+        // A hot reload of this plugin forgets the token while the scene stays in the world. The
+        // scene is then found again by name, and a marker object remembers how far it was moved.
+        private static bool _adopted;
+        private const string MarkerName = "TradersInRaid bunker marker";
+
+        private static void Mark()
+        {
+            var marker = GameObject.Find(MarkerName) ?? new GameObject(MarkerName);
+            marker.transform.position = Moved;
+        }
+
+        /// <summary>Takes over an interior loaded before this plugin was reloaded.</summary>
+        public static bool Adopt()
+        {
+            if (Loaded || Loading)
+            {
+                return Loaded;
+            }
+            var marker = GameObject.Find(MarkerName);
+            BunkerScenes.Clear();
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var scene = SceneManager.GetSceneAt(i);
+                if (scene.isLoaded && scene.name.StartsWith("bunker", StringComparison.OrdinalIgnoreCase))
+                {
+                    BunkerScenes.Add(scene);
+                }
+            }
+            if (BunkerScenes.Count == 0)
+            {
+                var names = new List<string>();
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    names.Add(SceneManager.GetSceneAt(i).name);
+                }
+                Plugin.Log.LogInfo("No hideout interior among the loaded scenes: " + string.Join(", ", names.ToArray()));
+                return false;
+            }
+            Moved = marker != null ? marker.transform.position : Vector3.zero;
+            _adopted = true;
+            RaidSettings = Singleton<LevelSettings>.Instantiated ? Singleton<LevelSettings>.Instance : null;
+            foreach (var root in Roots())
+            {
+                var settings = root.GetComponentInChildren<LevelSettings>(true);
+                if (settings != null && settings != RaidSettings)
+                {
+                    BunkerSettings = settings;
+                }
+            }
+            Plugin.Log.LogInfo("Hideout interior taken over after a reload, moved " + Moved.ToString("F1"));
+            return true;
+        }
 
         /// <summary>The map's own level settings, and the bunker's, so either can be applied.</summary>
         public static LevelSettings RaidSettings, BunkerSettings;
@@ -35,7 +88,7 @@ namespace TradersInRaid
 
         public static async Task<string> Load()
         {
-            if (Loaded || Loading)
+            if (Loaded || Loading || Adopt())
             {
                 return "already loaded";
             }
@@ -68,6 +121,7 @@ namespace TradersInRaid
                 }
             }
             Moved = Vector3.zero;
+            Mark();
 
             // Nothing in the bunker may render the screen or listen for sound in place of the player.
             int cameras = 0, listeners = 0;
@@ -240,6 +294,7 @@ namespace TradersInRaid
                 moved++;
             }
             Moved += by;
+            Mark();
             Physics.SyncTransforms();
             return "moved " + moved + " root object(s) by " + by.ToString("F1");
         }
@@ -292,7 +347,27 @@ namespace TradersInRaid
             Sun(true);
             var token = _token;
             _token = null;
-            await ModernLoadScenesFromPreset.Unload(token);
+            var marker = GameObject.Find(MarkerName);
+            if (marker != null)
+            {
+                UnityEngine.Object.Destroy(marker);
+            }
+            if (token != null)
+            {
+                await ModernLoadScenesFromPreset.Unload(token);
+            }
+            else
+            {
+                _adopted = false;
+                foreach (var scene in BunkerScenes.ToArray())
+                {
+                    var unloading = SceneManager.UnloadSceneAsync(scene);
+                    while (unloading != null && !unloading.isDone)
+                    {
+                        await Task.Yield();
+                    }
+                }
+            }
             BunkerScenes.Clear();
             BunkerSettings = null;
             if (RaidSettings != null && (!Singleton<LevelSettings>.Instantiated || Singleton<LevelSettings>.Instance != RaidSettings))
