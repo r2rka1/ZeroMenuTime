@@ -15,7 +15,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// lookat [NAME] | style NAME | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -149,6 +149,29 @@ namespace TradersInRaid
                     yield return new WaitForSecondsRealtime(0.5f);
                     Status(player);
                     break;
+                case "style":
+                    // Rebuilds the rooms in another trader's style (or "none" for their own).
+                    TraderRoom.LookOverride = parts.Length < 2 || parts[1].ToLowerInvariant() == "none" ? null : parts[1];
+                    SpawnTradersPatch.Postfix(Comfort.Common.Singleton<GameWorld>.Instance);
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    Report("rooms rebuilt in style " + (TraderRoom.LookOverride ?? "their own"));
+                    break;
+                case "lookat":
+                {
+                    // Turns the player toward the door on the map of the first room, or the room named.
+                    foreach (var room in TraderRoom.Rooms)
+                    {
+                        if (room.OutsideDoor == null || (parts.Length > 1 && !TraderConfig.NameOf(room.TraderId).ToLowerInvariant().StartsWith(parts[1].ToLowerInvariant())))
+                        {
+                            continue;
+                        }
+                        var to = room.OutsideDoor.transform.position - player.Transform.position;
+                        player.Rotation = new Vector2(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, 0f);
+                        Report("door of " + TraderConfig.NameOf(room.TraderId) + " is " + new Vector2(to.x, to.z).magnitude.ToString("F1") + " m away at " + room.OutsideDoor.transform.position.ToString("F1"));
+                        break;
+                    }
+                    break;
+                }
                 case "look":
                     player.Rotation = new Vector2(Number(parts[1]), parts.Length > 2 ? Number(parts[2]) : 0f);
                     break;

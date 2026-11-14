@@ -51,6 +51,9 @@ namespace TradersInRaid
 
         public static readonly List<TraderRoom> Rooms = new List<TraderRoom>();
 
+        /// <summary>Testing aid: build every room in this trader's style, to look at one without travelling to it.</summary>
+        public static string LookOverride;
+
         public static void Bind(ConfigFile config)
         {
             // BepInEx forbids = \n \t \ " ' [ ] in section and key names.
@@ -94,7 +97,8 @@ namespace TradersInRaid
         {
             // Rooms on the same map are kept well apart so one cannot be seen or heard from another.
             var origin = doorGround + new Vector3(Rooms.Count * 40f, -Mathf.Abs(Depth.Value), 0f);
-            var prefab = RoomBundle.Prefab("TraderRoom_Base");
+            // Each trader has a room of their own in the bundle; anyone without one gets the plain shop.
+            var prefab = RoomBundle.Prefab("TraderRoom_" + (LookOverride ?? traderName)) ?? RoomBundle.Prefab("TraderRoom_Base");
             if (prefab != null)
             {
                 try
@@ -386,18 +390,21 @@ namespace TradersInRaid
                 _tried = true;
                 try
                 {
-                    // A hot reload forgets the bundle here while the game still holds it open.
+                    // A hot reload forgets the bundle here while the game still holds the old one;
+                    // let go of that so a rebuilt file is picked up.
                     foreach (var loaded in AssetBundle.GetAllLoadedAssetBundles())
                     {
                         if (loaded != null && loaded.name == BundleName)
                         {
-                            _bundle = loaded;
+                            loaded.Unload(false);
                         }
                     }
+                    // Read into memory rather than opened in place, so the file is never locked and
+                    // can be replaced while the game runs.
                     string path = System.IO.Path.Combine(TraderConfig.Dir, BundleName);
-                    if (_bundle == null && System.IO.File.Exists(path))
+                    if (System.IO.File.Exists(path))
                     {
-                        _bundle = AssetBundle.LoadFromFile(path);
+                        _bundle = AssetBundle.LoadFromMemory(System.IO.File.ReadAllBytes(path));
                     }
                     Plugin.Log.LogInfo(_bundle != null
                         ? "Room bundle loaded: " + string.Join(", ", _bundle.GetAllAssetNames())

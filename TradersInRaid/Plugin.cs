@@ -396,13 +396,29 @@ namespace TradersInRaid
                     if (TraderRoom.Enabled.Value)
                     {
                         var room = TraderRoom.Build(extract.TraderId, name, exfil.transform.position);
-                        var door = RoomDoor.SpawnOutside("Enter " + name + "'s room", exfil.transform.position, facing);
+                        // The door goes where doors.json says, else against the nearest wall, else on the spot.
+                        var doorGround = exfil.transform.position;
+                        float doorFacing = facing;
+                        var chosen = TraderConfig.DoorFor(extract.TraderId, map);
+                        string how = "on the trader's spot";
+                        if (chosen != null)
+                        {
+                            doorGround = new Vector3(chosen.Position[0], chosen.Position[1], chosen.Position[2]);
+                            doorFacing = chosen.RotationY;
+                            how = "where doors.json says";
+                        }
+                        else if (RoomDoor.FindWall(exfil.transform.position, out doorGround, out doorFacing))
+                        {
+                            how = "against the nearest wall";
+                        }
+                        Plugin.Log.LogInfo("Door for " + name + " " + how + ": " + doorGround.ToString("F1") + " facing " + doorFacing.ToString("F0"));
+                        var door = RoomDoor.SpawnOutside("Enter " + name + "'s room", doorGround, doorFacing);
                         room.OutsideDoor = door;
                         door.Destination = room.Entry;
                         door.DestinationYaw = room.EntryYaw;
                         // Coming back out, the player stands just in front of the door, facing away from it.
-                        room.ExitDoor.Destination = exfil.transform.position + Quaternion.Euler(0f, facing, 0f) * new Vector3(0f, 0.05f, 1.0f);
-                        room.ExitDoor.DestinationYaw = facing;
+                        room.ExitDoor.Destination = doorGround + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0.05f, 1.0f);
+                        room.ExitDoor.DestinationYaw = doorFacing;
                         ground = room.TraderStand;
                         facing = room.TraderYaw;
                     }

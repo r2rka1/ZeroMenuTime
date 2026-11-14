@@ -48,6 +48,38 @@ namespace TradersInRaid
         public static string FilePath => Path.Combine(Dir, "traders.json");
         public static string CapturePath => Path.Combine(Dir, "captured_positions.txt");
 
+        public static string DoorsPath => Path.Combine(Dir, "doors.json");
+
+        /// <summary>
+        /// A hand-picked place for a trader's door on a map, for where the automatic choice of wall
+        /// is poor. doors.json holds a list of the same entries as traders.json: TraderId, Maps,
+        /// Position (on the ground) and RotationY (the way the door faces). Null if there is none.
+        /// </summary>
+        public static TraderSpot DoorFor(string traderId, string map)
+        {
+            try
+            {
+                if (!File.Exists(DoorsPath))
+                {
+                    return null;
+                }
+                var doors = JsonConvert.DeserializeObject<List<TraderSpot>>(File.ReadAllText(DoorsPath)) ?? new List<TraderSpot>();
+                foreach (var door in doors)
+                {
+                    if (door.Enabled && door.TraderId == traderId && door.Position != null && door.Position.Length >= 3
+                        && door.Maps.Exists(m => string.Equals(m, map, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return door;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Could not read doors.json: " + e);
+            }
+            return null;
+        }
+
         public static List<TraderSpot> Load()
         {
             try

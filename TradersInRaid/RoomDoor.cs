@@ -50,6 +50,62 @@ namespace TradersInRaid
             return door;
         }
 
+        /// <summary>
+        /// Looks for a wall near the trader's spot to stand the door against, so it reads as a door
+        /// into a building and not a slab in the open. Gives the point on the ground at the foot of
+        /// the wall and the way the door should face (out from the wall). False if nothing suitable
+        /// is close by.
+        /// </summary>
+        public static bool FindWall(Vector3 spot, out Vector3 ground, out float yaw)
+        {
+            ground = spot;
+            yaw = 0f;
+            int mask = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain", "Default");
+            var chest = spot + Vector3.up * 1.0f;
+            float best = float.MaxValue;
+            bool found = false;
+            for (int step = 0; step < 24; step++)
+            {
+                var direction = Quaternion.Euler(0f, step * 15f, 0f) * Vector3.forward;
+                RaycastHit hit;
+                if (!Physics.Raycast(chest, direction, out hit, 8f, mask, QueryTriggerInteraction.Ignore)
+                    || hit.distance < 0.7f || hit.distance >= best || Mathf.Abs(hit.normal.y) > 0.15f)
+                {
+                    continue;
+                }
+                // It has to be a flat stretch of wall as tall and wide as the door: probe it at the
+                // door's corners, straight along the wall's own normal.
+                var into = -new Vector3(hit.normal.x, 0f, hit.normal.z).normalized;
+                var along = Vector3.Cross(Vector3.up, into);
+                var foot = hit.point - Vector3.up * 1.0f;
+                bool flat = true;
+                foreach (var offset in new[] { new Vector2(-0.55f, 0.25f), new Vector2(0.55f, 0.25f), new Vector2(-0.55f, 2.0f), new Vector2(0.55f, 2.0f), new Vector2(0f, 1.1f) })
+                {
+                    var from = foot - into * 0.6f + along * offset.x + Vector3.up * offset.y;
+                    RaycastHit probe;
+                    if (!Physics.Raycast(from, into, out probe, 1.0f, mask, QueryTriggerInteraction.Ignore)
+                        || Mathf.Abs(probe.distance - 0.6f) > 0.12f)
+                    {
+                        flat = false;
+                        break;
+                    }
+                }
+                // And there must be floor to stand on in front of it, about level with the trader's spot.
+                RaycastHit floor;
+                if (!flat || !Physics.Raycast(foot - into * 0.7f + Vector3.up * 1.2f, Vector3.down, out floor, 2.2f, mask, QueryTriggerInteraction.Ignore)
+                    || Mathf.Abs(floor.point.y - spot.y) > 0.6f)
+                {
+                    continue;
+                }
+                best = hit.distance;
+                found = true;
+                var atWall = hit.point - into * 0.1f;
+                ground = new Vector3(atWall.x, floor.point.y, atWall.z);
+                yaw = Quaternion.LookRotation(-into).eulerAngles.y;
+            }
+            return found;
+        }
+
         /// <summary>The door on the map: the one from the bundle if there is one, otherwise a plain slab.</summary>
         public static RoomDoor SpawnOutside(string label, Vector3 ground, float rotationY)
         {
