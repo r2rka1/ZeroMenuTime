@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Comfort.Common;
+using Diz.Jobs;
 using EFT;
 using EFT.Communications;
 using EFT.InventoryLogic;
@@ -36,6 +37,8 @@ namespace TheTrueSPT
             public string Recipe, Product;
             public int Area, Count;
             public double Started, Due;
+            /// <summary>Waiting for power; its time is not running.</summary>
+            public bool Paused;
         }
 
         private const int PerPage = 6;
@@ -53,8 +56,8 @@ namespace TheTrueSPT
         {
             get
             {
-                List<Craft> list;
-                return HideoutDoors.Inside != null && Crafts.TryGetValue(HideoutDoors.Inside, out list) ? list : new List<Craft>();
+                // One hideout behind all three doors: whatever is being made is being made here.
+                return HideoutDoors.Inside != null ? Crafts.Values.SelectMany(list => list).ToList() : new List<Craft>();
             }
         }
 
@@ -74,6 +77,7 @@ namespace TheTrueSPT
                         {
                             Recipe = (string)entry["Recipe"], Product = (string)entry["Product"], Area = (int)entry["Area"],
                             Count = (int)entry["Count"], Started = (double)entry["Started"], Due = (double)entry["Due"],
+                            Paused = (bool?)entry["Paused"] ?? false,
                         });
                     }
                     Crafts[pair.Key] = list;
@@ -329,7 +333,7 @@ namespace TheTrueSPT
                 HideoutStash.Send("after starting a craft");
                 MenuArea = -1;
                 Refresh();
-                string text = "Making " + Label(recipe.Product, recipe.Count) + ", ready in " + WorldClock.Span(HideoutPower.Takes(recipe.Seconds)) + " of game time.";
+                string text = "Making " + Label(recipe.Product, recipe.Count) + ", ready in " + WorldClock.Span(recipe.Seconds) + " of game time.";
                 Plugin.Log.LogInfo(text + " (hideout '" + HideoutDoors.Inside + "', station " + recipe.Area + ")");
                 NotificationManager.DisplayMessageNotification(text, ENotificationDurationType.Long);
                 return text;
@@ -397,6 +401,18 @@ namespace TheTrueSPT
         /// <summary>Puts one made-up item into the hideout's stash, or into the player's gear if the stash is full.</summary>
         public static async Task<bool> PutItem(Player player, Item item)
         {
+            // A raid has only the models of what was in it when it began; something made here
+            // since would otherwise be invisible in the hand or on the ground.
+            try
+            {
+                var models = item.GetAllItems().SelectMany(part => part.Template.AllResources).ToArray();
+                await Singleton<ObjectsFactory>.Instance.LoadBundlesAndCreatePools(
+                    ObjectsFactory.PoolsCategory.Raid, ObjectsFactory.AssemblyType.Local, models, JobYieldPriority.Immediate);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Could not load the model of " + item.TemplateId + ": " + e.Message);
+            }
             var stash = HideoutStash.Current;
             var address = stash != null ? stash.Grids[0].FindLocationForItem(item) : null;
             if (address != null)
@@ -429,22 +445,7 @@ namespace TheTrueSPT
                 {
                     size = 1;
                 }
-                bool done = false;
-                var address = stash != null ? stash.Grids[0].FindLocationForItem(item) : null;
-                if (address != null)
-                {
-                    var add = ItemManipulator.Add(item, address, player.InventoryController, false);
-                    if (!add.Failed)
-                    {
-                        add.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
-                        add.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
-                        done = true;
-                    }
-                }
-                if (!done)
-                {
-                    done = await LocalTrade.Give(player, item);
-                }
+                bool done = await PutItem(player, item);
                 if (done)
                 {
                     placed += size;

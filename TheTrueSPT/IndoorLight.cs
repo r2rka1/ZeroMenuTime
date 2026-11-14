@@ -20,7 +20,8 @@ namespace TheTrueSPT
         private static float _intensity, _reflection;
 
         private static readonly Color RoomFill = new Color(0.085f, 0.085f, 0.09f);
-        private static readonly Color HideoutFill = new Color(0.05f, 0.05f, 0.055f);
+        private static readonly Color HideoutFill = new Color(0.06f, 0.06f, 0.065f);
+        private static readonly Color HideoutDark = new Color(0.012f, 0.012f, 0.014f);
 
         /// <summary>Called every frame.</summary>
         public static void Tick()
@@ -77,7 +78,8 @@ namespace TheTrueSPT
         /// <summary>Just before each picture is drawn: the sky's own code has set its light by now.</summary>
         private static void Hold(Camera camera)
         {
-            var fill = HideoutDoors.Inside != null ? HideoutFill : RoomFill;
+            // A hideout without power is close to black; with power its own lamps do the rest.
+            var fill = HideoutDoors.Inside == null ? RoomFill : HideoutPower.Powered ? HideoutFill : HideoutDark;
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = fill;
             RenderSettings.ambientSkyColor = fill;

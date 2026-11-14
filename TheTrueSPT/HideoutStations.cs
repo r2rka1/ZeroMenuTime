@@ -125,6 +125,7 @@ namespace TheTrueSPT
                 }
             }
             Plugin.Log.LogInfo("Stations shown: " + shown);
+            HideoutPower.ApplyLook();
         }
 
         private static void Show(EAreaType type, HideoutArea area, int level, bool immediate)
@@ -495,6 +496,7 @@ namespace TheTrueSPT
                 }
                 Plugin.Log.LogInfo(name + " built to level " + level + " in hideout '" + HideoutDoors.Inside + "'");
                 HideoutDoors.RefreshExits();
+                HideoutPower.ApplyLook();
                 // The wall comes down in several stages in the game's data; here it is one job.
                 if (area == (int)EAreaType.EmergencyWall && NextCosts.ContainsKey(area))
                 {

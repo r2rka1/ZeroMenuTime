@@ -64,16 +64,16 @@ Without it, or with "Also use traders.json spots" on, spots come from `BepInEx/p
 
 ## Hideouts
 
-There are three hideouts, each behind an existing door on its map: a red metal double door near Prapor on Streets, the door of a metal cabin north of Skier on Customs, and a grey steel door in a red shed west of Peacekeeper on Shoreline. Looking at the door offers **Enter hideout**. Inside is the game's own hideout interior, loaded into the raid; bots cannot follow.
+There is one hideout, reached through an existing door on each of three maps: a red metal double door near Prapor on Streets, the door of a metal cabin north of Skier on Customs, and a grey steel door in a red shed west of Peacekeeper on Shoreline. Looking at the door offers **Enter hideout**. Inside is the game's own hideout interior, loaded into the raid; bots cannot follow.
 
 Looking at a station and using it opens the station's window: what its next level needs and how much of that you have, what it can make, from what, how long that takes (in game time and in time played), and what is being made now. Esc closes it. The way out of a hideout is the shut door at the end of the small room up the steps.
 
-Each hideout is separate: its own stations, its own stash, its own crafts. The character's existing hideout and stash become the Streets one.
+All three doors lead to the same hideout: the same stations, stash and crafts. It keeps running on the world clock wherever you are, including on maps that have no door to it.
 
 - **Building.** Look at a station and choose **Build** or **Upgrade**. A level needs only its materials, taken from what you carry (pack, rig, pockets, secure container; never what you wear or hold) and then from that hideout's stash. Requirements for other stations, trader loyalty and skills are gone, and construction is instant.
 - **Stash.** The Stash station offers **Open stash**: your gear beside that hideout's stash. It is saved to the server whenever it is closed.
 - **Crafting.** A built station offers **Craft...**, which turns its action list into the recipe list, a page at a time. Tools are needed but not used up. When the time is up, **Collect** puts the result in that hideout's stash. Recipes locked behind quests stay locked until those quests are done.
-- **Power.** The Generator takes fuel cans (put in and taken out in its window) and has a switch. While it is on, fuel burns on the world clock, also while you are away or asleep. With power, crafts take the game's time; without it they take about fourteen times as long, settled when the craft is started. The Booze Generator works only with power.
+- **Power.** The Generator takes fuel cans (put in and taken out in its window) and has a switch. While it is on, fuel burns on the world clock, also while you are away or asleep. Without power the lamps are out and nothing electric works: a craft cannot be started, a craft under way waits and carries on when power is back, and the bitcoin farm stops. Only the Lavatory is worked by hand. The lamps themselves (candles, bulbs, fluorescent) are put up from the Generator's window.
 - **Bitcoin farm.** Fit graphics cards in its window; while there is power it mines bitcoins at the game's rate for that many cards, up to three waiting, collected into the stash.
 - **Boosts.** While you are inside, the hideout's built stations give back health, energy and water, at the game's own bonus amounts per game hour.
 - **Sleeping.** A built Rest Space offers sleeping for 2, 4 or 8 hours, or until morning. The clock jumps, you heal 20, 40 or 70 health per hour by Rest Space level, and you use up energy and water as if the time had passed.

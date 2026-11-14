@@ -42,6 +42,8 @@ public sealed class HideoutCraft
     /// <summary>World clock readings, in game seconds.</summary>
     public double Started { get; set; }
     public double Due { get; set; }
+    /// <summary>Told to the client: it is waiting for power and its time is not running.</summary>
+    public bool Paused { get; set; }
 }
 
 /// <summary>A recipe a station of the hideout in use can make now.</summary>
@@ -107,6 +109,8 @@ public sealed class PowerReport
 
 public sealed class HideoutStore
 {
+    /// <summary>2 once the three hideouts have been folded into one and crafts put on the pause-without-power rule.</summary>
+    public int Version { get; set; }
     /// <summary>Each hideout's generator, fuel and bitcoin farm.</summary>
     public Dictionary<string, HideoutPower> Power { get; set; } = [];
     /// <summary>What is being made in each hideout, in use or put away. They all run on the one clock.</summary>
@@ -216,11 +220,59 @@ public sealed class HideoutsService(
             var store = jsonUtil.Deserialize<HideoutStore>(File.ReadAllText(path));
             if (store != null)
             {
+                if (store.Version < 2)
+                {
+                    FoldIntoOne(sessionId, path, store);
+                }
                 return store;
             }
         }
-        // First use: the hideout the character already has is the Streets one.
-        return new HideoutStore();
+        // First use: the hideout the character already has is the one hideout.
+        return new HideoutStore { Version = 2 };
+    }
+
+    /// <summary>
+    /// There used to be a hideout behind each of the three doors. Now there is one, reached by all
+    /// three: the one that was in use. The others are written to a file beside the store and let
+    /// go. Crafts started under the old rule (slower without power) get their ordinary time back.
+    /// </summary>
+    private void FoldIntoOne(string sessionId, string path, HideoutStore store)
+    {
+        try
+        {
+            File.Copy(path, path + ".before-one-hideout", true);
+            if (store.Away.Count > 0)
+            {
+                string dropped = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "thetruespt.hideouts.dropped.json");
+                File.WriteAllText(dropped, jsonUtil.Serialize(store.Away) ?? "{}");
+                Console.WriteLine("[TheTrueSPT] One hideout now: kept '" + store.Active + "'; " + store.Away.Count + " other(s) with "
+                                  + store.Away.Values.Sum(h => h.Items.Count) + " item(s) written to " + dropped + " and let go.");
+                store.Away.Clear();
+            }
+            foreach (string other in store.Crafts.Keys.Where(k => k != store.Active).ToList())
+            {
+                store.Crafts.Remove(other);
+            }
+            foreach (string other in store.Power.Keys.Where(k => k != store.Active).ToList())
+            {
+                store.Power.Remove(other);
+            }
+            foreach (var craft in store.Crafts.Values.SelectMany(list => list))
+            {
+                var recipe = (hideoutTable.Production.Recipes ?? []).FirstOrDefault(r => r.Id.ToString() == craft.Recipe);
+                double ordinary = recipe?.ProductionTime ?? 0;
+                if (ordinary > 0 && craft.Due - craft.Started > ordinary)
+                {
+                    craft.Due = craft.Started + ordinary;
+                }
+            }
+            store.Version = 2;
+            Save(sessionId, store);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[TheTrueSPT] Folding the hideouts into one failed: " + e);
+        }
     }
 
     private void Save(string sessionId, HideoutStore store)
@@ -379,6 +431,14 @@ public sealed class HideoutsService(
             }
         }
         response.Power = Report(store, store.Active, response.Levels);
+        foreach (var pair in store.Crafts)
+        {
+            bool lit = store.Power.TryGetValue(pair.Key, out var there) && there.On && there.Fuel.Sum(can => can.Left) > 0.0001;
+            foreach (var craft in pair.Value)
+            {
+                craft.Paused = !lit && NeedsPower(craft.Area) && craft.Due > store.ClockSeconds;
+            }
+        }
         foreach (string id in Known)
         {
             response.StashCounts[id] = id == store.Active
@@ -406,7 +466,10 @@ public sealed class HideoutsService(
             }
             lock (_gate)
             {
-                return work(pmc, Load(sessionId.ToString()));
+                var store = Load(sessionId.ToString());
+                // The three doors lead to the one hideout; whichever was named, it is that one.
+                request.Id = store.Active;
+                return work(pmc, store);
             }
         }
         catch (Exception e)
@@ -519,28 +582,51 @@ public sealed class HideoutsService(
     /// </summary>
     private static void SettlePower(HideoutStore store)
     {
-        foreach (var power in store.Power.Values)
+        // A hideout nobody has switched anything in yet still has crafts that wait for power.
+        foreach (string id in store.Crafts.Keys.ToList())
         {
+            PowerOf(store, id);
+        }
+        foreach (var pair in store.Power)
+        {
+            var power = pair.Value;
             double elapsed = store.ClockSeconds - power.Settled;
             power.Settled = store.ClockSeconds;
-            if (elapsed <= 0 || !power.On)
+            if (elapsed <= 0)
             {
                 continue;
             }
-            double fuel = power.Fuel.Sum(can => can.Left);
-            double powered = Math.Min(elapsed, fuel / FuelPerSecond);
-            double burn = powered * FuelPerSecond;
-            foreach (var can in power.Fuel)
+            double powered = 0;
+            if (power.On)
             {
-                double from = Math.Min(can.Left, burn);
-                can.Left -= from;
-                burn -= from;
+                double fuel = power.Fuel.Sum(can => can.Left);
+                powered = Math.Min(elapsed, fuel / FuelPerSecond);
+                double burn = powered * FuelPerSecond;
+                foreach (var can in power.Fuel)
+                {
+                    double from = Math.Min(can.Left, burn);
+                    can.Left -= from;
+                    burn -= from;
+                }
+                if (power.Fuel.Sum(can => can.Left) <= 0.0001)
+                {
+                    power.On = false;
+                }
             }
-            if (power.Fuel.Sum(can => can.Left) <= 0.0001)
+            // Time without power is time a craft did not move: its finish is put back by as much.
+            double dark = elapsed - powered;
+            if (dark > 0 && store.Crafts.TryGetValue(pair.Key, out var crafts))
             {
-                power.On = false;
+                foreach (var craft in crafts)
+                {
+                    double already = Math.Max(0, store.ClockSeconds - craft.Due);
+                    if (NeedsPower(craft.Area) && already < dark)
+                    {
+                        craft.Due += dark - already;
+                    }
+                }
             }
-            if (power.Gpus > 0 && power.Coins < CoinCap)
+            if (powered > 0 && power.Gpus > 0 && power.Coins < CoinCap)
             {
                 power.CoinProgress += powered * (1 + (power.Gpus - 1) * GpuBoost) / SecondsPerCoin;
                 while (power.CoinProgress >= 1 && power.Coins < CoinCap)
@@ -555,6 +641,10 @@ public sealed class HideoutsService(
             }
         }
     }
+
+    public const int Lavatory = 2;
+    /// <summary>Everything is electric but the Lavatory, where things are made by hand.</summary>
+    private static bool NeedsPower(int area) => area != Lavatory;
 
     private static int FuelSlots(int generatorLevel) => generatorLevel <= 0 ? 0 : generatorLevel + 1;
     private static int GpuSlots(int farmLevel) => farmLevel switch { <= 0 => 0, 1 => 10, 2 => 25, _ => 50 };
@@ -577,7 +667,7 @@ public sealed class HideoutsService(
             Coins = power.Coins,
             CoinCap = CoinCap,
             NextCoinIn = powered && rate > 0 && power.Coins < CoinCap ? (1 - power.CoinProgress) / rate : -1,
-            SlowFactor = 1 / SpeedWithoutPower,
+            SlowFactor = 1,
         };
     }
 
@@ -705,12 +795,11 @@ public sealed class HideoutsService(
             Advance(store, request.Seconds);
             var power = PowerOf(store, request.Id);
             bool powered = power.On && power.Fuel.Sum(can => can.Left) > 0.0001;
-            if (recipe.Area == BoozeGenerator && !powered)
+            if (NeedsPower(recipe.Area) && !powered)
             {
-                return new HideoutResponse { Error = "The booze generator needs the generator running" };
+                return new HideoutResponse { Error = "There is no power: start the generator first" };
             }
-            // As in the game: without power the work still gets done, at a crawl. Settled when it is started.
-            double takes = powered ? recipe.Seconds : recipe.Seconds / SpeedWithoutPower;
+            double takes = recipe.Seconds;
             crafts.Add(new HideoutCraft
             {
                 Recipe = recipe.Id,
@@ -722,7 +811,7 @@ public sealed class HideoutsService(
             });
             Save(sessionId.ToString(), store);
             Console.WriteLine("[TheTrueSPT] Craft started in hideout '" + request.Id + "' at station " + recipe.Area + ": " + recipe.Count + " x " + recipe.Product
-                              + ", due in " + (takes / 3600.0).ToString("0.##") + " game hours" + (powered ? "." : " (no power)."));
+                              + ", due in " + (takes / 3600.0).ToString("0.##") + " game hours.");
             return Describe(pmc, store);
         });
     }
@@ -769,22 +858,7 @@ public sealed class HideoutsService(
     {
         return Guarded(sessionId, request, true, (pmc, store) =>
         {
-            if (store.Active != request.Id)
-            {
-                store.Away[store.Active] = Capture(pmc);
-                HideoutSave incoming;
-                if (!store.Away.Remove(request.Id, out incoming!))
-                {
-                    incoming = Fresh(pmc);
-                    Console.WriteLine("[TheTrueSPT] Hideout '" + request.Id + "' entered for the first time; starting it empty.");
-                }
-                Apply(pmc, incoming);
-                string was = store.Active;
-                store.Active = request.Id;
-                Save(sessionId.ToString(), store);
-                Console.WriteLine("[TheTrueSPT] Hideout in use changed from '" + was + "' to '" + request.Id + "'.");
-            }
-            else if (!File.Exists(PathFor(sessionId.ToString())))
+            if (!File.Exists(PathFor(sessionId.ToString())))
             {
                 Save(sessionId.ToString(), store);
             }

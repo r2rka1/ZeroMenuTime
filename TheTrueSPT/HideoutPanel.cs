@@ -32,7 +32,7 @@ namespace TheTrueSPT
         private static string _name = "";
         private static TextMeshProUGUI _status, _note;
         private static HideoutCrafting.Craft _shownCraft;
-        private static bool _shownDue;
+        private static bool _shownDue, _shownPowered;
         private static float _nextRefresh, _nextRedraw;
         private static bool _busy;
         private static TMP_FontAsset _font;
@@ -117,7 +117,7 @@ namespace TheTrueSPT
                 _nextRefresh = Time.unscaledTime + 0.5f;
                 var craft = HideoutCrafting.Here.FirstOrDefault(c => c.Area == _area);
                 bool due = craft != null && craft.Due <= WorldClock.Now;
-                if (craft != _shownCraft || due != _shownDue)
+                if (craft != _shownCraft || due != _shownDue || HideoutPower.Powered != _shownPowered)
                 {
                     Build();
                 }
@@ -131,6 +131,10 @@ namespace TheTrueSPT
         private static string StatusText(HideoutCrafting.Craft craft)
         {
             double left = craft.Due - WorldClock.Now;
+            if (left > 0 && craft.Paused)
+            {
+                return "<color=" + Bad + ">Paused: no power.</color>  " + WorldClock.Span(left) + " of work left";
+            }
             return left <= 0 ? "<color=" + Good + ">Ready to collect</color>" : "Ready in " + WorldClock.Span(left) + "  <color=" + Faint + ">(" + Played(left) + ")</color>";
         }
 
@@ -270,7 +274,30 @@ namespace TheTrueSPT
                 Horizontal(fuelRow, 10f);
                 Button(fuelRow, "ADD FUEL", () => Do(HideoutPower.AddFuel), cans > 0 && HideoutPower.Fuel.Count < HideoutPower.FuelSlots && !_busy, 150f);
                 Button(fuelRow, HideoutPower.On ? "SWITCH OFF" : "SWITCH ON", () => Do(() => HideoutPower.Switch(!HideoutPower.On)), (HideoutPower.On || HideoutPower.Fuel.Count > 0) && !_busy, 170f);
-                Text(left, "It burns only while switched on, and goes on burning while you are away or asleep. Power runs the bitcoin farm and the booze generator; without it crafts take " + HideoutPower.SlowFactor.ToString("0") + " times as long.", 15f, Dim, false);
+                Text(left, "It burns only while switched on, and goes on burning while you are away or asleep. Without power the lights are out and nothing electric works: crafts wait, the bitcoin farm stops. Only the Lavatory is worked by hand.", 15f, Dim, false);
+            }
+            if (_area == HideoutPower.Generator)
+            {
+                // The lamps have no place of their own to walk up to; they are wired from here.
+                const int lamps = (int)EAreaType.Illumination;
+                int lampLevel;
+                HideoutStations.Levels.TryGetValue(lamps, out lampLevel);
+                Space(left, 14f);
+                Heading(left, "LIGHTING");
+                string[] kinds = { "No lamps yet: only what the stations themselves give off.", "Candles.", "Light bulbs.", "Fluorescent lamps." };
+                Text(left, kinds[Mathf.Clamp(lampLevel, 0, 3)] + (lampLevel >= 2 ? " They burn while the generator runs." : ""), 16f, Ink, false);
+                if (HideoutStations.NextCosts.ContainsKey(lamps))
+                {
+                    var lampTally = HideoutStations.Tally(player, lamps);
+                    bool lampsAffordable = true;
+                    foreach (var pair in lampTally)
+                    {
+                        Row(left, pair.Key.Tpl, HideoutStations.FullName(pair.Key.Tpl), Stock(pair.Value, pair.Key.Count), 32f);
+                        lampsAffordable &= pair.Value >= pair.Key.Count;
+                    }
+                    Button(left, lampLevel == 0 ? "PUT UP CANDLES" : lampLevel == 1 ? "FIT LIGHT BULBS" : "FIT FLUORESCENT LAMPS",
+                        () => Do(() => HideoutStations.Build(lamps, "Illumination")), lampsAffordable && !_busy, 300f);
+                }
             }
             if (_area == HideoutPower.BitcoinFarm && level >= 1)
             {
@@ -325,6 +352,7 @@ namespace TheTrueSPT
             var craft = HideoutCrafting.Here.FirstOrDefault(c => c.Area == _area);
             _shownCraft = craft;
             _shownDue = craft != null && craft.Due <= WorldClock.Now;
+            _shownPowered = HideoutPower.Powered;
             _status = null;
             var recipes = HideoutCrafting.Recipes.Where(r => r.Area == _area).ToList();
             if (level < 1)
@@ -351,10 +379,10 @@ namespace TheTrueSPT
             else
             {
                 var spendable = HideoutStations.Spendable(player);
-                if (!HideoutPower.Powered)
+                bool dead = HideoutPower.NeedsPower(_area) && !HideoutPower.Powered;
+                if (dead)
                 {
-                    Text(right, _area == HideoutPower.BoozeGenerator ? "<color=" + Bad + ">This station works only while the generator runs.</color>"
-                        : "<color=" + Bad + ">No power: everything here takes " + HideoutPower.SlowFactor.ToString("0") + " times as long. Start the generator first.</color>", 15f, Ink, false);
+                    Text(right, "<color=" + Bad + ">No power. Start the generator and this station will work.</color>", 16f, Ink, false);
                 }
                 var list = Scroll(right);
                 // What can be made right now comes first.
@@ -365,8 +393,7 @@ namespace TheTrueSPT
                     Horizontal(top, 14f);
                     Icon(top, recipe.Product, 64f);
                     Flexible(Text(top, Amount(recipe.Product, recipe.Count), 22f, Ink, true).gameObject, 1f, 0f);
-                    double takes = HideoutPower.Takes(recipe.Seconds);
-                    Text(top, WorldClock.Span(takes) + "  <color=" + Faint + ">" + Played(takes) + "</color>", 16f, HideoutPower.Powered ? Ink : new Color32(229, 115, 115, 255), false).alignment = TextAlignmentOptions.MidlineRight;
+                    Text(top, WorldClock.Span(recipe.Seconds) + "  <color=" + Faint + ">" + Played(recipe.Seconds) + "</color>", 16f, Ink, false).alignment = TextAlignmentOptions.MidlineRight;
 
                     foreach (var cost in recipe.Items)
                     {
@@ -385,8 +412,7 @@ namespace TheTrueSPT
                         Text(card, "Needs nothing.", 16f, Dim, false);
                     }
                     var chosen = recipe;
-                    bool needsPower = recipe.Area == HideoutPower.BoozeGenerator && !HideoutPower.Powered;
-                    Button(card, "CRAFT", () => Do(() => HideoutCrafting.Start(chosen)), HideoutCrafting.Missing(player, recipe) == null && !needsPower && !_busy, 180f);
+                    Button(card, "CRAFT", () => Do(() => HideoutCrafting.Start(chosen)), HideoutCrafting.Missing(player, recipe) == null && !dead && !_busy, 180f);
                 }
                 var view = list.GetComponentInParent<ScrollRect>();
                 if (view != null)

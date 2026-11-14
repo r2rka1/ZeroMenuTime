@@ -64,12 +64,100 @@ namespace TheTrueSPT
             {
                 Fuel.Add(new Can { Tpl = (string)can["Tpl"], Left = (double?)can["Left"] ?? 0, Max = (double?)can["Max"] ?? 0 });
             }
+            if (HideoutDoors.Inside != null && _lookKnown && _lookPowered != Powered)
+            {
+                ApplyLook();
+            }
         }
 
-        /// <summary>How long a recipe takes if started now: the game's time with power, far longer without.</summary>
-        public static double Takes(double seconds)
+        /// <summary>Everything is electric but the Lavatory, where things are made by hand.</summary>
+        public static bool NeedsPower(int area)
         {
-            return Powered ? seconds : seconds * SlowFactor;
+            return area != 2;
+        }
+
+        private static EFT.Hideout.HideoutController _shown;
+        private static bool _lookKnown, _lookPowered;
+
+        /// <summary>
+        /// Makes the hideout look the way its power is: the game's own switch for lamps, props and
+        /// hum, and the lamps the Illumination station has earned. Without power only candles burn.
+        /// </summary>
+        public static void ApplyLook()
+        {
+            var controller = HideoutBunker.Loaded ? HideoutStations.Controller() : null;
+            if (controller == null)
+            {
+                return;
+            }
+            try
+            {
+                if (_shown != controller)
+                {
+                    _shown = controller;
+                    _lookKnown = false;
+                    // The game's switch stays deaf until it has been shown once; an empty list will do.
+                    controller._ambianceController.Show(new List<EFT.Hideout.AreaData>(), Powered);
+                }
+                if (!_lookKnown || _lookPowered != Powered)
+                {
+                    controller.EnergySupplyChanged(Powered);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hideout power: the game's own switch failed: " + e.Message);
+            }
+            try
+            {
+                int illumination;
+                HideoutStations.Levels.TryGetValue((int)EAreaType.Illumination, out illumination);
+                var have = new List<EFT.Hideout.ELightingLevel> { EFT.Hideout.ELightingLevel.Off };
+                if (illumination >= 1) have.Add(EFT.Hideout.ELightingLevel.Candles);
+                if (illumination >= 2) have.Add(EFT.Hideout.ELightingLevel.LightBulbs);
+                if (illumination >= 3) have.Add(EFT.Hideout.ELightingLevel.FluorescentLamps);
+                var use = Powered ? have[have.Count - 1] : (illumination >= 1 ? EFT.Hideout.ELightingLevel.Candles : EFT.Hideout.ELightingLevel.Off);
+                foreach (var pair in controller.Areas)
+                {
+                    var area = pair.Value;
+                    if (area == null || area.AreaLevels == null)
+                    {
+                        continue;
+                    }
+                    int level;
+                    HideoutStations.Levels.TryGetValue((int)pair.Key, out level);
+                    level = Mathf.Clamp(level, 0, area.AreaLevels.Length - 1);
+                    var shown = area.AreaLevels[level];
+                    if (shown != null)
+                    {
+                        try
+                        {
+                            shown.SetAvailableLightingLevels(have);
+                            shown.SetLightLevel(use);
+                        }
+                        catch (Exception)
+                        {
+                        }
+                    }
+                }
+                foreach (var pair in controller._globalLighting)
+                {
+                    if (pair.Value != null)
+                    {
+                        pair.Value.SetActive(pair.Key == use);
+                    }
+                }
+                if (!_lookKnown || _lookPowered != Powered)
+                {
+                    Plugin.Log.LogInfo("Hideout power: " + (Powered ? "on" : "off") + ", lamps " + use);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hideout power: setting the lamps failed: " + e.Message);
+            }
+            _lookKnown = true;
+            _lookPowered = Powered;
         }
 
         private static List<Item> Carried(Player player, Func<Item, bool> wanted)
