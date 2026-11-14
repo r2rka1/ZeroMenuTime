@@ -18,6 +18,8 @@ The rooms are furnished from the game itself: walls, floor, tables, shelves, cra
 
 With "Put traders in rooms" switched off, traders stand in the open at their spots as figures, and deliveries go straight into your gear.
 
+**A main menu of its own.** The menu is a title and four words at the top left: **Continue**, **New Game**, **Settings**, **Exit**, over a live view of your own hideout as you have built it. Under Continue it says where and when the game picks up. Character, Trade, Hideout and the bar along the bottom are gone from this screen; everything they led to is reached inside the world. Continue starts a raid where the character is (after a death or a crash, at the bed of the last save). New Game makes the character afresh, keeping a backup, and closes the game.
+
 **No menus between raids.** When a raid ends the result screens are passed through automatically. If it ended at your Vagabond hideout entrance, the hideout opens; leaving the hideout starts a raid at its door. After a death or an ordinary extract the next raid starts by itself. Hold Backspace during the short countdown to stay in the main menu.
 
 ## Install
@@ -127,7 +129,8 @@ With "Test harness" on, the mod reads `BepInEx/plugins/TradersInRaid/test/comman
 | `style NAME` | Rebuild the rooms in another trader's style |
 | `layout [NAME]`, `props WORD`, `survey` | Furnish the rooms again (from `test/layout.txt` if it exists); search the hideout's pieces; write the full catalogue to `test/` |
 | `savequit` | Choose "Save and go to menu" at the room's trader |
-| `startraid` | From the main menu: start a raid where the character is |
+| `startraid`, `menu`, `press NAME` | From the main menu: start a raid where the character is; list what the menu shows; click one of its items |
+| `backdrop X Y Z YAW PITCH`, `backdrop free`, `backdrop lamp POWER` | Hold the menu's view of the hideout at one spot; let it move again; set its lamp |
 | `hideout enter ID`, `hideout leave`, `use` | Go into a hideout (streets, customs, shoreline) and out; use the nearest door of ours |
 | `stations`, `build NUMBER`, `give TEMPLATE COUNT` | List stations with costs; build one; hand out materials |
 | `stash [open\|close\|put TPL N\|take TPL\|save]`, `carried [TPL]` | Work with the hideout stash; count carried items |

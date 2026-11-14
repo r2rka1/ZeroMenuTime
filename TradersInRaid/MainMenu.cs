@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using Comfort.Common;
 using System.Reflection;
 using EFT;
 using EFT.Communications;
@@ -8,14 +10,17 @@ using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using SPT.Common.Http;
 using SPT.Reflection.Patching;
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace TradersInRaid
 {
     /// <summary>
-    /// The main menu, cut down to what this way of playing needs: Continue, New Game and Exit.
-    /// Character, traders and hideout are all reached inside the world now, so their buttons go,
-    /// here and on the bar along the bottom.
+    /// The main menu, made over: a title and a short column of words at the top left (Continue,
+    /// New Game, Settings, Exit) over a view of the player's own hideout. Character, traders and
+    /// hideout are all reached inside the world now, so the game's own buttons and bottom bar go.
     ///
     /// Continue starts a raid where the character is; after a death or a crash that is the bed of
     /// the last save. New Game makes the character afresh on the server (keeping a backup) and
@@ -23,12 +28,65 @@ namespace TradersInRaid
     /// </summary>
     public static class MainMenu
     {
-        private const string NewGameName = "TradersInRaid New Game";
+        private const string PanelName = "TradersInRaid menu";
+        public const string Title = "THE TRUE SPT";
 
         private static MenuScreen _screen;
-        private static DefaultUIButton _newGame;
+        private static GameObject _panel;
+        private static TextMeshProUGUI _whereLabel;
         private static float _nextCheck;
         private static bool _working;
+
+        /// <summary>The line under Continue: where and when the game picks up.</summary>
+        public static string Where => When.Length > 0 && _place.Length > 0 ? _place + ", " + When : _place + When;
+        public static string When = "";
+        private static string _place = "";
+        private static bool _askedPlace;
+
+        private static readonly Dictionary<string, string> Places = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "bigmap", "Customs" }, { "Customs", "Customs" }, { "factory4_day", "Factory" }, { "factory4_night", "Factory" },
+            { "FactoryDay", "Factory" }, { "FactoryNight", "Factory" }, { "TarkovStreets", "Streets of Tarkov" }, { "Streets", "Streets of Tarkov" },
+            { "Shoreline", "Shoreline" }, { "Woods", "Woods" }, { "Interchange", "Interchange" }, { "RezervBase", "Reserve" }, { "Reserve", "Reserve" },
+            { "Lighthouse", "Lighthouse" }, { "laboratory", "The Lab" }, { "Sandbox", "Ground Zero" },
+            { "Sandbox_high", "Ground Zero" }, { "GroundZero", "Ground Zero" }, { "Labyrinth", "The Labyrinth" },
+        };
+
+        /// <summary>The menu has come up again: where the character is may have changed.</summary>
+        public static void Refresh()
+        {
+            _askedPlace = false;
+        }
+
+        private static async void AskPlace()
+        {
+            try
+            {
+                var state = await Seamless.FetchVagabondState();
+                string map = state != null ? state.CurrentMap : null;
+                string known;
+                // Vagabond names the map by its database id; the game knows the short name for it.
+                var app = SPT.Reflection.Utils.ClientAppUtils.GetMainApp();
+                if (!string.IsNullOrEmpty(map) && app != null && app.Session != null && app.Session.LocationSettings != null)
+                {
+                    foreach (var candidate in app.Session.LocationSettings.locations.Values)
+                    {
+                        if (string.Equals(candidate._Id, map, StringComparison.OrdinalIgnoreCase))
+                        {
+                            map = candidate.Id;
+                            break;
+                        }
+                    }
+                }
+                _place = string.IsNullOrEmpty(map) ? "" : Places.TryGetValue(map, out known) ? known : map;
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        private static readonly Color Ink = new Color32(231, 229, 212, 255);
+        private static readonly Color Dim = new Color32(231, 229, 212, 120);
 
         /// <summary>Called when the menu is shown, and then twice a second while it stays up: other code switches buttons back on.</summary>
         public static void Arrange(MenuScreen screen)
@@ -40,99 +98,232 @@ namespace TradersInRaid
             _screen = screen;
             try
             {
-                foreach (var unwanted in new MonoBehaviour[] { screen._playerButton, screen._tradeButton, screen._hideoutButton, screen._toggleGameModeButton, screen._hideScreenButton })
+                // Everything the game put on this screen goes; ours is drawn instead.
+                foreach (var stock in new MonoBehaviour[] { screen._playButton, screen._playerButton, screen._tradeButton, screen._hideoutButton,
+                             screen._exitButton, screen._disconnectButton, screen._toggleGameModeButton, screen._hideScreenButton })
                 {
-                    if (unwanted != null && unwanted.gameObject.activeSelf)
+                    if (stock != null && stock.gameObject.activeSelf)
                     {
-                        unwanted.gameObject.SetActive(false);
+                        stock.gameObject.SetActive(false);
                     }
+                }
+                if (screen._alphaWarningGameObject != null && screen._alphaWarningGameObject.activeSelf)
+                {
+                    screen._alphaWarningGameObject.SetActive(false);
+                }
+                var preloader = MonoBehaviourSingleton<PreloaderUI>.Instance;
+                if (preloader != null && preloader.MenuTaskBar != null && preloader.MenuTaskBar.gameObject.activeSelf)
+                {
+                    preloader.SetMenuTaskBarVisibility(false);
                 }
 
-                var play = screen._playButton;
-                if (play != null && play.GetComponent<ContinueMark>() == null)
+                if (_panel == null)
                 {
-                    play.gameObject.AddComponent<ContinueMark>();
-                    play.OnClick.RemoveAllListeners();
-                    play.OnClick.AddListener(Continue);
+                    Build(screen);
                 }
-                if (play != null)
+                if (!_askedPlace)
                 {
-                    play.SetHeaderText("CONTINUE");
+                    _askedPlace = true;
+                    AskPlace();
                 }
+                if (_whereLabel != null && _whereLabel.text != Where)
+                {
+                    _whereLabel.text = Where;
+                }
+                MenuBackdrop.KeepStockHidden();
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Arranging the main menu failed: " + e);
+            }
+        }
 
-                if (_newGame == null && play != null)
+        private static void Build(MenuScreen screen)
+        {
+            // A reload of this plugin leaves the panel made by the one before.
+            var left = screen.transform.Find(PanelName);
+            if (left != null)
+            {
+                left.gameObject.SetActive(false);
+                UnityEngine.Object.Destroy(left.gameObject);
+            }
+            foreach (var child in screen.GetComponentsInChildren<Transform>(true))
+            {
+                // The New Game button an earlier build of this mod cloned from Play.
+                if (child != null && child.name == "TradersInRaid New Game")
                 {
-                    // A reload of this plugin leaves the button made by the one before; take it over.
-                    var left = play.transform.parent.Find(NewGameName);
-                    if (left != null)
-                    {
-                        UnityEngine.Object.Destroy(left.gameObject);
-                    }
-                    var copy = UnityEngine.Object.Instantiate(play.gameObject, play.transform.parent);
-                    copy.name = NewGameName;
-                    copy.transform.SetSiblingIndex(play.transform.GetSiblingIndex() + 1);
-                    var mark = copy.GetComponent<ContinueMark>();
-                    if (mark != null)
-                    {
-                        UnityEngine.Object.Destroy(mark);
-                    }
-                    _newGame = copy.GetComponent<DefaultUIButton>();
-                    _newGame.OnClick.RemoveAllListeners();
-                    _newGame.OnClick.AddListener(AskNewGame);
-                    Plugin.Log.LogInfo("Main menu arranged: Continue, New Game, Exit");
+                    UnityEngine.Object.Destroy(child.gameObject);
                 }
-                if (_newGame != null && play != null)
-                {
-                    // The menu's buttons are placed by hand, not by a layout, so the copy starts
-                    // exactly on top of Continue. Put it one button's height below.
-                    var above = play.GetComponent<RectTransform>();
-                    var below = _newGame.GetComponent<RectTransform>();
-                    if (above != null && below != null)
-                    {
-                        float height = Mathf.Max(above.rect.height, 50f);
-                        below.anchoredPosition = above.anchoredPosition + new Vector2(0f, -(height + 24f));
-                    }
-                }
-                if (_newGame != null)
-                {
-                    _newGame.SetHeaderText("NEW GAME");
-                    if (!_newGame.gameObject.activeSelf)
-                    {
-                        _newGame.gameObject.SetActive(true);
-                    }
-                }
+            }
+            var font = screen._playButton != null ? screen._playButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
 
-                // The bar along the bottom has its own ways into the same screens.
-                foreach (var bar in UnityEngine.Object.FindObjectsOfType<MenuTaskBar>())
+            _panel = new GameObject(PanelName, typeof(RectTransform));
+            var panel = (RectTransform)_panel.transform;
+            panel.SetParent(screen.transform, false);
+            panel.SetAsFirstSibling();
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.one;
+            panel.offsetMin = panel.offsetMax = Vector2.zero;
+
+            // Darkens the left of the picture so the words read against anything.
+            var shade = new GameObject("shade", typeof(RectTransform), typeof(RawImage));
+            var shadeRect = (RectTransform)shade.transform;
+            shadeRect.SetParent(panel, false);
+            shadeRect.anchorMin = new Vector2(0f, 0f);
+            shadeRect.anchorMax = new Vector2(0.62f, 1f);
+            shadeRect.offsetMin = shadeRect.offsetMax = Vector2.zero;
+            var gradient = new Texture2D(64, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            for (int x = 0; x < 64; x++)
+            {
+                float t = x / 63f;
+                gradient.SetPixel(x, 0, new Color(0f, 0f, 0f, 0.88f * (1f - t) * (1f - t)));
+            }
+            gradient.Apply();
+            var shadeImage = shade.GetComponent<RawImage>();
+            shadeImage.texture = gradient;
+            shadeImage.raycastTarget = false;
+
+            const float left0 = 110f;
+            var title = Text(panel, "title", Title, font, 76f, Ink, new Vector2(left0, -110f), new Vector2(900f, 90f));
+            title.fontStyle = FontStyles.Bold;
+            title.characterSpacing = 6f;
+
+            var rule = new GameObject("rule", typeof(RectTransform), typeof(Image));
+            var ruleRect = (RectTransform)rule.transform;
+            ruleRect.SetParent(panel, false);
+            ruleRect.anchorMin = ruleRect.anchorMax = ruleRect.pivot = new Vector2(0f, 1f);
+            ruleRect.anchoredPosition = new Vector2(left0 + 2f, -206f);
+            ruleRect.sizeDelta = new Vector2(84f, 3f);
+            var ruleImage = rule.GetComponent<Image>();
+            ruleImage.color = new Color32(197, 160, 72, 255);
+            ruleImage.raycastTarget = false;
+
+            float y = -270f;
+            Item(panel, "Continue", font, new Vector2(left0, y), Continue);
+            _whereLabel = Text(panel, "where", Where, font, 17f, Dim, new Vector2(left0 + 2f, y - 50f), new Vector2(700f, 26f));
+            y -= 96f;
+            Item(panel, "New Game", font, new Vector2(left0, y), AskNewGame);
+            y -= 66f;
+            Item(panel, "Settings", font, new Vector2(left0, y), () => Open(EMenuType.Settings));
+            y -= 66f;
+            Item(panel, "Exit", font, new Vector2(left0, y), () => Open(EMenuType.Exit));
+            Plugin.Log.LogInfo("Main menu built: Continue, New Game, Settings, Exit");
+        }
+
+        private static TextMeshProUGUI Text(RectTransform parent, string name, string words, TextMeshProUGUI like, float size, Color colour, Vector2 at, Vector2 box)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = at;
+            rect.sizeDelta = box;
+            var label = go.AddComponent<TextMeshProUGUI>();
+            if (like != null)
+            {
+                label.font = like.font;
+                label.fontSharedMaterial = like.fontSharedMaterial;
+            }
+            label.text = words;
+            label.fontSize = size;
+            label.color = colour;
+            label.alignment = TextAlignmentOptions.Left;
+            label.enableWordWrapping = false;
+            label.raycastTarget = false;
+            return label;
+        }
+
+        private static void Item(RectTransform parent, string words, TextMeshProUGUI like, Vector2 at, Action onClick)
+        {
+            var go = new GameObject("item " + words, typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = at + new Vector2(-24f, 6f);
+            rect.sizeDelta = new Vector2(420f, 58f);
+            var hit = go.GetComponent<Image>();
+            hit.color = new Color(1f, 1f, 1f, 0f);
+
+            var bar = new GameObject("bar", typeof(RectTransform), typeof(Image));
+            var barRect = (RectTransform)bar.transform;
+            barRect.SetParent(rect, false);
+            barRect.anchorMin = new Vector2(0f, 0f);
+            barRect.anchorMax = new Vector2(0f, 1f);
+            barRect.pivot = new Vector2(0f, 0.5f);
+            barRect.anchoredPosition = new Vector2(6f, 0f);
+            barRect.sizeDelta = new Vector2(4f, -18f);
+            var barImage = bar.GetComponent<Image>();
+            barImage.color = new Color32(197, 160, 72, 255);
+            barImage.raycastTarget = false;
+            bar.SetActive(false);
+
+            var label = Text(rect, "label", words.ToUpperInvariant(), like, 36f, Dim, new Vector2(24f, -6f), new Vector2(390f, 46f));
+            label.characterSpacing = 3f;
+
+            var item = go.AddComponent<MenuItem>();
+            item.Label = label;
+            item.Bar = bar;
+            item.Clicked = onClick;
+        }
+
+        private static void Open(EMenuType what)
+        {
+            try
+            {
+                var operation = Seamless.MenuOperation();
+                if (operation != null)
                 {
-                    if (bar._toggleButtons == null)
-                    {
-                        continue;
-                    }
-                    foreach (var kind in new[] { EMenuType.Player, EMenuType.Trade, EMenuType.Hideout, EMenuType.RagFair })
-                    {
-                        AnimatedToggle toggle;
-                        if (bar._toggleButtons.TryGetValue(kind, out toggle) && toggle != null && toggle.gameObject.activeSelf)
-                        {
-                            toggle.gameObject.SetActive(false);
-                        }
-                    }
+                    operation.ShowScreen(what, true);
                 }
             }
             catch (Exception e)
             {
-                Plugin.Log.LogWarning("Arranging the main menu failed: " + e.Message);
+                Plugin.Log.LogError("Opening " + what + " from the menu failed: " + e);
             }
+        }
+
+        /// <summary>The names on the menu, for the test harness.</summary>
+        public static List<string> Items()
+        {
+            var names = new List<string>();
+            if (_panel != null)
+            {
+                foreach (var item in _panel.GetComponentsInChildren<MenuItem>(false))
+                {
+                    names.Add(item.Label.text);
+                }
+            }
+            return names;
+        }
+
+        /// <summary>Presses a menu item by name, as a click would.</summary>
+        public static bool Press(string name)
+        {
+            if (_panel == null)
+            {
+                return false;
+            }
+            foreach (var item in _panel.GetComponentsInChildren<MenuItem>(false))
+            {
+                if (string.Equals(item.Label.text.Replace(" ", ""), name.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                {
+                    item.Clicked();
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static void Tick()
         {
+            bool showing = _screen != null && _screen.gameObject.activeInHierarchy;
+            MenuBackdrop.Tick(showing);
             if (_screen == null || Time.unscaledTime < _nextCheck)
             {
                 return;
             }
             _nextCheck = Time.unscaledTime + 0.5f;
-            if (_screen.gameObject.activeInHierarchy)
+            if (showing)
             {
                 Arrange(_screen);
             }
@@ -225,10 +416,64 @@ namespace TradersInRaid
         {
             Application.Quit();
         }
+    }
 
-        /// <summary>Marks the Play button once it has been turned into Continue.</summary>
-        private class ContinueMark : MonoBehaviour
+    /// <summary>One line of the main menu: lights up under the pointer, acts on a click.</summary>
+    public class MenuItem : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+    {
+        public TextMeshProUGUI Label;
+        public GameObject Bar;
+        public Action Clicked;
+
+        private static readonly Color Lit = new Color32(255, 252, 235, 255);
+        private static readonly Color Unlit = new Color32(231, 229, 212, 120);
+
+        public void OnPointerEnter(PointerEventData data)
         {
+            Label.color = Lit;
+            Bar.SetActive(true);
+            Sound(EUISoundType.ButtonOver);
+        }
+
+        public void OnPointerExit(PointerEventData data)
+        {
+            Label.color = Unlit;
+            Bar.SetActive(false);
+        }
+
+        public void OnPointerClick(PointerEventData data)
+        {
+            Sound(EUISoundType.ButtonClick);
+            if (Clicked != null)
+            {
+                Clicked();
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (Label != null)
+            {
+                Label.color = Unlit;
+            }
+            if (Bar != null)
+            {
+                Bar.SetActive(false);
+            }
+        }
+
+        private static void Sound(EUISoundType kind)
+        {
+            try
+            {
+                if (Singleton<GUISounds>.Instantiated)
+                {
+                    Singleton<GUISounds>.Instance.PlayUISound(kind);
+                }
+            }
+            catch (Exception)
+            {
+            }
         }
     }
 
@@ -252,6 +497,7 @@ namespace TradersInRaid
         [PatchPostfix]
         public static void Postfix(MenuScreen __instance)
         {
+            MainMenu.Refresh();
             MainMenu.Arrange(__instance);
         }
     }

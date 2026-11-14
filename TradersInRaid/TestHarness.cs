@@ -142,7 +142,11 @@ namespace TradersInRaid
                     Report("the main menu is not showing");
                     yield break;
                 }
-                var shown = new List<string>();
+                var shown = MainMenu.Items();
+                foreach (var entry in MenuBackdrop.Describe())
+                {
+                    Report("  " + entry);
+                }
                 foreach (var button in screen.GetComponentsInChildren<DefaultUIButton>(false))
                 {
                     var label = button.GetComponentInChildren<TMPro.TMP_Text>();
@@ -161,6 +165,43 @@ namespace TradersInRaid
                     }
                 }
                 Report("bottom bar showing: " + string.Join(", ", bars.ToArray()));
+                yield break;
+            }
+            if (player == null && verb == "press")
+            {
+                // press NAME: click one of the menu's own items.
+                Report(MainMenu.Press(parts.Length > 1 ? parts[1] : "") ? "pressed " + parts[1] : "FAILED no such menu item");
+                yield break;
+            }
+            if (player == null && verb == "backdrop")
+            {
+                // backdrop X Y Z YAW PITCH: hold the menu's view at one spot; "backdrop free" lets it move again.
+                if (parts.Length > 2 && parts[1] == "lamp")
+                {
+                    // backdrop lamp POWER [RANGE]: brightness of the lamp that travels with the view.
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<Light>())
+                    {
+                        if (light.name == "lamp" && light.transform.parent != null && light.transform.parent.name.StartsWith("TradersInRaid menu"))
+                        {
+                            MenuBackdrop.LampPower = Number(parts[2]);
+                            if (parts.Length > 3)
+                            {
+                                light.range = Number(parts[3]);
+                            }
+                        }
+                    }
+                    Report("lamp set");
+                }
+                else if (parts.Length < 6)
+                {
+                    MenuBackdrop.Fixed = null;
+                    Report("backdrop moving freely");
+                }
+                else
+                {
+                    MenuBackdrop.Fixed = new MenuBackdrop.Framing { Position = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3])), Yaw = Number(parts[4]), Pitch = Number(parts[5]) };
+                    Report("backdrop held");
+                }
                 yield break;
             }
             if (player == null && verb == "continue")

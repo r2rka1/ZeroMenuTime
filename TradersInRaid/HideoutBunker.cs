@@ -120,6 +120,12 @@ namespace TradersInRaid
                     BunkerScenes.Add(scene);
                 }
             }
+            // Another scene can finish loading in the same moment (the menu's own, after a raid);
+            // only the interior's are ours.
+            if (BunkerScenes.Exists(s => s.name.StartsWith("bunker", StringComparison.OrdinalIgnoreCase)))
+            {
+                BunkerScenes.RemoveAll(s => !s.name.StartsWith("bunker", StringComparison.OrdinalIgnoreCase));
+            }
             Moved = Vector3.zero;
             Mark();
 

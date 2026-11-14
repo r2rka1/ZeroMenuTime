@@ -60,13 +60,13 @@ namespace TradersInRaid
                 "Hold this while the countdown runs to stay in the main menu instead.");
         }
 
-        private class VagabondState
+        public class VagabondState
         {
             public string CurrentMap;
             public bool HideoutAccessible;
         }
 
-        private static async Task<VagabondState> FetchVagabondState()
+        public static async Task<VagabondState> FetchVagabondState()
         {
             try
             {
@@ -85,7 +85,7 @@ namespace TradersInRaid
             }
         }
 
-        private static MainMenuShowOperation MenuOperation()
+        public static MainMenuShowOperation MenuOperation()
         {
             var app = ClientAppUtils.GetMainApp();
             return app == null ? null : AccessTools.Field(typeof(TarkovApplication), "_menuOperation").GetValue(app) as MainMenuShowOperation;
@@ -195,6 +195,7 @@ namespace TradersInRaid
         {
             try
             {
+                MenuBackdrop.Release();
                 var app = ClientAppUtils.GetMainApp();
                 var menu = MenuOperation();
                 if (app == null || menu == null || string.IsNullOrEmpty(locationId))
