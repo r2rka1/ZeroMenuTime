@@ -155,7 +155,7 @@ namespace TradersInRaid
             {
                 Plugin.Log.LogInfo("Waking up at the bed of hideout '" + bed + "'");
                 var consumed = SaveGame.Status(true);
-                Enter(bed, front.Key, front.Value);
+                Enter(bed, front.Key, front.Value, true);
                 NotificationManager.DisplayMessageNotification("You wake up at your bed.", ENotificationDurationType.Long);
             }
         }
@@ -200,13 +200,13 @@ namespace TradersInRaid
             return _indoor != null ? _indoor.Check(position) : null;
         }
 
-        public static void Enter(string id, Vector3 returnTo, float returnYaw)
+        public static void Enter(string id, Vector3 returnTo, float returnYaw, bool atBed = false)
         {
             if (_busy || Inside != null || Plugin.Instance == null)
             {
                 return;
             }
-            Plugin.Instance.StartCoroutine(Going(id, returnTo, returnYaw));
+            Plugin.Instance.StartCoroutine(Going(id, returnTo, returnYaw, atBed));
         }
 
         public static void Leave()
@@ -218,7 +218,7 @@ namespace TradersInRaid
             Plugin.Instance.StartCoroutine(Leaving());
         }
 
-        private static IEnumerator Going(string id, Vector3 returnTo, float returnYaw)
+        private static IEnumerator Going(string id, Vector3 returnTo, float returnYaw, bool atBed)
         {
             _busy = true;
             var player = GamePlayerOwner.MyPlayer;
@@ -289,6 +289,25 @@ namespace TradersInRaid
             _returnTo = returnTo;
             _returnYaw = returnYaw;
             Inside = id;
+            if (atBed)
+            {
+                // Waking up: stand by the Rest Space, on whatever floor is beside it.
+                var controller = HideoutStations.Controller();
+                EFT.Hideout.HideoutArea rest;
+                Bounds bedBounds;
+                if (controller != null && controller.Areas.TryGetValue(EAreaType.RestSpace, out rest) && HideoutStations.LevelBounds(rest, 1, out bedBounds))
+                {
+                    var towardsHall = (origin - bedBounds.center);
+                    towardsHall.y = 0f;
+                    var beside = bedBounds.center + towardsHall.normalized * (Mathf.Max(bedBounds.extents.x, bedBounds.extents.z) + 0.9f);
+                    RaycastHit floor;
+                    if (Physics.Raycast(new Vector3(beside.x, bedBounds.max.y + 1.5f, beside.z), Vector3.down, out floor, 6f,
+                            LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain"), QueryTriggerInteraction.Ignore))
+                    {
+                        arrival = floor.point + Vector3.up * 0.05f;
+                    }
+                }
+            }
             // Needs to know which hideout this is, so only now.
             var recipes = HideoutCrafting.Load();
             player.Teleport(arrival, false);

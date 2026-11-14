@@ -89,7 +89,7 @@ namespace TradersInRaid
                 }
                 Set(seconds);
                 _running = true;
-                _nextSend = Time.unscaledTime + 60f;
+                _nextSend = Time.unscaledTime + 5f;
                 Plugin.Log.LogInfo("World clock: " + Describe(seconds) + " (" + seconds.ToString("F0") + " game seconds)");
             }
             catch (Exception e)
@@ -117,6 +117,7 @@ namespace TradersInRaid
                 return;
             }
             _nextSend = Time.unscaledTime + 60f;
+            HideTimer();
             if (Game() == null)
             {
                 _running = false;
@@ -148,6 +149,28 @@ namespace TradersInRaid
             catch (Exception e)
             {
                 Plugin.Log.LogWarning("World clock not sent: " + e.Message);
+            }
+        }
+
+        /// <summary>
+        /// A raid no longer runs out, so the countdown in the corner means nothing; it would show the
+        /// weeks left with the days cut off. Switched off wherever it has appeared.
+        /// </summary>
+        public static void HideTimer()
+        {
+            try
+            {
+                foreach (var panel in UnityEngine.Object.FindObjectsOfType<EFT.UI.BattleTimer.MainTimerPanel>())
+                {
+                    if (panel.gameObject.activeSelf)
+                    {
+                        panel.gameObject.SetActive(false);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hiding the raid timer failed: " + e.Message);
             }
         }
 
