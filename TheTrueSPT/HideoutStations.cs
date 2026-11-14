@@ -336,7 +336,15 @@ namespace TheTrueSPT
             {
                 return null;
             }
-            return ActionsFor((int)area.AreaTemplate.Type, Name(area.AreaTemplate.Type));
+            var actions = ActionsFor((int)area.AreaTemplate.Type, Name(area.AreaTemplate.Type));
+            // The cultists' circle answers to a look from most of the small room in front of it,
+            // the way out included. Standing at that door, leaving comes first.
+            var player = GamePlayerOwner.MyPlayer;
+            if (area.AreaTemplate.Type == EAreaType.CircleOfCultists && player != null && HideoutDoors.NearExit(player.Transform.position))
+            {
+                actions.Actions.Insert(0, new InteractionAction { Name = "Leave hideout", Action = HideoutDoors.Leave, Disabled = false });
+            }
+            return actions;
         }
 
         public static AvailableInteractionState ActionsFor(StationInteractable station)

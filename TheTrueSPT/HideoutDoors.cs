@@ -140,6 +140,35 @@ namespace TheTrueSPT
         /// </summary>
         private static IEnumerator Preload()
         {
+            // After a death, a crash since the last save, or a new game, the raid begins at the bed.
+            // That is settled at once, behind a dark screen, so the map is never seen first.
+            var waking = SaveGame.Status(false);
+            while (!waking.IsCompleted)
+            {
+                yield return null;
+            }
+            var first = waking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? waking.Result : null;
+            string wakeAt = first != null && ((bool?)first["Resume"] ?? false) ? (string)first["Hideout"] : null;
+            KeyValuePair<Vector3, float> wakeFront;
+            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy)
+            {
+                RoomDoor.Fade = 1f;
+                RoomDoor.FadeText = "Waking up...";
+                while (GamePlayerOwner.MyPlayer == null)
+                {
+                    yield return null;
+                }
+                Plugin.Log.LogInfo("Waking up at the bed of hideout '" + wakeAt + "'");
+                var taken = SaveGame.Status(true);
+                Enter(wakeAt, wakeFront.Key, wakeFront.Value, true);
+                while (_busy)
+                {
+                    yield return null;
+                }
+                RoomDoor.FadeText = null;
+                NotificationManager.DisplayMessageNotification("You wake up at your bed.", ENotificationDurationType.Long);
+                yield break;
+            }
             yield return new WaitForSecondsRealtime(25f);
             if (GamePlayerOwner.MyPlayer == null)
             {
@@ -194,6 +223,12 @@ namespace TheTrueSPT
             {
                 yield return front.Key;
             }
+        }
+
+        /// <summary>True within a few steps of the door that leads out.</summary>
+        public static bool NearExit(Vector3 position)
+        {
+            return HideoutBunker.Loaded && Vector3.Distance(position, HideoutBunker.Moved + ExitDoor) < 3.2f;
         }
 
         private static RoomDoor _securityExit;

@@ -114,6 +114,22 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         }
     }
 
+    /// <summary>
+    /// The first save of a new game: the character as just made, with the next raid set to begin
+    /// inside the hideout by the given door.
+    /// </summary>
+    public void StartFresh(string sessionId, PmcData pmc, string hideout)
+    {
+        lock (_gate)
+        {
+            Directory.CreateDirectory(Dir(sessionId));
+            File.WriteAllText(CharacterFile(sessionId), jsonUtil.Serialize(pmc));
+            WriteMeta(sessionId, new SaveMeta { Hideout = hideout, SavedAtUtc = DateTime.UtcNow.ToString("u"), Resume = true });
+            PlaceAt(sessionId, hideout);
+            Console.WriteLine("[TheTrueSPT] New game: the first raid begins in the hideout, by its '" + hideout + "' door.");
+        }
+    }
+
     private SaveResponse Describe(string sessionId, SaveMeta? meta)
     {
         return new SaveResponse { Ok = true, Has = meta != null, Hideout = meta?.Hideout ?? "", Resume = meta?.Resume ?? false };
