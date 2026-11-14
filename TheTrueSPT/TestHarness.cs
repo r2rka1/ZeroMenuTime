@@ -733,6 +733,61 @@ namespace TheTrueSPT
                     }
                     break;
                 }
+                case "fps":
+                {
+                    // fps [SECONDS]: the frame rate averaged over a few seconds, and what the interior is doing.
+                    float span = parts.Length > 1 ? Number(parts[1]) : 3f;
+                    int frames = 0;
+                    float began = Time.unscaledTime;
+                    while (Time.unscaledTime - began < span)
+                    {
+                        frames++;
+                        yield return null;
+                    }
+                    int lights = 0;
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<Light>())
+                    {
+                        if (light.isActiveAndEnabled)
+                        {
+                            lights++;
+                        }
+                    }
+                    Report((frames / (Time.unscaledTime - began)).ToString("F0") + " frames a second over " + span.ToString("0") + " s; lights on " + lights
+                           + "; bots switched off " + BotFreeze.Count + "; interior loaded " + HideoutBunker.Loaded + ", parked " + HideoutBunker.Parked + ", inside " + (HideoutDoors.Inside ?? "no"));
+                    break;
+                }
+                case "lights":
+                {
+                    // lights: what the interior's lamps cost. lights shadows off|on, lights far METRES.
+                    int on = 0, shadowed = 0, changed = 0;
+                    string what = parts.Length > 1 ? parts[1] : "";
+                    foreach (var root in HideoutBunker.Roots())
+                    {
+                        foreach (var light in root.GetComponentsInChildren<Light>(true))
+                        {
+                            if (!light.isActiveAndEnabled)
+                            {
+                                continue;
+                            }
+                            on++;
+                            if (what == "shadows")
+                            {
+                                light.shadows = parts.Length > 2 && parts[2] == "on" ? LightShadows.Soft : LightShadows.None;
+                                changed++;
+                            }
+                            if (light.shadows != LightShadows.None)
+                            {
+                                shadowed++;
+                            }
+                        }
+                    }
+                    Report("interior lamps lit " + on + ", casting shadows " + shadowed + ", changed " + changed);
+                    break;
+                }
+                case "park":
+                    HideoutBunker.Park(parts.Length < 2 || parts[1] != "off");
+                    Report("interior parked: " + HideoutBunker.Parked);
+                    break;
                 case "locate":
                     // locate WORD: where hideout objects of that name are.
                     foreach (var entry in RoomProps.Locate(parts.Length > 1 ? parts[1] : "door"))

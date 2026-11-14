@@ -319,6 +319,22 @@ namespace TheTrueSPT
                 Text(left, "More cards mine faster. It works only while the generator runs.", 15f, Dim, false);
             }
 
+            if (HideoutShelves.Has(_area) && level >= 1)
+            {
+                Space(left, 14f);
+                Heading(left, _area == (int)EAreaType.PlaceOfFame ? "TROPHIES" : _area == (int)EAreaType.EquipmentPresetsStand ? "OUTFITS" : "ON THE STAND");
+                int kept = HideoutShelves.Count(_area);
+                Text(left, kept == 0 ? "Nothing is kept here yet." : kept + " thing(s) kept here.", 17f, Ink, false);
+                int here = _area;
+                Button(left, "STORE / TAKE", () => { Close(); HideoutShelves.Open(here); }, true, 220f);
+                const int second = (int)EAreaType.WeaponStandSecondary;
+                if (_area == (int)EAreaType.WeaponStand && HideoutShelves.Has(second))
+                {
+                    Text(left, "Second rack: " + HideoutShelves.Count(second) + " thing(s).", 17f, Ink, false);
+                    Button(left, "SECOND RACK", () => { Close(); HideoutShelves.Open(second); }, true, 220f);
+                }
+            }
+
             if (_area == (int)EAreaType.Stash && HideoutStash.Current != null)
             {
                 Space(left, 14f);

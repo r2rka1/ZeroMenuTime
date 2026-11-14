@@ -276,6 +276,8 @@ namespace TheTrueSPT
             HideoutPanel.Tick();
             IndoorLight.Tick();
             MapMarkers.Tick();
+            HideoutPower.Tick();
+            BotFreeze.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;

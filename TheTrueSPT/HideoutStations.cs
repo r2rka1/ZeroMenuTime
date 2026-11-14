@@ -126,6 +126,7 @@ namespace TheTrueSPT
             }
             Plugin.Log.LogInfo("Stations shown: " + shown);
             HideoutPower.ApplyLook();
+            HideoutShelves.ShowAll();
         }
 
         private static void Show(EAreaType type, HideoutArea area, int level, bool immediate)

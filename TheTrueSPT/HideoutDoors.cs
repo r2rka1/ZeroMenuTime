@@ -275,6 +275,11 @@ namespace TheTrueSPT
             }
             // Whenever the interior is at hand, rooms still bare get their furniture.
             RoomProps.DressAll();
+            // Loaded ahead of time for a quick way in; until someone goes in it is switched off.
+            if (!waited && Inside == null && !_busy)
+            {
+                HideoutBunker.Park(true);
+            }
         }
 
         public static IndoorTrigger IndoorAt(Vector3 position)
@@ -332,6 +337,7 @@ namespace TheTrueSPT
             }
             HideoutStations.Read(reply);
             HideoutStash.Read(id, reply);
+            HideoutShelves.Read(reply);
             HideoutBoosts.Read(reply);
             HideoutCrafting.Read(reply);
 
@@ -350,6 +356,8 @@ namespace TheTrueSPT
             }
             var origin = HideoutBunker.Moved;
 
+            HideoutBunker.Park(false);
+            BotFreeze.Set(true);
             HideoutStations.ShowAll();
             HideoutBunker.Sun(false);
             if (HideoutBunker.BunkerSettings != null)
@@ -423,6 +431,8 @@ namespace TheTrueSPT
             string was = Inside;
             StepOut();
             yield return new WaitForSecondsRealtime(0.2f);
+            HideoutBunker.Park(true);
+            BotFreeze.Set(false);
             RoomDoor.PlayDoorSound(false, _returnTo);
             yield return RoomDoor.FadeTo(0f);
             Plugin.Log.LogInfo("Left hideout '" + was + "'");
@@ -458,6 +468,7 @@ namespace TheTrueSPT
         public static async System.Threading.Tasks.Task Close()
         {
             HideoutPanel.Close();
+            BotFreeze.Set(false);
             if (Inside != null)
             {
                 HideoutStash.Send("raid ending");
@@ -465,6 +476,7 @@ namespace TheTrueSPT
             Inside = null;
             HideoutStations.Clear();
             HideoutStash.Clear();
+            HideoutShelves.Clear();
             try
             {
                 HideoutBunker.Sun(true);

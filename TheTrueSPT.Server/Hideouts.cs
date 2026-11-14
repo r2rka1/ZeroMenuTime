@@ -154,8 +154,18 @@ public sealed class HideoutCost
     public int Count { get; set; }
 }
 
+/// <summary>What a station keeps on it: the weapon stand's guns, the place of fame's trophies.</summary>
+public sealed class ShelfReport
+{
+    public string Id { get; set; } = "";
+    public string Template { get; set; } = "";
+    public List<Item> Items { get; set; } = [];
+}
+
 public sealed class HideoutResponse
 {
+    /// <summary>Station number to the container that station keeps things in.</summary>
+    public Dictionary<int, ShelfReport> Shelves { get; set; } = [];
     /// <summary>Station number to what its next level costs. A station at its top level is not listed.</summary>
     public Dictionary<int, List<HideoutCost>> NextCosts { get; set; } = [];
     public bool Ok { get; set; }
@@ -431,6 +441,15 @@ public sealed class HideoutsService(
             }
         }
         response.Power = Report(store, store.Active, response.Levels);
+        foreach (var shelf in pmc.Inventory?.HideoutAreaStashes ?? [])
+        {
+            string shelfId = shelf.Value.ToString();
+            var root = pmc.Inventory!.Items!.FirstOrDefault(x => x.Id.ToString() == shelfId);
+            if (root != null && int.TryParse(shelf.Key.ToString(), out int shelfArea))
+            {
+                response.Shelves[shelfArea] = new ShelfReport { Id = shelfId, Template = root.Template.ToString(), Items = Inside(pmc, [shelfId]) };
+            }
+        }
         foreach (var pair in store.Crafts)
         {
             bool lit = store.Power.TryGetValue(pair.Key, out var there) && there.On && there.Fuel.Sum(can => can.Left) > 0.0001;
@@ -898,6 +917,51 @@ public sealed class HideoutsService(
     }
 
     /// <summary>Replaces a hideout's stash contents with what the client holds.</summary>
+    /// <summary>Replaces what a station keeps on it with what the client says is there now.</summary>
+    public HideoutResponse SetShelf(MongoId sessionId, HideoutRequest request)
+    {
+        return Guarded(sessionId, request, true, (pmc, store) =>
+        {
+            string? shelfId = null;
+            foreach (var shelf in pmc.Inventory?.HideoutAreaStashes ?? [])
+            {
+                if (shelf.Key.ToString() == request.Area.ToString())
+                {
+                    shelfId = shelf.Value.ToString();
+                }
+            }
+            if (shelfId == null)
+            {
+                return new HideoutResponse { Error = "That station keeps nothing" };
+            }
+            // As with the stash: only what really hangs off this container is taken.
+            var sent = request.Items ?? [];
+            var reach = new HashSet<string> { shelfId };
+            var items = new List<Item>();
+            bool grew = true;
+            while (grew)
+            {
+                grew = false;
+                foreach (var item in sent)
+                {
+                    string id = item.Id.ToString();
+                    if (id != shelfId && item.ParentId != null && reach.Contains(item.ParentId) && reach.Add(id))
+                    {
+                        items.Add(item);
+                        grew = true;
+                    }
+                }
+            }
+            var gone = new HashSet<string>(Inside(pmc, [shelfId]).Select(x => x.Id.ToString()));
+            pmc.Inventory!.Items!.RemoveAll(x => gone.Contains(x.Id.ToString()));
+            var incoming = new HashSet<string>(items.Select(x => x.Id.ToString()));
+            pmc.Inventory.Items.RemoveAll(x => incoming.Contains(x.Id.ToString()));
+            pmc.Inventory.Items.AddRange(items);
+            Console.WriteLine("[TheTrueSPT] Station " + request.Area + " now keeps " + items.Count + " item(s)" + (items.Count != sent.Count ? "; ignored " + (sent.Count - items.Count) + " not inside it." : "."));
+            return Describe(pmc, store);
+        });
+    }
+
     public HideoutResponse SetStash(MongoId sessionId, HideoutRequest request)
     {
         return Guarded(sessionId, request, true, (pmc, store) =>

@@ -151,6 +151,44 @@ namespace TheTrueSPT
                    + listeners + " listener(s), level settings kept: " + (Singleton<LevelSettings>.Instantiated && Singleton<LevelSettings>.Instance == RaidSettings);
         }
 
+        private static readonly List<GameObject> ParkedRoots = new List<GameObject>();
+        public static bool Parked => ParkedRoots.Count > 0;
+
+        /// <summary>
+        /// Switches the whole interior off while nobody is in it, and back on. Loaded but out of
+        /// sight it still ran every lamp, script and sound it has, at a cost in frame rate on the
+        /// map above. Furniture can still be copied out of it while it is off.
+        /// </summary>
+        public static void Park(bool away)
+        {
+            if (away)
+            {
+                if (Parked)
+                {
+                    return;
+                }
+                foreach (var root in Roots())
+                {
+                    if (root.activeSelf)
+                    {
+                        root.SetActive(false);
+                        ParkedRoots.Add(root);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var root in ParkedRoots)
+                {
+                    if (root != null)
+                    {
+                        root.SetActive(true);
+                    }
+                }
+                ParkedRoots.Clear();
+            }
+        }
+
         /// <summary>True for anything that belongs to the bunker's scenes.</summary>
         public static bool Owns(GameObject go)
         {
@@ -353,6 +391,7 @@ namespace TheTrueSPT
                 return "not loaded";
             }
             Sun(true);
+            ParkedRoots.Clear();
             var token = _token;
             _token = null;
             var marker = GameObject.Find(MarkerName);

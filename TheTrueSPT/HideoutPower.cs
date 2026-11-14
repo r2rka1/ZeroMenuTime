@@ -76,6 +76,48 @@ namespace TheTrueSPT
             return area != 2;
         }
 
+        private static Light[] _lamps;
+        private static float _nextLamps, _lampsListed;
+
+        /// <summary>
+        /// Called every frame. A built-up hideout has some four hundred lamps lit, about a hundred
+        /// of them casting shadows; with a whole map loaded above, those shadows cost a third of the
+        /// frame rate. They are kept off while the player is inside (lamps switch them back on as
+        /// they light up, so this is done again every couple of seconds).
+        /// </summary>
+        public static void Tick()
+        {
+            if (HideoutDoors.Inside == null || Time.unscaledTime < _nextLamps || !HideoutBunker.Loaded)
+            {
+                return;
+            }
+            _nextLamps = Time.unscaledTime + 2f;
+            try
+            {
+                if (_lamps == null || Time.unscaledTime - _lampsListed > 20f)
+                {
+                    var found = new List<Light>();
+                    foreach (var root in HideoutBunker.Roots())
+                    {
+                        found.AddRange(root.GetComponentsInChildren<Light>(true));
+                    }
+                    _lamps = found.ToArray();
+                    _lampsListed = Time.unscaledTime;
+                }
+                foreach (var lamp in _lamps)
+                {
+                    if (lamp != null && lamp.shadows != LightShadows.None)
+                    {
+                        lamp.shadows = LightShadows.None;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                _lamps = null;
+            }
+        }
+
         private static EFT.Hideout.HideoutController _shown;
         private static bool _lookKnown, _lookPowered;
 
@@ -156,6 +198,9 @@ namespace TheTrueSPT
             {
                 Plugin.Log.LogWarning("Hideout power: setting the lamps failed: " + e.Message);
             }
+            // The lamps come on over a second or two; the list is taken afresh after that.
+            _lamps = null;
+            _nextLamps = Time.unscaledTime + 0.2f;
             _lookKnown = true;
             _lookPowered = Powered;
         }

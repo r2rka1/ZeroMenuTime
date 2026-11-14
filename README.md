@@ -75,6 +75,8 @@ All three doors lead to the same hideout: the same stations, stash and crafts. I
 - **Crafting.** A built station offers **Craft...**, which turns its action list into the recipe list, a page at a time. Tools are needed but not used up. When the time is up, **Collect** puts the result in that hideout's stash. Recipes locked behind quests stay locked until those quests are done.
 - **Power.** The Generator takes fuel cans (put in and taken out in its window) and has a switch. While it is on, fuel burns on the world clock, also while you are away or asleep. Without power the lamps are out and nothing electric works: a craft cannot be started, a craft under way waits and carries on when power is back, and the bitcoin farm stops. Only the Lavatory is worked by hand. The lamps themselves (candles, bulbs, fluorescent) are put up from the Generator's window.
 - **Bitcoin farm.** Fit graphics cards in its window; while there is power it mines bitcoins at the game's rate for that many cards, up to three waiting, collected into the stash.
+- **Kept on stations.** The Weapon Stand (both racks), the Place of Fame and the Equipment Presets Stand each have a STORE / TAKE button in their window that opens what they keep beside your gear; it is saved when closed.
+- **While you are inside.** Every bot on the map is switched off and switched back on, where it stood, when you leave. The hideout's lamps cast no shadows, which is worth about a third of the frame rate with a map loaded above; outside, the interior itself is switched off.
 - **Boosts.** While you are inside, the hideout's built stations give back health, energy and water, at the game's own bonus amounts per game hour.
 - **Sleeping.** A built Rest Space offers sleeping for 2, 4 or 8 hours, or until morning. The clock jumps, you heal 20, 40 or 70 health per hour by Rest Space level, and you use up energy and water as if the time had passed.
 - **Saving.** Sleeping saves the game, and the Rest Space also offers **Save**. If you die, the save is put back (gear, health, skills, quests, all three hideouts and the clock) and the next raid begins beside that bed. The same happens if the game stops without the raid ending. Leaving a raid in the ordinary way carries on from where you left.
@@ -96,7 +98,7 @@ The door is a real door of the game. Where a good one was picked by hand it is u
 - Only the backpack (or the rig, if there is no backpack) is shown for selling. Payment and purchases use all carried containers.
 - Barter trades paid with items are not counted toward trader loyalty.
 - Quests that give you an item when you accept them do not deliver it if accepted in a raid.
-- Not built for the hideouts: the scav case, the water collector's and air filter's filters, the cultist circle, and storing things on the weapon stand and the place of fame. Skill and experience bonuses from stations are not applied.
+- Not built for the hideouts: the scav case, the water collector's and air filter's filters, the cultist circle, and showing stored guns and trophies on their stands (they are kept, but may not be displayed). Skill and experience bonuses from stations are not applied.
 - Hideout bonuses apply only while you are inside; menus outside a raid show the hideout last entered.
 - Gear lost in a death is still reported to insurance by the game although the save brings it back, so insured items can return twice.
 - Waking up after a death puts you by the Rest Space.
