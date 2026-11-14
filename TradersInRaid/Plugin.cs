@@ -511,6 +511,12 @@ namespace TradersInRaid
                 __result = door.GetActions();
                 return false;
             }
+            var stationActions = HideoutStations.ActionsForObject(interactive);
+            if (stationActions != null)
+            {
+                __result = stationActions;
+                return false;
+            }
             return true;
         }
     }

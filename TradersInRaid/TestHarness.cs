@@ -16,7 +16,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | use | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | use | target | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -272,6 +272,76 @@ namespace TradersInRaid
                     Status(player);
                     break;
                 }
+                case "stations":
+                {
+                    // Every station of the hideout the player is in: level, where it is, what the next level costs.
+                    var controller = HideoutStations.Controller();
+                    if (controller == null || HideoutDoors.Inside == null)
+                    {
+                        Report("FAILED not inside a hideout");
+                        break;
+                    }
+                    Report("hideout '" + HideoutDoors.Inside + "':");
+                    foreach (var pair in controller.Areas)
+                    {
+                        int level;
+                        HideoutStations.Levels.TryGetValue((int)pair.Key, out level);
+                        Bounds b;
+                        bool has = HideoutStations.LevelBounds(pair.Value, Mathf.Max(level, 1), out b);
+                        var tally = HideoutStations.Tally(player, (int)pair.Key);
+                        Report("  " + (int)pair.Key + " " + pair.Key + " level " + level + "/" + (pair.Value.AreaLevels.Length - 1)
+                               + (has ? " at " + b.center.ToString("F1") + " size " + b.size.ToString("F1") : " (nothing to see)")
+                               + (HideoutStations.NextCosts.ContainsKey((int)pair.Key) ? " | next needs: " + HideoutStations.CostText(tally, false) + " | missing: " + HideoutStations.CostText(tally, true) : " | fully built"));
+                    }
+                    break;
+                }
+                case "build":
+                {
+                    // build NUMBER: what choosing Build or Upgrade at that station does.
+                    int number = (int)Number(parts[1]);
+                    var job = HideoutStations.Build(number, ((EFT.EAreaType)number).ToString());
+                    while (!job.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report(job.IsFaulted ? "FAILED " + job.Exception.InnerException : job.Result);
+                    break;
+                }
+                case "give":
+                {
+                    // give TEMPLATE COUNT: puts items into carried gear, for paying station costs in tests.
+                    int count = parts.Length > 2 ? (int)Number(parts[2]) : 1;
+                    var template = Comfort.Common.Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), parts[1], null);
+                    int given = 0;
+                    if (template.StackMaxSize > 1)
+                    {
+                        template.StackObjectsCount = Mathf.Min(count, template.StackMaxSize);
+                        var one = LocalTrade.Give(player, template);
+                        while (!one.IsCompleted)
+                        {
+                            yield return null;
+                        }
+                        given = one.Result ? template.StackObjectsCount : 0;
+                    }
+                    else
+                    {
+                        for (int i = 0; i < count; i++)
+                        {
+                            var item = i == 0 ? template : Comfort.Common.Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), parts[1], null);
+                            var one = LocalTrade.Give(player, item);
+                            while (!one.IsCompleted)
+                            {
+                                yield return null;
+                            }
+                            if (one.Result)
+                            {
+                                given++;
+                            }
+                        }
+                    }
+                    Report("gave " + given + " of " + count + " " + HideoutStations.ItemName(parts[1]));
+                    break;
+                }
                 case "doors":
                 {
                     // Door objects near the player, nearest first: candidates for a hideout door.
@@ -364,6 +434,30 @@ namespace TradersInRaid
                     yield return new WaitForSecondsRealtime(1.2f);
                     yield return new WaitForEndOfFrame();
                     Screenshot(parts.Length > 4 ? parts[4] : "shot");
+                    break;
+                }
+                case "target":
+                {
+                    // What the game currently offers to interact with, and the actions we would give it.
+                    var seen = player.InteractableObject;
+                    if (seen == null)
+                    {
+                        Report("the game offers nothing to interact with here");
+                        break;
+                    }
+                    string offered = "";
+                    var station = seen as StationInteractable;
+                    var door = seen as RoomDoor;
+                    var trader = seen as TraderInteractable;
+                    var actions = HideoutStations.ActionsForObject(seen) ?? (station != null ? station.GetActions() : door != null ? door.GetActions() : trader != null ? trader.GetActions() : null);
+                    if (actions != null)
+                    {
+                        foreach (var action in actions.Actions)
+                        {
+                            offered += " [" + action.Name + (action.Disabled ? " (greyed out)" : "") + "]";
+                        }
+                    }
+                    Report("the game offers: " + seen.name + offered);
                     break;
                 }
                 case "aim":

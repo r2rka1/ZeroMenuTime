@@ -42,8 +42,6 @@ namespace TradersInRaid
 
         /// <summary>The hideout the player is standing in, or null.</summary>
         public static string Inside;
-        /// <summary>Station number to level for that hideout, as the server last reported them.</summary>
-        public static readonly Dictionary<int, int> Levels = new Dictionary<int, int>();
 
         private static Vector3 _returnTo;
         private static float _returnYaw;
@@ -60,7 +58,7 @@ namespace TradersInRaid
                 // A rust-red metal double door in a tiled wall, at street level a few steps from Prapor.
                 new HideoutSpot { Id = "streets", Map = "TarkovStreets", Position = new[] { -15.30f, 3.00f, -108.65f }, RotationY = 0f },
                 // The door of one of the metal cabins north of Skier.
-                new HideoutSpot { Id = "customs", Map = "bigmap", Position = new[] { 75.00f, 1.40f, -109.75f }, RotationY = 345f },
+                new HideoutSpot { Id = "customs", Map = "bigmap", Position = new[] { 74.90f, 1.40f, -110.00f }, RotationY = 165f },
                 // A grey steel door in a red corrugated shed, west of Peacekeeper.
                 new HideoutSpot { Id = "shoreline", Map = "Shoreline", Position = new[] { -1005.70f, -60.15f, 391.60f }, RotationY = 0f },
             };
@@ -97,6 +95,14 @@ namespace TradersInRaid
                 // laid over it and not drawn.
                 var ground = new Vector3(spot.Position[0], spot.Position[1], spot.Position[2]);
                 var facing = Quaternion.Euler(0f, spot.RotationY, 0f);
+                // The ground in front of a door is rarely level with where it was measured; stand the
+                // player on what is actually there.
+                RaycastHit floor;
+                if (Physics.Raycast(ground + facing * new Vector3(0f, 1.6f, 0.9f), Vector3.down, out floor, 4f,
+                        LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain"), QueryTriggerInteraction.Ignore))
+                {
+                    ground.y = floor.point.y;
+                }
                 var door = RoomDoor.Spawn("Enter hideout", ground + Vector3.up * (RoomDoor.Height / 2f) + facing * new Vector3(0f, 0f, 0.08f), spot.RotationY);
                 var renderer = door.GetComponent<MeshRenderer>();
                 if (renderer != null)
@@ -220,15 +226,7 @@ namespace TradersInRaid
                 _busy = false;
                 yield break;
             }
-            Levels.Clear();
-            var levels = reply["Levels"] as JObject;
-            if (levels != null)
-            {
-                foreach (var pair in levels)
-                {
-                    Levels[int.Parse(pair.Key)] = (int)pair.Value;
-                }
-            }
+            HideoutStations.Read(reply);
 
             if (!HideoutBunker.Loaded)
             {
@@ -245,6 +243,7 @@ namespace TradersInRaid
             }
             var origin = HideoutBunker.Moved;
 
+            HideoutStations.ShowAll();
             HideoutBunker.Sun(false);
             if (HideoutBunker.BunkerSettings != null)
             {
@@ -295,7 +294,7 @@ namespace TradersInRaid
         private static void StepOut()
         {
             Inside = null;
-            Levels.Clear();
+            HideoutStations.Clear();
             HideoutBunker.Sun(true);
             if (HideoutBunker.RaidSettings != null)
             {
@@ -312,7 +311,7 @@ namespace TradersInRaid
         public static async System.Threading.Tasks.Task Close()
         {
             Inside = null;
-            Levels.Clear();
+            HideoutStations.Clear();
             try
             {
                 HideoutBunker.Sun(true);

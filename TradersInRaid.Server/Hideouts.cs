@@ -49,8 +49,17 @@ public sealed class HideoutRequest : IRequestData
     public List<Item>? Items { get; set; }
 }
 
+/// <summary>One kind of material a station level needs.</summary>
+public sealed class HideoutCost
+{
+    public string Tpl { get; set; } = "";
+    public int Count { get; set; }
+}
+
 public sealed class HideoutResponse
 {
+    /// <summary>Station number to what its next level costs. A station at its top level is not listed.</summary>
+    public Dictionary<int, List<HideoutCost>> NextCosts { get; set; } = [];
     public bool Ok { get; set; }
     public string? Error { get; set; }
     public string Active { get; set; } = "";
@@ -233,6 +242,15 @@ public sealed class HideoutsService(
         foreach (var area in pmc.Hideout?.Areas ?? [])
         {
             response.Levels[(int)area.Type] = area.Level ?? 0;
+            var station = hideoutTable.Areas.FirstOrDefault(a => a.Type == area.Type);
+            Stage? next = null;
+            if (station?.Stages != null && station.Stages.TryGetValue(((area.Level ?? 0) + 1).ToString(), out next) && next != null)
+            {
+                response.NextCosts[(int)area.Type] = (next.Requirements ?? [])
+                    .Where(r => string.Equals(r.Type, "Item", StringComparison.OrdinalIgnoreCase) && (r.Count ?? 0) > 0)
+                    .Select(r => new HideoutCost { Tpl = r.TemplateId.ToString(), Count = r.Count ?? 0 })
+                    .ToList();
+            }
         }
         foreach (string id in Known)
         {
