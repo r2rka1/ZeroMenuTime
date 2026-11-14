@@ -133,7 +133,75 @@ namespace TheTrueSPT
                 return false;
             }
             owner.ShowInventoryScreenLoot(shelf, () => Send(area), false);
+            if (Plugin.Instance != null)
+            {
+                Plugin.Instance.StartCoroutine(Fit());
+            }
             return true;
+        }
+
+        /// <summary>
+        /// The game's looting screen was laid out for small containers. A station's container is
+        /// drawn growing upwards from the top of the panel, out of sight, and is wider than the
+        /// panel. This sets it at the panel's top left and shrinks it to the panel's width.
+        /// </summary>
+        private static System.Collections.IEnumerator Fit()
+        {
+            // The screen builds the container's grid a moment after it opens.
+            EFT.UI.DragAndDrop.TemplatedGridsView view = null;
+            RectTransform inner = null;
+            for (float waited = 0f; waited < 2f && inner == null; waited += Time.unscaledDeltaTime)
+            {
+                yield return null;
+                EFT.UI.DragAndDrop.GridView best = null;
+                foreach (var found in UnityEngine.Object.FindObjectsOfType<EFT.UI.DragAndDrop.GridView>())
+                {
+                    // The player's own rig and pockets are drawn the same way, on the left; the
+                    // looted container is the one furthest to the right.
+                    if (found.isActiveAndEnabled && found.GetComponentInParent<EFT.UI.DragAndDrop.TemplatedGridsView>() != null
+                        && found.GetComponentInParent<UnityEngine.UI.ScrollRect>() != null
+                        && (best == null || found.transform.position.x > best.transform.position.x))
+                    {
+                        best = found;
+                    }
+                }
+                if (best == null)
+                {
+                    continue;
+                }
+                view = best.GetComponentInParent<EFT.UI.DragAndDrop.TemplatedGridsView>();
+                // The frame that holds the grid: the child of the view that the grid sits under.
+                for (var at = best.transform; at != null && at != view.transform; at = at.parent)
+                {
+                    inner = at as RectTransform;
+                }
+            }
+            if (view == null || inner == null)
+            {
+                Plugin.Log.LogWarning("Station storage screen: the container's grid was not found; left as the game drew it");
+                yield break;
+            }
+            var scroll = (RectTransform)view.GetComponentInParent<UnityEngine.UI.ScrollRect>().transform;
+            Plugin.Log.LogInfo("Station storage screen: fitting '" + view.name + "' (child '" + (inner != null ? inner.name : "?") + "' " + (inner != null ? inner.rect.size.ToString("F0") : "") + " at "
+                               + (inner != null ? inner.position.ToString("F0") : "") + ") into '" + scroll.name + "' " + scroll.rect.size.ToString("F0") + " at " + scroll.position.ToString("F0"));
+            var corners = new Vector3[4];
+            // The layout settles over a few frames; hold the place until it has.
+            for (float held = 0f; held < 0.6f && view != null && inner != null; held += Time.unscaledDeltaTime)
+            {
+                float fit = inner.rect.width > 1f ? Mathf.Min(1f, (scroll.rect.width - 8f) / inner.rect.width) : 1f;
+                inner.localScale = new Vector3(fit, fit, 1f);
+                scroll.GetWorldCorners(corners);   // bottom left, top left, top right, bottom right
+                var topLeft = corners[1];
+                // Its pivot may be at its bottom or its top; place it by where its own top left ends up.
+                var own = new Vector3[4];
+                inner.GetWorldCorners(own);
+                inner.position += new Vector3(topLeft.x + 36f - own[1].x, topLeft.y - own[1].y, 0f);
+                yield return null;
+            }
+            if (inner != null)
+            {
+                Plugin.Log.LogInfo("Station storage screen: left at " + inner.position.ToString("F0") + ", scale " + inner.lossyScale.x.ToString("F2"));
+            }
         }
 
         public static async void Send(int area)

@@ -733,6 +733,34 @@ namespace TheTrueSPT
                     }
                     break;
                 }
+                case "uigrid":
+                {
+                    // Every item grid on screen, biggest first, with where it sits: for fixing a screen's layout.
+                    foreach (var grid in UnityEngine.Object.FindObjectsOfType<EFT.UI.DragAndDrop.GridView>())
+                    {
+                        var rect = (RectTransform)grid.transform;
+                        if (!grid.isActiveAndEnabled || rect.rect.width < 500f)
+                        {
+                            continue;
+                        }
+                        Report("grid " + rect.rect.size.ToString("F0") + " at " + rect.position.ToString("F0") + " anchors " + rect.anchorMin + "-" + rect.anchorMax + " pivot " + rect.pivot + " scale " + rect.lossyScale.x.ToString("F2"));
+                        var up = rect.parent;
+                        for (int i = 0; i < 6 && up != null; i++, up = up.parent)
+                        {
+                            var r = up as RectTransform;
+                            var kinds = new List<string>();
+                            foreach (var c in up.GetComponents<Component>())
+                            {
+                                if (!(c is RectTransform) && !(c is CanvasRenderer))
+                                {
+                                    kinds.Add(c.GetType().Name);
+                                }
+                            }
+                            Report("   in " + up.name + (r != null ? " " + r.rect.size.ToString("F0") + " at " + r.position.ToString("F0") + " pivot " + r.pivot : "") + " [" + string.Join(",", kinds.ToArray()) + "]");
+                        }
+                    }
+                    break;
+                }
                 case "fps":
                 {
                     // fps [SECONDS]: the frame rate averaged over a few seconds, and what the interior is doing.
