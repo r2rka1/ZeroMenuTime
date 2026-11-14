@@ -164,6 +164,18 @@ public class TradersInRaidRouter(
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetClock(sessionId, payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/recipes",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Recipes(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/craft",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Craft(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
+        "/tradersinraid/hideout/collect",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Collect(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
         "/tradersinraid/hideout/list",
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(sessionId, payload)) ?? "{}")
     ),

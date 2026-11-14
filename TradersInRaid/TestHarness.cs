@@ -21,7 +21,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | recipes [STATION] | craft RECIPE_ID | collect STATION | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -392,6 +392,54 @@ namespace TradersInRaid
                     }
                     Report("hideout screen objects present: overlay " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenOverlay != null)
                            + ", rear " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenRear != null));
+                    break;
+                }
+                case "recipes":
+                {
+                    // recipes [STATION]: what this hideout can make, and what is under way everywhere.
+                    int only = parts.Length > 1 ? (int)Number(parts[1]) : -1;
+                    Report("hideout '" + HideoutDoors.Inside + "' can make " + HideoutCrafting.Recipes.Count + " recipe(s)");
+                    foreach (var recipe in HideoutCrafting.Recipes.Where(r => only < 0 || r.Area == only).OrderBy(r => r.Area).ThenBy(r => r.Seconds).Take(40))
+                    {
+                        string missing = HideoutCrafting.Missing(player, recipe);
+                        Report("  " + recipe.Id + " station " + recipe.Area + ": " + recipe.Count + " x " + HideoutStations.ItemName(recipe.Product) + " in " + WorldClock.Span(recipe.Seconds)
+                               + " from " + HideoutCrafting.Needs(recipe) + (missing == null ? " | CAN MAKE" : " | missing " + missing));
+                    }
+                    foreach (var pair in HideoutCrafting.Crafts)
+                    {
+                        foreach (var craft in pair.Value)
+                        {
+                            Report("  under way in '" + pair.Key + "' at station " + craft.Area + ": " + craft.Count + " x " + HideoutStations.ItemName(craft.Product)
+                                   + (craft.Due <= WorldClock.Now ? ", READY" : ", ready in " + WorldClock.Span(craft.Due - WorldClock.Now)));
+                        }
+                    }
+                    break;
+                }
+                case "craft":
+                {
+                    // craft RECIPE_ID: what choosing that recipe at its station does.
+                    var recipe = HideoutCrafting.Recipes.FirstOrDefault(r => r.Id == parts[1]);
+                    if (recipe == null)
+                    {
+                        Report("FAILED no such recipe here");
+                        break;
+                    }
+                    var job = HideoutCrafting.Start(recipe);
+                    while (!job.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report(job.IsFaulted ? "FAILED " + job.Exception.InnerException : job.Result);
+                    break;
+                }
+                case "collect":
+                {
+                    var job = HideoutCrafting.Collect((int)Number(parts[1]));
+                    while (!job.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report(job.IsFaulted ? "FAILED " + job.Exception.InnerException : job.Result);
                     break;
                 }
                 case "sleep":

@@ -85,6 +85,8 @@ namespace TradersInRaid
                 outcome = "Something woke you early.";
             }
 
+            HideoutCrafting.AnnounceDue();
+
             // Sleeping is also where the game is saved.
             SaveGame.Save("slept");
 

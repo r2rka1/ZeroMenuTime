@@ -32,8 +32,37 @@ public sealed class HideoutSave
     public List<Item> Items { get; set; } = [];
 }
 
+/// <summary>Something being made at a station, timed on the world clock.</summary>
+public sealed class HideoutCraft
+{
+    public string Recipe { get; set; } = "";
+    public int Area { get; set; }
+    public string Product { get; set; } = "";
+    public int Count { get; set; }
+    /// <summary>World clock readings, in game seconds.</summary>
+    public double Started { get; set; }
+    public double Due { get; set; }
+}
+
+/// <summary>A recipe a station of the hideout in use can make now.</summary>
+public sealed class HideoutRecipe
+{
+    public string Id { get; set; } = "";
+    public int Area { get; set; }
+    public string Product { get; set; } = "";
+    public int Count { get; set; }
+    /// <summary>How long it takes, in game seconds.</summary>
+    public double Seconds { get; set; }
+    /// <summary>Used up.</summary>
+    public List<HideoutCost> Items { get; set; } = [];
+    /// <summary>Needed at hand, not used up.</summary>
+    public List<string> Tools { get; set; } = [];
+}
+
 public sealed class HideoutStore
 {
+    /// <summary>What is being made in each hideout, in use or put away. They all run on the one clock.</summary>
+    public Dictionary<string, List<HideoutCraft>> Crafts { get; set; } = [];
     /// <summary>The hideout whose state is in the profile right now.</summary>
     public string Active { get; set; } = HideoutsService.First;
     /// <summary>The others, put away until they are entered.</summary>
@@ -55,6 +84,8 @@ public sealed class HideoutRequest : IRequestData
     public List<Item>? Items { get; set; }
     /// <summary>For the clock: what the game says the world clock reads now.</summary>
     public double Seconds { get; set; }
+    /// <summary>For crafting: the recipe to start.</summary>
+    public string Recipe { get; set; } = "";
 }
 
 /// <summary>One kind of material a station level needs.</summary>
@@ -85,6 +116,12 @@ public sealed class HideoutResponse
     /// (HealthRegeneration, EnergyRegeneration, HydrationRegeneration, MaximumEnergyReserve) to amount.
     /// </summary>
     public Dictionary<string, double> Boosts { get; set; } = [];
+    /// <summary>What is being made in every hideout, by hideout.</summary>
+    public Dictionary<string, List<HideoutCraft>> Crafts { get; set; } = [];
+    /// <summary>Only in answer to "recipes": what the hideout in use can make.</summary>
+    public List<HideoutRecipe> Recipes { get; set; } = [];
+    /// <summary>Only in answer to "collect": the finished crafts handed over.</summary>
+    public List<HideoutCraft> Collected { get; set; } = [];
 }
 
 /// <summary>
@@ -253,6 +290,7 @@ public sealed class HideoutsService(
             Ok = true,
             Active = store.Active,
             Clock = store.ClockSeconds,
+            Crafts = store.Crafts,
             StashTemplate = StashRoot(pmc)?.Template.ToString(),
             StashId = pmc.Inventory?.Stash?.ToString(),
             Stash = Inside(pmc, pmc.Inventory?.Stash != null ? [pmc.Inventory.Stash.Value.ToString()] : []),
@@ -323,6 +361,150 @@ public sealed class HideoutsService(
     public HideoutResponse List(MongoId sessionId, HideoutRequest request)
     {
         return Guarded(sessionId, request, false, Describe);
+    }
+
+    /// <summary>The recipes the built stations of the hideout in use can make at their levels.</summary>
+    private List<HideoutRecipe> RecipesFor(PmcData pmc)
+    {
+        var levels = (pmc.Hideout?.Areas ?? []).ToDictionary(a => (int)a.Type, a => a.Level ?? 0);
+        var done = new HashSet<string>((pmc.Quests ?? []).Where(q => q.Status == QuestStatusEnum.Success).Select(q => q.QId.ToString()));
+        var unlocked = new HashSet<string>((pmc.UnlockedInfo?.UnlockedProductionRecipe ?? []).Select(x => x.ToString()));
+        var result = new List<HideoutRecipe>();
+        foreach (var recipe in hideoutTable.Production.Recipes ?? [])
+        {
+            int area = (int)(recipe.AreaType ?? 0);
+            if (!levels.TryGetValue(area, out int level) || level < 1)
+            {
+                continue;
+            }
+            if (recipe.Locked == true && !unlocked.Contains(recipe.Id.ToString()))
+            {
+                continue;
+            }
+            var entry = new HideoutRecipe
+            {
+                Id = recipe.Id.ToString(),
+                Area = area,
+                Product = recipe.EndProduct.ToString(),
+                Count = recipe.Count ?? 1,
+                Seconds = recipe.ProductionTime ?? 0,
+            };
+            bool allowed = true;
+            foreach (var need in recipe.Requirements ?? [])
+            {
+                switch (need.Type)
+                {
+                    case "Area":
+                        allowed &= levels.GetValueOrDefault(need.AreaType ?? area) >= (need.RequiredLevel ?? 0);
+                        break;
+                    case "QuestComplete":
+                        allowed &= need.QuestId != null && done.Contains(need.QuestId.Value.ToString());
+                        break;
+                    case "Item":
+                        if (need.TemplateId != null && (need.Count ?? 0) > 0)
+                        {
+                            entry.Items.Add(new HideoutCost { Tpl = need.TemplateId.Value.ToString(), Count = need.Count ?? 0 });
+                        }
+                        break;
+                    case "Tool":
+                        if (need.TemplateId != null)
+                        {
+                            entry.Tools.Add(need.TemplateId.Value.ToString());
+                        }
+                        break;
+                }
+            }
+            if (allowed)
+            {
+                result.Add(entry);
+            }
+        }
+        return result;
+    }
+
+    private static void Advance(HideoutStore store, double seconds)
+    {
+        if (seconds > store.ClockSeconds)
+        {
+            store.ClockSeconds = seconds;
+        }
+    }
+
+    public HideoutResponse Recipes(MongoId sessionId, HideoutRequest request)
+    {
+        return Guarded(sessionId, request, true, (pmc, store) =>
+        {
+            if (store.Active != request.Id)
+            {
+                return new HideoutResponse { Error = "Hideout '" + request.Id + "' is not the one in use; enter it first" };
+            }
+            var response = Describe(pmc, store);
+            response.Recipes = RecipesFor(pmc);
+            return response;
+        });
+    }
+
+    /// <summary>Starts making something. Ingredients are settled on the client, as building is.</summary>
+    public HideoutResponse Craft(MongoId sessionId, HideoutRequest request)
+    {
+        return Guarded(sessionId, request, true, (pmc, store) =>
+        {
+            if (store.Active != request.Id)
+            {
+                return new HideoutResponse { Error = "Hideout '" + request.Id + "' is not the one in use; enter it first" };
+            }
+            var recipe = RecipesFor(pmc).FirstOrDefault(r => r.Id == request.Recipe);
+            if (recipe == null)
+            {
+                return new HideoutResponse { Error = "This hideout cannot make that" };
+            }
+            if (!store.Crafts.TryGetValue(request.Id, out var crafts))
+            {
+                crafts = [];
+                store.Crafts[request.Id] = crafts;
+            }
+            if (crafts.Any(c => c.Area == recipe.Area))
+            {
+                return new HideoutResponse { Error = "That station is busy" };
+            }
+            Advance(store, request.Seconds);
+            crafts.Add(new HideoutCraft
+            {
+                Recipe = recipe.Id,
+                Area = recipe.Area,
+                Product = recipe.Product,
+                Count = recipe.Count,
+                Started = store.ClockSeconds,
+                Due = store.ClockSeconds + recipe.Seconds,
+            });
+            Save(sessionId.ToString(), store);
+            Console.WriteLine("[TradersInRaid] Craft started in hideout '" + request.Id + "' at station " + recipe.Area + ": " + recipe.Count + " x " + recipe.Product
+                              + ", due in " + (recipe.Seconds / 3600.0).ToString("0.##") + " game hours.");
+            return Describe(pmc, store);
+        });
+    }
+
+    /// <summary>Hands over what a station has finished making. The client puts it in the stash.</summary>
+    public HideoutResponse Collect(MongoId sessionId, HideoutRequest request)
+    {
+        return Guarded(sessionId, request, true, (pmc, store) =>
+        {
+            Advance(store, request.Seconds);
+            var collected = new List<HideoutCraft>();
+            if (store.Crafts.TryGetValue(request.Id, out var crafts))
+            {
+                collected = crafts.Where(c => c.Area == request.Area && c.Due <= store.ClockSeconds).ToList();
+                crafts.RemoveAll(collected.Contains);
+            }
+            Save(sessionId.ToString(), store);
+            var response = Describe(pmc, store);
+            response.Collected = collected;
+            if (collected.Count > 0)
+            {
+                Console.WriteLine("[TradersInRaid] Collected " + collected.Count + " finished craft(s) from station " + request.Area + " in hideout '" + request.Id + "'.");
+            }
+            return response;
+        });
     }
 
     /// <summary>Moves the world clock on to what the game reports. It never goes back.</summary>

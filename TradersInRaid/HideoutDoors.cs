@@ -229,6 +229,7 @@ namespace TradersInRaid
             HideoutStations.Read(reply);
             HideoutStash.Read(id, reply);
             HideoutBoosts.Read(reply);
+            HideoutCrafting.Read(reply);
 
             if (!HideoutBunker.Loaded)
             {
@@ -266,6 +267,8 @@ namespace TradersInRaid
             _returnTo = returnTo;
             _returnYaw = returnYaw;
             Inside = id;
+            // Needs to know which hideout this is, so only now.
+            var recipes = HideoutCrafting.Load();
             player.Teleport(arrival, false);
             player.Rotation = new Vector2(exitYaw, 0f);
             yield return new WaitForSecondsRealtime(0.3f);
@@ -273,6 +276,7 @@ namespace TradersInRaid
             yield return RoomDoor.FadeTo(0f);
             Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + exitGround.ToString("F1") + "; boosts: " + HideoutBoosts.Describe());
             HideoutBoosts.Announce();
+            HideoutCrafting.AnnounceDue();
             WorldClock.Send("entered a hideout");
             _busy = false;
         }
@@ -300,6 +304,7 @@ namespace TradersInRaid
             HideoutStash.Send("leaving");
             Inside = null;
             HideoutStations.Clear();
+            HideoutCrafting.Clear();
             HideoutStash.Clear();
             HideoutBunker.Sun(true);
             if (HideoutBunker.RaidSettings != null)

@@ -236,7 +236,7 @@ namespace TradersInRaid
         // ---------------------------------------------------------------- building
 
         /// <summary>Items that may be spent: whatever sits in a carried pack, rig, pockets or case (not what is worn or held), and the hideout's stash.</summary>
-        private static List<Item> Spendable(Player player)
+        public static List<Item> Spendable(Player player)
         {
             var equipment = player.Profile.Inventory.Equipment;
             var worn = new HashSet<Item>(equipment.GetAllSlots().Select(slot => slot.ContainedItem).Where(item => item != null));
@@ -328,10 +328,17 @@ namespace TradersInRaid
         public static AvailableInteractionState ActionsFor(int stationArea, string stationName)
         {
             var station = new { Area = stationArea, StationName = stationName };
+            if (HideoutCrafting.MenuArea == stationArea)
+            {
+                return HideoutCrafting.Menu(stationArea);
+            }
+            // Looking at another station closes a recipe list left open elsewhere.
+            HideoutCrafting.MenuArea = -1;
             var state = new AvailableInteractionState();
             var player = GamePlayerOwner.MyPlayer;
             int level;
             Levels.TryGetValue(station.Area, out level);
+            HideoutCrafting.AddActions(state, station.Area, level);
             if (player == null || !NextCosts.ContainsKey(station.Area))
             {
                 if (station.Area == (int)EAreaType.Stash && HideoutStash.Current != null)
@@ -376,6 +383,33 @@ namespace TradersInRaid
                 Disabled = false,
             });
             return state;
+        }
+
+        /// <summary>
+        /// Takes a list of materials out of carried gear, then the stash. Returns null when all of
+        /// it was handed over, otherwise a line saying what could not be taken.
+        /// </summary>
+        public static async Task<string> Pay(Player player, List<Cost> costs)
+        {
+            foreach (var cost in costs)
+            {
+                int left = cost.Count;
+                foreach (var item in Spendable(player).Where(item => item.TemplateId == cost.Tpl).ToList())
+                {
+                    if (left <= 0)
+                    {
+                        break;
+                    }
+                    int take = Mathf.Min(left, item.StackObjectsCount);
+                    if (!await LocalTrade.Take(player, item, take))
+                    {
+                        NotificationManager.DisplayWarningNotification("Could not hand over " + ItemName(cost.Tpl) + ".");
+                        return "could not take " + ItemName(cost.Tpl);
+                    }
+                    left -= take;
+                }
+            }
+            return null;
         }
 
         /// <summary>A built Rest Space is somewhere to sleep.</summary>
@@ -454,6 +488,7 @@ namespace TradersInRaid
                 Read(reply);
                 HideoutBoosts.Read(reply);
                 HideoutStash.Send("after building");
+                await HideoutCrafting.Load();
                 int level;
                 Levels.TryGetValue(area, out level);
                 var controller = Controller();
