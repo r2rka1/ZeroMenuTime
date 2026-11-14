@@ -67,7 +67,7 @@ Without it, or with "Also use traders.json spots" on, spots come from `BepInEx/p
 
 ## Hideouts
 
-There is one hideout, reached through an existing door on each of three maps: a red metal double door near Prapor on Streets, the door of a metal cabin north of Skier on Customs, and a grey steel door in a red shed west of Peacekeeper on Shoreline. Looking at the door offers **Enter hideout**. Inside is the game's own hideout interior, loaded into the raid; bots cannot follow.
+There is one hideout, reached through an existing door on each of three maps: a red metal double door near Prapor on Streets, a door on the east side of Customs, and a grey steel door in a red shed west of Peacekeeper on Shoreline. Looking at the door offers **Enter hideout**. Inside is the game's own hideout interior, loaded into the raid; bots cannot follow.
 
 Looking at a station and using it opens the station's window: what its next level needs and how much of that you have, what it can make, from what, how long that takes (in game time and in time played), and what is being made now. Esc closes it. The way out of a hideout is the shut door at the end of the small room up the steps.
 

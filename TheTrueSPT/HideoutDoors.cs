@@ -23,6 +23,8 @@ namespace TheTrueSPT
         /// <summary>The way the door faces, out from its wall.</summary>
         public float RotationY;
         public bool Enabled = true;
+        /// <summary>The position is where someone stood with their back to the door; it is moved back onto the door.</summary>
+        public bool AtFeet;
     }
 
     /// <summary>
@@ -63,7 +65,7 @@ namespace TheTrueSPT
                 // A rust-red metal double door in a tiled wall, at street level a few steps from Prapor.
                 new HideoutSpot { Id = "streets", Map = "TarkovStreets", Position = new[] { -15.30f, 3.00f, -108.65f }, RotationY = 0f },
                 // The door of one of the metal cabins north of Skier.
-                new HideoutSpot { Id = "customs", Map = "bigmap", Position = new[] { 74.90f, 1.40f, -110.00f }, RotationY = 165f },
+                new HideoutSpot { Id = "customs", Map = "bigmap", Position = new[] { 622.70f, -2.67f, -126.40f }, RotationY = 101f, AtFeet = true },
                 // A grey steel door in a red corrugated shed, west of Peacekeeper.
                 new HideoutSpot { Id = "shoreline", Map = "Shoreline", Position = new[] { -1005.70f, -60.15f, 391.60f }, RotationY = 0f },
             };
@@ -100,7 +102,12 @@ namespace TheTrueSPT
                 // The door itself is part of the map already; this is only something to look at and use,
                 // laid over it and not drawn.
                 var ground = new Vector3(spot.Position[0], spot.Position[1], spot.Position[2]);
-                var facing = Quaternion.Euler(0f, spot.RotationY, 0f);
+                float yaw = spot.RotationY;
+                if (spot.AtFeet)
+                {
+                    RoomDoor.BackToWall(ref ground, ref yaw);
+                }
+                var facing = Quaternion.Euler(0f, yaw, 0f);
                 // The ground in front of a door is rarely level with where it was measured; stand the
                 // player on what is actually there.
                 RaycastHit floor;
@@ -109,7 +116,7 @@ namespace TheTrueSPT
                 {
                     ground.y = floor.point.y;
                 }
-                var door = RoomDoor.Spawn("Enter hideout", ground + Vector3.up * (RoomDoor.Height / 2f) + facing * new Vector3(0f, 0f, 0.08f), spot.RotationY);
+                var door = RoomDoor.Spawn("Enter hideout", ground + Vector3.up * (RoomDoor.Height / 2f) + facing * new Vector3(0f, 0f, 0.08f), yaw);
                 var renderer = door.GetComponent<MeshRenderer>();
                 if (renderer != null)
                 {
@@ -117,11 +124,11 @@ namespace TheTrueSPT
                 }
                 string id = spot.Id;
                 var back = ground + facing * new Vector3(0f, 0.05f, 1.0f);
-                float backYaw = spot.RotationY;
+                float backYaw = yaw;
                 door.OnUse = () => Enter(id, back, backYaw);
                 Fronts[id] = new KeyValuePair<Vector3, float>(back, backYaw);
                 placed++;
-                Plugin.Log.LogInfo("Hideout door for '" + spot.Id + "' at " + ground.ToString("F1") + " facing " + spot.RotationY.ToString("F0"));
+                Plugin.Log.LogInfo("Hideout door for '" + spot.Id + "' at " + ground.ToString("F1") + " facing " + yaw.ToString("F0"));
             }
             // The interior is wanted for its own sake where there is a hideout door, and for its
             // furniture wherever a trader has a room.
