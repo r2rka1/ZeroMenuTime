@@ -51,6 +51,18 @@ namespace TradersInRaid
                     return;
                 }
 
+                // With rooms, deliveries are laid on the trader's table and picked up by hand.
+                var room = TraderRoom.For(traderId);
+                if (room != null)
+                {
+                    int laid = await RewardTable.LayOut(room, parcels);
+                    Plugin.Log.LogInfo("Mail from " + traderName + ": laid " + laid + " on the table, " + RewardTable.Count + " lying there in all");
+                    NotificationManager.DisplayMessageNotification(
+                        laid > 0 ? laid + " item(s) for you are on the table." : "Everything for you is already on the table.",
+                        ENotificationDurationType.Long);
+                    return;
+                }
+
                 var factory = Singleton<ItemFactory>.Instance;
                 var taken = new List<string>();
                 int leftBehind = 0;

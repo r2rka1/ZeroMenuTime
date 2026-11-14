@@ -130,7 +130,9 @@ public class TradersInRaidRouter(
     JsonUtil jsonUtil,
     ProfileHelper profileHelper,
     TraderHelper traderHelper,
-    HandbookHelper handbookHelper) : StaticRouter(jsonUtil, [
+    HandbookHelper handbookHelper,
+    SPTarkov.Server.Core.Helpers.Quest.QuestHelper questHelper,
+    SPTarkov.Server.Core.Utils.Cloners.ICloner cloner) : StaticRouter(jsonUtil, [
     new RouteAction<TradeReport>(
         "/tradersinraid/trade",
         (_, payload, sessionId, _, _) =>
@@ -150,6 +152,11 @@ public class TradersInRaidRouter(
         "/tradersinraid/quests/sync",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(SyncQuests(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<QuestRewardRequest>(
+        "/tradersinraid/quest/rewards",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(TableRewards.Deliver(sessionId, payload, profileHelper, questHelper, cloner)) ?? "{}")
     ),
     new RouteAction<DeathChoiceRequest>(
         "/tradersinraid/death/goto",

@@ -61,6 +61,38 @@ public sealed class RaidQuestRewardsPatch : AbstractPatch
         return null;
     }
 
+    private static List<SPTarkov.Server.Core.Models.Eft.Profile.Message> Messages(
+        SPTarkov.Server.Core.Helpers.Profile.ProfileHelper? profiles, MongoId sessionId, MongoId traderId)
+    {
+        var records = profiles?.GetFullProfile(sessionId)?.DialogueRecords;
+        if (records != null && records.TryGetValue(traderId, out var dialogue) && dialogue?.Messages != null)
+        {
+            return dialogue.Messages;
+        }
+        return [];
+    }
+
+    private static HashSet<string> MessageIds(
+        SPTarkov.Server.Core.Helpers.Profile.ProfileHelper? profiles, MongoId sessionId, MongoId traderId)
+    {
+        return new HashSet<string>(Messages(profiles, sessionId, traderId).Select(m => m.Id.ToString()));
+    }
+
+    private static void EmptyNewMail(
+        SPTarkov.Server.Core.Helpers.Profile.ProfileHelper? profiles, MongoId sessionId, MongoId traderId, HashSet<string> before)
+    {
+        foreach (var message in Messages(profiles, sessionId, traderId))
+        {
+            if (before.Contains(message.Id.ToString()) || message.Items?.Data == null || message.Items.Data.Count == 0)
+            {
+                continue;
+            }
+            message.Items.Data.Clear();
+            message.RewardCollected = true;
+            Console.WriteLine("[TradersInRaid] Raid-end reward mail emptied: its items were already handed over in the raid.");
+        }
+    }
+
     [PatchPostfix]
     public static void Postfix(LocationLifecycleService __instance, MongoId sessionId,
         List<QuestStatus> postRaidQuests, List<QuestStatus> preRaidQuests, PmcData pmcProfile)
@@ -68,6 +100,7 @@ public sealed class RaidQuestRewardsPatch : AbstractPatch
         try
         {
             var questHelper = Dependency<QuestHelper>(__instance);
+            var profileHelper = Dependency<SPTarkov.Server.Core.Helpers.Profile.ProfileHelper>(__instance);
             var templates = Dependency<TemplateTable>(__instance);
             if (questHelper == null || templates == null || postRaidQuests == null || preRaidQuests == null)
             {
@@ -91,13 +124,22 @@ public sealed class RaidQuestRewardsPatch : AbstractPatch
                 {
                     continue;
                 }
+                // The items may already have been handed over on the trader's table during the raid.
+                // Pay the rest now, and empty the reward mail this payout sends so they are not given twice.
+                bool itemsGiven = TableRewards.WasDelivered(sessionId.ToString(), finished.QId.ToString());
+                var mailBefore = itemsGiven ? MessageIds(profileHelper, sessionId, quest.TraderId) : null;
                 questHelper.CompleteQuest(pmcProfile, new CompleteQuestRequestData
                 {
                     Action = "CompleteQuest",
                     QuestId = finished.QId,
                     RemoveExcessItems = false,
                 }, sessionId);
+                if (mailBefore != null)
+                {
+                    EmptyNewMail(profileHelper, sessionId, quest.TraderId, mailBefore);
+                }
             }
+            TableRewards.Clear(sessionId.ToString());
         }
         catch (Exception e)
         {

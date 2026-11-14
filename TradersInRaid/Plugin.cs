@@ -63,6 +63,8 @@ namespace TradersInRaid
             Death.Bind(Config);
             TraderModelBundle.Bind(Config);
             Metabolism.Bind(Config);
+            TraderRoom.Bind(Config);
+            TestHarness.Bind(Config);
             ShowFigures = Config.Bind("General", "Show trader figures", true,
                 "Stand a character at each trader spot. The marker box is hidden once the figure has loaded.");
             _patches = new List<ModulePatch>
@@ -72,6 +74,7 @@ namespace TradersInRaid
                 new LocalPurchasePatch(), new LocalSellPatch(), new CarriedPaymentPatch(), new DrawPackItemsPatch(),
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
+                new RoomIndoorPatch(), new RoomIndoorBasePatch(),
             };
             foreach (var patch in _patches)
             {
@@ -173,6 +176,20 @@ namespace TradersInRaid
             }
         }
 
+        /// <summary>The black screen while the player steps through a room door.</summary>
+        private void OnGUI()
+        {
+            if (RoomDoor.Fade <= 0f)
+            {
+                return;
+            }
+            var before = GUI.color;
+            GUI.depth = -1000;
+            GUI.color = new Color(0f, 0f, 0f, Mathf.Clamp01(RoomDoor.Fade));
+            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = before;
+        }
+
         private void Update()
         {
             if (SelfTestKey != null && SelfTestKey.Value.IsDown() && GamePlayerOwner.MyPlayer != null)
@@ -184,6 +201,8 @@ namespace TradersInRaid
                 InteractionProbe.Run();
             }
             ApplyUndying();
+            TestHarness.Tick();
+            RewardTable.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;
@@ -369,12 +388,30 @@ namespace TradersInRaid
                         continue;
                     }
                     string name = TraderConfig.NameOf(extract.TraderId);
-                    var at = exfil.transform.position + new Vector3(0f, 0.9f, 0f);
-                    var trader = TraderInteractable.Spawn(name, extract.TraderId, at, exfil.transform.rotation.eulerAngles.y, Plugin.ShowMarkers.Value);
+                    float facing = exfil.transform.rotation.eulerAngles.y;
+                    // In the open the trader stands on the extract; with rooms, a door stands there
+                    // and the trader waits inside.
+                    var ground = exfil.transform.position;
+                    if (TraderRoom.Enabled.Value)
+                    {
+                        var room = TraderRoom.Build(extract.TraderId, name, exfil.transform.position);
+                        var door = RoomDoor.Spawn("Enter " + name + "'s room",
+                            exfil.transform.position + new Vector3(0f, RoomDoor.Height / 2f, 0f), facing);
+                        room.OutsideDoor = door;
+                        door.Destination = room.Entry;
+                        door.DestinationYaw = room.EntryYaw;
+                        // Coming back out, the player stands just in front of the door, facing away from it.
+                        room.ExitDoor.Destination = exfil.transform.position + Quaternion.Euler(0f, facing, 0f) * new Vector3(0f, 0.05f, 1.0f);
+                        room.ExitDoor.DestinationYaw = facing;
+                        ground = room.TraderStand;
+                        facing = room.TraderYaw;
+                    }
+                    var at = ground + new Vector3(0f, 0.9f, 0f);
+                    var trader = TraderInteractable.Spawn(name, extract.TraderId, at, facing, Plugin.ShowMarkers.Value);
                     trader.Exfil = exfil;
                     if (Plugin.ShowFigures.Value)
                     {
-                        TraderFigure.Spawn(extract.TraderId, name, exfil.transform.position, exfil.transform.rotation.eulerAngles.y, trader.gameObject);
+                        TraderFigure.Spawn(extract.TraderId, name, ground, facing, trader.gameObject);
                     }
                     VagabondLink.TraderExfils.Add(exfil.GetInstanceID());
                     count++;
@@ -397,6 +434,7 @@ namespace TradersInRaid
                     count++;
                     Plugin.Log.LogInfo("Placed " + spot.Name + " on " + map + " at " + string.Join(", ", spot.Position));
                 }
+                TraderRoom.ExtendPhysics();
                 Plugin.Log.LogInfo("Raid started on '" + map + "', traders placed: " + count);
                 QuestSync.Send("raid start");
                 if (count > 0 && Plugin.Instance != null)
@@ -426,6 +464,11 @@ namespace TradersInRaid
             if (interactive is TraderInteractable trader)
             {
                 __result = trader.GetActions();
+                return false;
+            }
+            if (interactive is RoomDoor door)
+            {
+                __result = door.GetActions();
                 return false;
             }
             return true;

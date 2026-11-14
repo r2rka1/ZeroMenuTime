@@ -67,6 +67,7 @@ public sealed class RaidStartLocationPatch : AbstractPatch
     {
         try
         {
+            TableRewards.Clear(sessionId.ToString());
             DeathChoiceBridge.RememberRaidStart(sessionId.ToString());
         }
         catch (Exception e)

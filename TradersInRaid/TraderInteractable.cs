@@ -89,6 +89,7 @@ namespace TradersInRaid
             }
             Spawned.Clear();
             TraderFigure.DestroyAll();
+            TraderRoom.DestroyAll();
         }
     }
 }
