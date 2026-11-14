@@ -21,7 +21,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | clock [add HOURS] | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -392,6 +392,19 @@ namespace TradersInRaid
                     }
                     Report("hideout screen objects present: overlay " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenOverlay != null)
                            + ", rear " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenRear != null));
+                    break;
+                }
+                case "clock":
+                {
+                    // clock | clock add HOURS
+                    if (parts.Length > 2 && parts[1].ToLowerInvariant() == "add")
+                    {
+                        WorldClock.Add(Number(parts[2]) * 3600.0);
+                        yield return new WaitForSecondsRealtime(1.5f);
+                    }
+                    var world = Comfort.Common.Singleton<GameWorld>.Instance;
+                    Report("world clock: " + WorldClock.Describe(WorldClock.Now) + " (" + WorldClock.Now.ToString("F0") + " game seconds); the raid's own clock reads "
+                           + world.GameDateTime.Calculate().ToString("yyyy-MM-dd HH:mm") + ", pace x" + world.GameDateTime.TimeFactor);
                     break;
                 }
                 case "stations":

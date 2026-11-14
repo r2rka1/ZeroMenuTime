@@ -38,6 +38,12 @@ public sealed class HideoutStore
     public string Active { get; set; } = HideoutsService.First;
     /// <summary>The others, put away until they are entered.</summary>
     public Dictionary<string, HideoutSave> Away { get; set; } = [];
+    /// <summary>
+    /// The character's world clock, in game seconds. It runs while a raid runs, jumps when the
+    /// character sleeps and stands still while the game is closed. Crafts in every hideout are
+    /// timed against it.
+    /// </summary>
+    public double ClockSeconds { get; set; }
 }
 
 public sealed class HideoutRequest : IRequestData
@@ -47,6 +53,8 @@ public sealed class HideoutRequest : IRequestData
     public int Area { get; set; } = -1;
     /// <summary>For the stash: everything in it, as the client holds it.</summary>
     public List<Item>? Items { get; set; }
+    /// <summary>For the clock: what the game says the world clock reads now.</summary>
+    public double Seconds { get; set; }
 }
 
 /// <summary>One kind of material a station level needs.</summary>
@@ -70,6 +78,8 @@ public sealed class HideoutResponse
     public List<Item> Stash { get; set; } = [];
     /// <summary>How many items each hideout's stash holds, in use or put away.</summary>
     public Dictionary<string, int> StashCounts { get; set; } = [];
+    /// <summary>The world clock, in game seconds.</summary>
+    public double Clock { get; set; }
 }
 
 /// <summary>
@@ -235,6 +245,7 @@ public sealed class HideoutsService(
         {
             Ok = true,
             Active = store.Active,
+            Clock = store.ClockSeconds,
             StashTemplate = StashRoot(pmc)?.Template.ToString(),
             StashId = pmc.Inventory?.Stash?.ToString(),
             Stash = Inside(pmc, pmc.Inventory?.Stash != null ? [pmc.Inventory.Stash.Value.ToString()] : []),
@@ -292,6 +303,20 @@ public sealed class HideoutsService(
     public HideoutResponse List(MongoId sessionId, HideoutRequest request)
     {
         return Guarded(sessionId, request, false, Describe);
+    }
+
+    /// <summary>Moves the world clock on to what the game reports. It never goes back.</summary>
+    public HideoutResponse SetClock(MongoId sessionId, HideoutRequest request)
+    {
+        return Guarded(sessionId, request, false, (pmc, store) =>
+        {
+            if (request.Seconds > store.ClockSeconds)
+            {
+                store.ClockSeconds = request.Seconds;
+                Save(sessionId.ToString(), store);
+            }
+            return Describe(pmc, store);
+        });
     }
 
     /// <summary>Makes the named hideout the one in the profile, putting the current one away.</summary>
@@ -436,8 +461,11 @@ public sealed class HideoutsService(
 /// hideout data, so the game's own screens show the same.
 /// </summary>
 [Injectable(TypePriority = OnLoadOrder.PostLoad)]
-public sealed class HideoutRulesLoader(HideoutTable hideoutTable) : IOnLoad
+public sealed class HideoutRulesLoader(HideoutTable hideoutTable, LocationTable locationTable) : IOnLoad
 {
+    /// <summary>About ten weeks of real time.</summary>
+    private const int EndlessMinutes = 100000;
+
     private static readonly HashSet<string> Dropped = new(StringComparer.OrdinalIgnoreCase) { "Area", "TraderLoyalty", "Skill" };
 
     public Task OnLoadAsync(CancellationToken cancellationToken)
@@ -460,6 +488,19 @@ public sealed class HideoutRulesLoader(HideoutTable hideoutTable) : IOnLoad
                     }
                 }
             }
+            // A raid lasts until the player ends it. The limit is set far beyond any sitting.
+            int maps = 0;
+            foreach (var property in typeof(LocationTable).GetProperties())
+            {
+                if (property.GetValue(locationTable) is SPTarkov.Server.Core.Models.Eft.Common.Location location && location.Base != null)
+                {
+                    location.Base.EscapeTimeLimit = EndlessMinutes;
+                    location.Base.EscapeTimeLimitCoop = EndlessMinutes;
+                    location.Base.EscapeTimeLimitPVE = EndlessMinutes;
+                    maps++;
+                }
+            }
+            Console.WriteLine("[TradersInRaid] Raid time limit lifted on " + maps + " maps.");
             Console.WriteLine("[TradersInRaid] Hideout rules: removed " + removed + " station, loyalty and skill requirements; made "
                               + timers + " station levels build at once.");
         }

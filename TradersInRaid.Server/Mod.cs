@@ -160,6 +160,10 @@ public class TradersInRaidRouter(
             ValueTask.FromResult(jsonUtil.Serialize(TableRewards.Deliver(sessionId, payload, profileHelper, questHelper, cloner)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
+        "/tradersinraid/clock",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetClock(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<HideoutRequest>(
         "/tradersinraid/hideout/list",
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(sessionId, payload)) ?? "{}")
     ),

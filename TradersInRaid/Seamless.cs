@@ -273,6 +273,7 @@ namespace TradersInRaid
         public static void Prefix(ExitStatus exitStatus, string exitName)
         {
             // The hideout interior must not outlive the raid it was loaded into.
+            WorldClock.End();
             HideoutDoors.Close();
             try
             {

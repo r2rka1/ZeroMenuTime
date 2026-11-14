@@ -212,6 +212,7 @@ namespace TradersInRaid
             ApplyUndying();
             TestHarness.Tick();
             RewardTable.Tick();
+            WorldClock.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;
@@ -474,6 +475,7 @@ namespace TradersInRaid
                     Plugin.Log.LogInfo("Placed " + spot.Name + " on " + map + " at " + string.Join(", ", spot.Position));
                 }
                 int hideoutDoors = HideoutDoors.Spawn(map);
+                WorldClock.Begin();
                 TraderRoom.ExtendPhysics();
                 Plugin.Log.LogInfo("Raid started on '" + map + "', traders placed: " + count);
                 QuestSync.Send("raid start");
