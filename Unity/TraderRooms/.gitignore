@@ -1,0 +1,12 @@
+# Everything Unity regenerates. The generated textures, meshes, materials and prefabs under
+# Assets/TraderRooms are rebuilt by the editor script too, so they are not kept either.
+/Library/
+/Temp/
+/Logs/
+/obj/
+/Build/
+/UserSettings/
+/Assets/TraderRooms/
+/Assets/TraderRooms.meta
+*.csproj
+*.sln

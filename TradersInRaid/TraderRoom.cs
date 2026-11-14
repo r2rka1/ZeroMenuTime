@@ -40,6 +40,9 @@ namespace TradersInRaid
         public Vector3 TableTop;
         public Vector2 TableSize = new Vector2(1.6f, 0.8f);
 
+        /// <summary>Exact places on the table for items, when the room comes from the bundle.</summary>
+        public List<Vector3> TableSlots;
+
         /// <summary>The door inside the room that leads back out.</summary>
         public RoomDoor ExitDoor;
 
@@ -91,18 +94,22 @@ namespace TradersInRaid
         {
             // Rooms on the same map are kept well apart so one cannot be seen or heard from another.
             var origin = doorGround + new Vector3(Rooms.Count * 40f, -Mathf.Abs(Depth.Value), 0f);
+            var prefab = RoomBundle.Prefab("TraderRoom_Base");
+            if (prefab != null)
+            {
+                try
+                {
+                    return FromPrefab(prefab, traderId, traderName, origin);
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogError("Room from the bundle failed for " + traderName + ", using the plain one: " + e);
+                }
+            }
+
             var root = new GameObject("TradersInRaid room -- " + traderName);
             root.transform.position = origin;
-
-            int solid = LayerMask.NameToLayer("HighPolyCollider");
-            if (solid < 0)
-            {
-                solid = LayerMask.NameToLayer("Terrain");
-            }
-            if (solid < 0)
-            {
-                solid = 0;
-            }
+            int solid = SolidLayer();
 
             var wallColour = new Color(0.42f, 0.43f, 0.40f);
             var floorColour = new Color(0.20f, 0.19f, 0.18f);
@@ -217,8 +224,32 @@ namespace TradersInRaid
             {
                 renderer.material.color = colour;
             }
-            // The game keeps separate collision layers for bullets, for walking and for terrain, and a
-            // collider on only one of them lets the player fall through. Put the same box on each.
+            MakeSolid(box.GetComponent<Collider>(), layer);
+            return box;
+        }
+
+        private static int SolidLayer()
+        {
+            int solid = LayerMask.NameToLayer("HighPolyCollider");
+            if (solid < 0)
+            {
+                solid = LayerMask.NameToLayer("Terrain");
+            }
+            return solid < 0 ? 0 : solid;
+        }
+
+        /// <summary>
+        /// The game keeps separate collision layers for bullets, for walking and for terrain, and a
+        /// collider on only one of them lets the player fall through. Puts the collider on the first
+        /// and adds a copy of it on each of the others.
+        /// </summary>
+        public static void MakeSolid(Collider collider, int layer)
+        {
+            if (collider == null || collider.isTrigger)
+            {
+                return;
+            }
+            collider.gameObject.layer = layer;
             foreach (var other in new[] { "LowPolyCollider", "Terrain" })
             {
                 int otherLayer = LayerMask.NameToLayer(other);
@@ -226,12 +257,101 @@ namespace TradersInRaid
                 {
                     continue;
                 }
-                var copy = new GameObject(name + " (" + other + ")");
-                copy.transform.SetParent(box.transform, false);
+                var copy = new GameObject(collider.name + " (" + other + ")");
+                copy.transform.SetParent(collider.transform, false);
                 copy.layer = otherLayer;
-                copy.AddComponent<BoxCollider>();
+                var box = collider as BoxCollider;
+                var mesh = collider as MeshCollider;
+                if (box != null)
+                {
+                    var boxCopy = copy.AddComponent<BoxCollider>();
+                    boxCopy.center = box.center;
+                    boxCopy.size = box.size;
+                }
+                else if (mesh != null)
+                {
+                    var meshCopy = copy.AddComponent<MeshCollider>();
+                    meshCopy.sharedMesh = mesh.sharedMesh;
+                    meshCopy.convex = mesh.convex;
+                }
+                else
+                {
+                    UnityEngine.Object.Destroy(copy);
+                }
             }
-            return box;
+        }
+
+        public static Transform FindDeep(Transform parent, string name)
+        {
+            foreach (var child in parent.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == name)
+                {
+                    return child;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>The dressed room built in Unity. The named children say where everything is.</summary>
+        private static TraderRoom FromPrefab(GameObject prefab, string traderId, string traderName, Vector3 origin)
+        {
+            var root = UnityEngine.Object.Instantiate(prefab, origin, Quaternion.identity);
+            root.name = "TradersInRaid room -- " + traderName;
+
+            var entry = FindDeep(root.transform, "Entry");
+            var stand = FindDeep(root.transform, "TraderStand");
+            var exit = FindDeep(root.transform, "ExitDoor");
+            var indoorBox = FindDeep(root.transform, "IndoorBounds");
+            if (entry == null || stand == null || exit == null || indoorBox == null)
+            {
+                UnityEngine.Object.Destroy(root);
+                throw new InvalidOperationException("the room prefab lacks Entry, TraderStand, ExitDoor or IndoorBounds");
+            }
+
+            int solid = SolidLayer();
+            foreach (var collider in root.GetComponentsInChildren<Collider>(true))
+            {
+                // The way out is something to look at and use, not a wall.
+                if (collider.transform != exit)
+                {
+                    MakeSolid(collider, solid);
+                }
+            }
+
+            var indoor = indoorBox.gameObject.AddComponent<IndoorTrigger>();
+            indoor.IsBunker = true;
+            indoor.Reinit();
+
+            var slots = new List<Vector3>();
+            var middle = Vector3.zero;
+            foreach (var child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name.StartsWith("TableSlot_", StringComparison.Ordinal))
+                {
+                    slots.Add(child.position);
+                    middle += child.position;
+                }
+            }
+
+
+            var room = new TraderRoom
+            {
+                TraderId = traderId,
+                Root = root,
+                Indoor = indoor,
+                Entry = entry.position,
+                EntryYaw = entry.eulerAngles.y,
+                TraderStand = stand.position,
+                TraderYaw = stand.eulerAngles.y,
+                TableTop = slots.Count > 0 ? middle / slots.Count : origin + Vector3.up * TableHeight,
+                TableSize = new Vector2(0.8f, 1.6f),
+                TableSlots = slots.Count > 0 ? slots : null,
+            };
+            room.ExitDoor = RoomDoor.Attach(exit.gameObject, "Leave");
+            Rooms.Add(room);
+            Plugin.Log.LogInfo("Room for " + traderName + " placed from the bundle at " + origin.ToString("F1") + " with " + slots.Count + " table slots");
+            return room;
         }
 
         public static void DestroyAll()
@@ -246,6 +366,60 @@ namespace TradersInRaid
             Rooms.Clear();
             RewardTable.Clear();
             RoomDoor.DestroyAll();
+        }
+    }
+
+    /// <summary>
+    /// The rooms and doors built in the Unity project (Unity/TraderRooms). Optional: without the
+    /// bundle file the mod builds plain rooms in code.
+    /// </summary>
+    public static class RoomBundle
+    {
+        private const string BundleName = "traderrooms";
+        private static AssetBundle _bundle;
+        private static bool _tried;
+
+        public static GameObject Prefab(string name)
+        {
+            if (!_tried)
+            {
+                _tried = true;
+                try
+                {
+                    // A hot reload forgets the bundle here while the game still holds it open.
+                    foreach (var loaded in AssetBundle.GetAllLoadedAssetBundles())
+                    {
+                        if (loaded != null && loaded.name == BundleName)
+                        {
+                            _bundle = loaded;
+                        }
+                    }
+                    string path = System.IO.Path.Combine(TraderConfig.Dir, BundleName);
+                    if (_bundle == null && System.IO.File.Exists(path))
+                    {
+                        _bundle = AssetBundle.LoadFromFile(path);
+                    }
+                    Plugin.Log.LogInfo(_bundle != null
+                        ? "Room bundle loaded: " + string.Join(", ", _bundle.GetAllAssetNames())
+                        : "No room bundle at " + path + "; building plain rooms.");
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogError("Loading the room bundle failed: " + e);
+                }
+            }
+            return _bundle != null ? _bundle.LoadAsset<GameObject>(name) : null;
+        }
+
+        /// <summary>Lets the bundle file be replaced while the game runs.</summary>
+        public static void Unload()
+        {
+            if (_bundle != null)
+            {
+                _bundle.Unload(false);
+                _bundle = null;
+            }
+            _tried = false;
         }
     }
 

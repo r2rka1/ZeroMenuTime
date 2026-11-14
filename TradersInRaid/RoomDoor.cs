@@ -37,6 +37,53 @@ namespace TradersInRaid
             return state;
         }
 
+        /// <summary>Turns an existing object, such as the door leaf of a prefab, into a usable door.</summary>
+        public static RoomDoor Attach(GameObject go, string label)
+        {
+            if (go.GetComponent<Collider>() == null)
+            {
+                go.AddComponent<BoxCollider>();
+            }
+            go.layer = LayerMask.NameToLayer("Interactive");
+            var door = go.AddComponent<RoomDoor>();
+            door.Label = label;
+            return door;
+        }
+
+        /// <summary>The door on the map: the one from the bundle if there is one, otherwise a plain slab.</summary>
+        public static RoomDoor SpawnOutside(string label, Vector3 ground, float rotationY)
+        {
+            var prefab = RoomBundle.Prefab("TraderDoor");
+            if (prefab != null)
+            {
+                try
+                {
+                    var root = Instantiate(prefab, ground, Quaternion.Euler(0f, rotationY, 0f));
+                    root.name = "TradersInRaid door -- " + label;
+                    Spawned.Add(root);
+                    var leaf = TraderRoom.FindDeep(root.transform, "Leaf");
+                    if (leaf == null)
+                    {
+                        throw new System.InvalidOperationException("the door prefab has no Leaf");
+                    }
+                    int solid = LayerMask.NameToLayer("HighPolyCollider");
+                    foreach (var collider in root.GetComponentsInChildren<Collider>(true))
+                    {
+                        if (collider.transform != leaf)
+                        {
+                            TraderRoom.MakeSolid(collider, solid < 0 ? 0 : solid);
+                        }
+                    }
+                    return Attach(leaf.gameObject, label);
+                }
+                catch (System.Exception e)
+                {
+                    Plugin.Log.LogError("Door from the bundle failed, using the plain one: " + e);
+                }
+            }
+            return Spawn(label, ground + new Vector3(0f, Height / 2f, 0f), rotationY);
+        }
+
         public static RoomDoor Spawn(string label, Vector3 centre, float rotationY)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);

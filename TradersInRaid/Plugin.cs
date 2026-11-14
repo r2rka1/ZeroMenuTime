@@ -168,6 +168,7 @@ namespace TradersInRaid
                     }
                 }
                 TraderInteractable.DestroyAll();
+                RoomBundle.Unload();
                 Log.LogInfo("TradersInRaid unloaded");
             }
             catch (Exception e)
@@ -395,8 +396,7 @@ namespace TradersInRaid
                     if (TraderRoom.Enabled.Value)
                     {
                         var room = TraderRoom.Build(extract.TraderId, name, exfil.transform.position);
-                        var door = RoomDoor.Spawn("Enter " + name + "'s room",
-                            exfil.transform.position + new Vector3(0f, RoomDoor.Height / 2f, 0f), facing);
+                        var door = RoomDoor.SpawnOutside("Enter " + name + "'s room", exfil.transform.position, facing);
                         room.OutsideDoor = door;
                         door.Destination = room.Entry;
                         door.DestinationYaw = room.EntryYaw;

@@ -53,6 +53,15 @@ namespace TradersInRaid
         /// <summary>Where the n-th item goes: across the table first, then on the floor in front of it.</summary>
         private static Vector3 Slot(TraderRoom room, int index)
         {
+            if (room.TableSlots != null && index < room.TableSlots.Count)
+            {
+                return room.TableSlots[index];
+            }
+            if (room.TableSlots != null)
+            {
+                index -= room.TableSlots.Count;
+                index += Mathf.Max(1, Mathf.FloorToInt(room.TableSize.y / 0.3f)) * 2;
+            }
             const float step = 0.3f;
             // The table's long side runs along z; two items fit across its width.
             int rows = Mathf.Max(1, Mathf.FloorToInt(room.TableSize.y / step));
