@@ -14,7 +14,7 @@ namespace TheTrueSPT
     public static class IndoorLight
     {
         private static bool _dark;
-        private static float _nextCheck;
+        private static float _nextCheck, _nextSunCheck;
         private static AmbientMode _mode;
         private static Color _light, _sky, _equator, _ground;
         private static float _intensity, _reflection;
@@ -57,6 +57,7 @@ namespace TheTrueSPT
                 if (!_dark)
                 {
                     _dark = true;
+                    _nextSunCheck = 0f;
                     _mode = RenderSettings.ambientMode;
                     _light = RenderSettings.ambientLight;
                     _sky = RenderSettings.ambientSkyColor;
@@ -66,8 +67,13 @@ namespace TheTrueSPT
                     _reflection = RenderSettings.reflectionIntensity;
                     Camera.onPreCull += Hold;
                 }
-                // The sky swaps sun for moon as the hours pass; catch whichever is lit now.
-                HideoutBunker.Sun(false);
+                // The sky swaps sun for moon as the hours pass; catch whichever is lit now. Looking
+                // through every light on the map is slow, so only now and then.
+                if (Time.unscaledTime >= _nextSunCheck)
+                {
+                    _nextSunCheck = Time.unscaledTime + 15f;
+                    HideoutBunker.Sun(false);
+                }
             }
             else if (_dark)
             {

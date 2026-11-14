@@ -20,7 +20,10 @@ namespace TheTrueSPT
         private static Type _viewType, _defType;
         private static MethodInfo _add, _byCategory, _toMap;
         private static PropertyInfo _mapDef;
-        private static float _nextCheck;
+        private static float _nextCheck, _nextSearch;
+        // Searching a whole map's scene for the map view is slow enough to feel; it is done
+        // rarely, and the views found are remembered.
+        private static readonly List<UnityEngine.Object> Views = new List<UnityEngine.Object>();
 
         private static bool Ready()
         {
@@ -81,7 +84,13 @@ namespace TheTrueSPT
             }
             try
             {
-                foreach (var found in UnityEngine.Object.FindObjectsOfType(_viewType))
+                Views.RemoveAll(view => view == null);
+                if (Views.Count == 0 && Time.unscaledTime >= _nextSearch)
+                {
+                    _nextSearch = Time.unscaledTime + 20f;
+                    Views.AddRange(UnityEngine.Object.FindObjectsOfType(_viewType));
+                }
+                foreach (var found in Views)
                 {
                     var def = _mapDef.GetValue(found, null);
                     if (def == null || !IsThisMap(def, player.Location))
