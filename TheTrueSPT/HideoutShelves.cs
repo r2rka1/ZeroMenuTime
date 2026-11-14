@@ -147,60 +147,60 @@ namespace TheTrueSPT
         /// </summary>
         private static System.Collections.IEnumerator Fit()
         {
-            // The screen builds the container's grid a moment after it opens.
-            EFT.UI.DragAndDrop.TemplatedGridsView view = null;
-            RectTransform inner = null;
-            for (float waited = 0f; waited < 2f && inner == null; waited += Time.unscaledDeltaTime)
+            // The screen builds the container's picture a moment after it opens. It is looked for
+            // a few times a second (searching every frame costs frames), in the panel the looted
+            // container is drawn in and nowhere else: the player's own rig is drawn the same way
+            // in the panel beside it.
+            RectTransform scroll = null, inner = null;
+            for (int tries = 0; tries < 20 && inner == null; tries++)
             {
-                yield return null;
-                EFT.UI.DragAndDrop.GridView best = null;
-                foreach (var found in UnityEngine.Object.FindObjectsOfType<EFT.UI.DragAndDrop.GridView>())
+                yield return new WaitForSecondsRealtime(0.2f);
+                foreach (var found in UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.ScrollRect>())
                 {
-                    // The player's own rig and pockets are drawn the same way, on the left; the
-                    // looted container is the one furthest to the right.
-                    if (found.isActiveAndEnabled && found.GetComponentInParent<EFT.UI.DragAndDrop.TemplatedGridsView>() != null
-                        && found.GetComponentInParent<UnityEngine.UI.ScrollRect>() != null
-                        && (best == null || found.transform.position.x > best.transform.position.x))
+                    if (found.isActiveAndEnabled && found.name == "Scroll Area" && found.content != null && found.content.childCount > 0
+                        && (scroll == null || found.transform.position.x > scroll.position.x))
                     {
-                        best = found;
+                        scroll = (RectTransform)found.transform;
                     }
                 }
-                if (best == null)
+                if (scroll == null)
                 {
                     continue;
                 }
-                view = best.GetComponentInParent<EFT.UI.DragAndDrop.TemplatedGridsView>();
-                // The frame that holds the grid: the child of the view that the grid sits under.
-                for (var at = best.transform; at != null && at != view.transform; at = at.parent)
+                // The container's view is the panel's content; its frame is the largest thing in it
+                // (beside it there is only a small sort button).
+                var view = scroll.GetComponent<UnityEngine.UI.ScrollRect>().content.GetChild(0);
+                float largest = 2500f;
+                foreach (Transform child in view)
                 {
-                    inner = at as RectTransform;
+                    var rect = child as RectTransform;
+                    if (rect != null && rect.gameObject.activeSelf && rect.rect.width * rect.rect.height > largest)
+                    {
+                        largest = rect.rect.width * rect.rect.height;
+                        inner = rect;
+                    }
                 }
             }
-            if (view == null || inner == null)
+            if (scroll == null || inner == null)
             {
-                Plugin.Log.LogWarning("Station storage screen: the container's grid was not found; left as the game drew it");
+                Plugin.Log.LogWarning("Station storage screen: the container's picture was not found; left as the game drew it");
                 yield break;
             }
-            var scroll = (RectTransform)view.GetComponentInParent<UnityEngine.UI.ScrollRect>().transform;
-            Plugin.Log.LogInfo("Station storage screen: fitting '" + view.name + "' (child '" + (inner != null ? inner.name : "?") + "' " + (inner != null ? inner.rect.size.ToString("F0") : "") + " at "
-                               + (inner != null ? inner.position.ToString("F0") : "") + ") into '" + scroll.name + "' " + scroll.rect.size.ToString("F0") + " at " + scroll.position.ToString("F0"));
+            Plugin.Log.LogInfo("Station storage screen: fitting '" + inner.name + "' " + inner.rect.size.ToString("F0") + " into the panel " + scroll.rect.size.ToString("F0"));
             var corners = new Vector3[4];
-            // The layout settles over a few frames; hold the place until it has.
-            for (float held = 0f; held < 0.6f && view != null && inner != null; held += Time.unscaledDeltaTime)
+            var own = new Vector3[4];
+            // The screen lays itself out again whenever something in it changes (an item picked up
+            // or put down) and puts the container back where it was; so it is held for as long
+            // as the screen is open.
+            while (scroll != null && inner != null && scroll.gameObject.activeInHierarchy && inner.gameObject.activeInHierarchy)
             {
-                float fit = inner.rect.width > 1f ? Mathf.Min(1f, (scroll.rect.width - 8f) / inner.rect.width) : 1f;
+                float fit = inner.rect.width > 1f ? Mathf.Min(1f, (scroll.rect.width - 44f) / inner.rect.width) : 1f;
                 inner.localScale = new Vector3(fit, fit, 1f);
                 scroll.GetWorldCorners(corners);   // bottom left, top left, top right, bottom right
-                var topLeft = corners[1];
                 // Its pivot may be at its bottom or its top; place it by where its own top left ends up.
-                var own = new Vector3[4];
                 inner.GetWorldCorners(own);
-                inner.position += new Vector3(topLeft.x + 36f - own[1].x, topLeft.y - own[1].y, 0f);
+                inner.position += new Vector3(corners[1].x + 36f - own[1].x, corners[1].y - own[1].y, 0f);
                 yield return null;
-            }
-            if (inner != null)
-            {
-                Plugin.Log.LogInfo("Station storage screen: left at " + inner.position.ToString("F0") + ", scale " + inner.lossyScale.x.ToString("F2"));
             }
         }
 
