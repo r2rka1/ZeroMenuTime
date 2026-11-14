@@ -14,7 +14,7 @@ Needs Unity 2022.3.43f1, the version the game runs on, with a licence activated.
     Unity.exe -batchmode -nographics -quit -projectPath Unity/TraderRooms -executeMethod RoomBuilder.BuildAll
 
 or open the project and choose **Trader Rooms > Build everything**. The bundle is written to
-`Unity/TraderRooms/Build/traderrooms`; copy it to `BepInEx/plugins/TradersInRaid/`.
+`Unity/TraderRooms/Build/traderrooms`; copy it to `BepInEx/plugins/TheTrueSPT/`.
 
 ## What the mod expects
 

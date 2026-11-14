@@ -1,4 +1,4 @@
-# TradersInRaid
+# The True SPT
 
 A mod for Single Player Tarkov (SPT) 4.1.x that moves trading, quest hand-ins and the hideout out of the menus and into the raid.
 
@@ -12,7 +12,7 @@ Built and tested against SPT 4.1.6 (client 0.16.9.5) together with the open-worl
 - **Collect deliveries** drops everything waiting in your mail (quest rewards, insurance returns, from every sender) on the table in the room. An item leaves the mail only when you pick it up, so whatever you leave on the table is there again next visit.
 - **Save and go to menu** ends the raid at that spot and returns to the main menu.
 
-The rooms are furnished from the game itself: walls, floor, tables, shelves, crates and the door are copies of pieces of the game's hideout interior, laid out differently for each trader. The layouts are plain text in `TradersInRaid/RoomLayouts.cs`.
+The rooms are furnished from the game itself: walls, floor, tables, shelves, crates and the door are copies of pieces of the game's hideout interior, laid out differently for each trader. The layouts are plain text in `TheTrueSPT/RoomLayouts.cs`.
 
 **Quests work at those traders.** Accept and hand in quests through the trader's Tasks tab. On hand-in the reward items land on the table at once; experience, standing and follow-up quests are paid when the raid ends. Trader sales totals and loyalty levels grow from in-raid trades.
 
@@ -26,9 +26,9 @@ With "Put traders in rooms" switched off, traders stand in the open at their spo
 
 Unpack the release zip into the SPT game folder (the one containing `EscapeFromTarkov.exe`). It adds:
 
-- `BepInEx/plugins/TradersInRaid/TradersInRaid.dll` (client)
-- `BepInEx/plugins/TradersInRaid/traderrooms` (the rooms; without this file the mod builds plain grey ones)
-- `SPT_Runtime/user/mods/TradersInRaid/TradersInRaid.Server.dll` (server)
+- `BepInEx/plugins/TheTrueSPT/TheTrueSPT.dll` (client)
+- `BepInEx/plugins/TheTrueSPT/traderrooms` (the rooms; without this file the mod builds plain grey ones)
+- `SPT_Runtime/user/mods/TheTrueSPT/TheTrueSPT.Server.dll` (server)
 
 Restart the server and the game.
 
@@ -36,7 +36,7 @@ If you use Vagabond and want to receive trader mail inside the hideout, set `"Li
 
 ## Settings
 
-In game, press F12 and open TradersInRaid.
+In game, press F12 and open The True SPT.
 
 | Section | Setting | Default | Meaning |
 |---|---|---|---|
@@ -59,7 +59,7 @@ In game, press F12 and open TradersInRaid.
 
 With Vagabond installed, traders stand at Vagabond's trader extracts, read from its `trader_locations.json`.
 
-Without it, or with "Also use traders.json spots" on, spots come from `BepInEx/plugins/TradersInRaid/traders.json`, which is created on first run. Stand where you want a trader, press F10, and copy the line from `captured_positions.txt` into that file with the trader's name and id filled in.
+Without it, or with "Also use traders.json spots" on, spots come from `BepInEx/plugins/TheTrueSPT/traders.json`, which is created on first run. Stand where you want a trader, press F10, and copy the line from `captured_positions.txt` into that file with the trader's name and id filled in.
 
 ## Hideouts
 
@@ -82,7 +82,7 @@ A raid has no time limit; it lasts until you leave, extract, die or quit. The co
 
 ## Doors
 
-The door is stood against the nearest flat stretch of wall near the trader's spot, and on the spot itself if there is none. Where that choice looks wrong, put the door by hand: stand where it should be, facing the way it should face, press F10, and copy the line from `captured_positions.txt` into `BepInEx/plugins/TradersInRaid/doors.json` (a list, same format as `traders.json`) with the trader's id filled in.
+The door is stood against the nearest flat stretch of wall near the trader's spot, and on the spot itself if there is none. Where that choice looks wrong, put the door by hand: stand where it should be, facing the way it should face, press F10, and copy the line from `captured_positions.txt` into `BepInEx/plugins/TheTrueSPT/doors.json` (a list, same format as `traders.json`) with the trader's id filled in.
 
 ## Known limits
 
@@ -104,8 +104,8 @@ The door is stood against the nearest flat stretch of wall near the trader's spo
 Needs the .NET 10 SDK and an installed SPT 4.1.x copy to reference.
 
 ```
-dotnet build TradersInRaid/TradersInRaid.csproj -c Release -p:TarkovDir=F:\SPT\
-dotnet build TradersInRaid.Server/TradersInRaid.Server.csproj -c Release -p:TarkovDir=F:\SPT\
+dotnet build TheTrueSPT/TheTrueSPT.csproj -c Release -p:TarkovDir=F:\SPT\
+dotnet build TheTrueSPT.Server/TheTrueSPT.Server.csproj -c Release -p:TarkovDir=F:\SPT\
 ```
 
 The rooms are built separately, with Unity 2022.3.43f1 (see `Unity/TraderRooms/README.md`); the result is `Unity/TraderRooms/Build/traderrooms`.
@@ -114,7 +114,7 @@ The rooms are built separately, with Unity 2022.3.43f1 (see `Unity/TraderRooms/R
 
 ## Testing
 
-With "Test harness" on, the mod reads `BepInEx/plugins/TradersInRaid/test/commands.txt` twice a second while in a raid, carries the lines out in order and appends what happened to `test/results.log`. Hot reloading with BepInEx ScriptEngine plus this file makes a change testable in seconds without touching the game.
+With "Test harness" on, the mod reads `BepInEx/plugins/TheTrueSPT/test/commands.txt` twice a second while in a raid, carries the lines out in order and appends what happened to `test/results.log`. Hot reloading with BepInEx ScriptEngine plus this file makes a change testable in seconds without touching the game.
 
 | Command | Does |
 |---|---|
