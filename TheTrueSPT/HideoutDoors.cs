@@ -141,12 +141,22 @@ namespace TheTrueSPT
         private static IEnumerator Preload()
         {
             yield return new WaitForSecondsRealtime(25f);
-            if (GamePlayerOwner.MyPlayer == null || _busy || HideoutBunker.Loaded || HideoutBunker.Loading)
+            if (GamePlayerOwner.MyPlayer == null)
             {
                 yield break;
             }
+            // Someone may have opened a hideout already; the rooms are furnished either way.
+            while (_busy || HideoutBunker.Loading)
+            {
+                yield return null;
+            }
+            bool wasLoaded = HideoutBunker.Loaded;
             yield return Prepare(false);
             RoomProps.DressAll();
+            if (wasLoaded)
+            {
+                yield break;
+            }
             if (Fronts.Count == 0)
             {
                 // No hideout on this map: the furniture has been copied out, so the interior can go.
@@ -218,6 +228,8 @@ namespace TheTrueSPT
                 _indoor.Reinit();
                 TraderRoom.ExtendPhysics();
             }
+            // Whenever the interior is at hand, rooms still bare get their furniture.
+            RoomProps.DressAll();
         }
 
         public static IndoorTrigger IndoorAt(Vector3 position)
