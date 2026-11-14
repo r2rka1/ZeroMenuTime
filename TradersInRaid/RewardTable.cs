@@ -93,8 +93,22 @@ namespace TradersInRaid
             }
             int index;
             NextSlot.TryGetValue(room, out index);
-            NextSlot[room] = index + 1;
-            var at = Slot(room, index);
+            // Slots come in pairs across the table. Anything big (a gun, a vest, a pack) gets a whole
+            // pair to itself and is put down in the middle of it, so it does not lie on its neighbour.
+            var cells = item.CalculateCellSize();
+            bool large = cells.X * cells.Y >= 4;
+            Vector3 at;
+            if (large)
+            {
+                index += index % 2;
+                at = (Slot(room, index) + Slot(room, index + 1)) / 2f;
+                NextSlot[room] = index + 2;
+            }
+            else
+            {
+                at = Slot(room, index);
+                NextSlot[room] = index + 1;
+            }
 
             // An item's model is only in memory if something on this map already uses it. Load it
             // (and the models of everything attached to it) before asking the game to show it.

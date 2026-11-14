@@ -15,7 +15,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// lookat [NAME] | style NAME | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -156,6 +156,29 @@ namespace TradersInRaid
                     yield return new WaitForSecondsRealtime(1.5f);
                     Report("rooms rebuilt in style " + (TraderRoom.LookOverride ?? "their own"));
                     break;
+                case "savequit":
+                {
+                    // Chooses "Save and go to menu" at the trader of the room the player is in.
+                    var here = RoomHolding(player.Transform.position);
+                    TraderInteractable keeper = null;
+                    foreach (var trader in UnityEngine.Object.FindObjectsOfType<TraderInteractable>())
+                    {
+                        if (here != null && trader.TraderId == here.TraderId)
+                        {
+                            keeper = trader;
+                        }
+                    }
+                    if (keeper == null || keeper.Exfil == null)
+                    {
+                        Report("FAILED no trader with an extract in this room");
+                        break;
+                    }
+                    VagabondLink.Leave(keeper.Exfil);
+                    Report("leave requested at " + keeper.Exfil.name + "; extract status " + keeper.Exfil.Status);
+                    yield return new WaitForSecondsRealtime(3f);
+                    Report("three seconds on: extract status " + keeper.Exfil.Status + ", player still in raid " + (GamePlayerOwner.MyPlayer != null));
+                    break;
+                }
                 case "lookat":
                 {
                     // Turns the player toward the door on the map of the first room, or the room named.

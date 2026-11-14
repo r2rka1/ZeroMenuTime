@@ -171,11 +171,55 @@ namespace TradersInRaid
             Plugin.Instance.StartCoroutine(Travel(Destination, DestinationYaw));
         }
 
+        private static AudioClip[] _openSounds, _shutSounds;
+        private static bool _soundsLooked;
+
+        /// <summary>
+        /// Borrows the open and shut sounds of a door already on this map, so ours sounds like the
+        /// doors around it. Maps without doors stay silent.
+        /// </summary>
+        private static void PlayDoorSound(bool opening, Vector3 at)
+        {
+            try
+            {
+                if (!_soundsLooked)
+                {
+                    _soundsLooked = true;
+                    foreach (var door in FindObjectsOfType<Door>())
+                    {
+                        if (door.OpenSound != null && door.OpenSound.Length > 0 && door.ShutSound != null && door.ShutSound.Length > 0)
+                        {
+                            _openSounds = door.OpenSound;
+                            _shutSounds = door.ShutSound;
+                            break;
+                        }
+                    }
+                    Plugin.Log.LogInfo(_openSounds != null ? "Door sounds borrowed from a door on this map" : "No door on this map to borrow sounds from");
+                }
+                var clips = opening ? _openSounds : _shutSounds;
+                if (clips == null || clips.Length == 0 || !MonoBehaviourSingleton<BetterAudio>.Instantiated)
+                {
+                    return;
+                }
+                var clip = clips[Random.Range(0, clips.Length)];
+                MonoBehaviourSingleton<BetterAudio>.Instance.PlayAtPoint(at, clip, BetterAudio.AudioSourceGroupType.InteractiveObjects, 10, 1f);
+            }
+            catch (System.Exception e)
+            {
+                Plugin.Log.LogWarning("Door sound failed: " + e.Message);
+            }
+        }
+
         private static IEnumerator Travel(Vector3 destination, float yaw)
         {
             _travelling = true;
             try
             {
+                var leaving = GamePlayerOwner.MyPlayer;
+                if (leaving != null)
+                {
+                    PlayDoorSound(true, leaving.Transform.position);
+                }
                 for (float t = 0f; t < 0.35f; t += Time.unscaledDeltaTime)
                 {
                     Fade = t / 0.35f;
@@ -189,6 +233,7 @@ namespace TradersInRaid
                     player.Teleport(destination, false);
                     player.Rotation = new Vector2(yaw, 0f);
                     Plugin.Log.LogInfo("Stepped through a door to " + destination.ToString("F1"));
+                    PlayDoorSound(false, destination);
                 }
                 yield return new WaitForSecondsRealtime(0.2f);
 
@@ -217,6 +262,10 @@ namespace TradersInRaid
             Spawned.Clear();
             Fade = 0f;
             _travelling = false;
+            // The next raid may be on another map, with other doors.
+            _soundsLooked = false;
+            _openSounds = null;
+            _shutSounds = null;
         }
     }
 }
