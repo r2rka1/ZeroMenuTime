@@ -89,6 +89,15 @@ All three doors lead to the same hideout: the same stations, stash and crafts. I
 
 With the Dynamic Maps mod installed, the hideout's door and the traders' doors on the map you are on are marked on its map. Without that mod there are no markers and nothing else changes.
 
+### What the stations' bonuses do
+
+The server writes a station's bonuses into the character when its level is built, and the game reads them from there in a raid. Read from the game's code, not measured:
+
+- **Count in a raid, by the game itself:** experience rate (applied to the raid's experience when it ends), skill group boosts (Library, Shooting Range, Air Filtering Unit, Place of Fame), the larger energy reserve from the Rest Space, and the repair bonuses wherever something is repaired.
+- **Applied by this mod, while you are inside the hideout:** health, energy and water regeneration.
+- **Counted by this mod:** Solar Power's halving of fuel use. The smaller fuel bonuses of the Emergency Wall are not.
+- **Only matter in screens this mod no longer uses:** flea market commission, scav cooldown, insurance return time, quest money.
+
 ### Time
 
 The character has one world clock. It runs at the raid's pace (seven game hours to a real hour) while a raid runs, jumps when you sleep and stands still while the game is closed. The time of day carries over from raid to raid, and crafts in every hideout are timed on it, so they keep going while you are elsewhere.
@@ -104,7 +113,7 @@ The door is a real door of the game. Where a good one was picked by hand it is u
 - Only the backpack (or the rig, if there is no backpack) is shown for selling. Payment and purchases use all carried containers.
 - Barter trades paid with items are not counted toward trader loyalty.
 - Quests that give you an item when you accept them do not deliver it if accepted in a raid.
-- Not built for the hideouts: the air filter's filters and the equipment stand's outfits. Which of the stations' skill, experience and repair bonuses the game honours in a raid has not been checked; the health, energy and water ones are applied by this mod while you are inside.
+- Not built for the hideouts: the air filter's filters (its skill bonus is in the profile whether or not a filter is in) and the equipment stand's outfits.
 - Hideout bonuses apply only while you are inside; menus outside a raid show the hideout last entered.
 - Gear lost in a death is still reported to insurance by the game although the save brings it back, so insured items can return twice.
 - Waking up after a death puts you by the Rest Space.
