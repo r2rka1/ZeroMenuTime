@@ -80,6 +80,11 @@ public sealed class HideoutResponse
     public Dictionary<string, int> StashCounts { get; set; } = [];
     /// <summary>The world clock, in game seconds.</summary>
     public double Clock { get; set; }
+    /// <summary>
+    /// What the built stations of the hideout in use give while the character is inside: bonus kind
+    /// (HealthRegeneration, EnergyRegeneration, HydrationRegeneration, MaximumEnergyReserve) to amount.
+    /// </summary>
+    public Dictionary<string, double> Boosts { get; set; } = [];
 }
 
 /// <summary>
@@ -99,6 +104,8 @@ public sealed class HideoutsService(
 {
     public const string First = "streets";
     public static readonly string[] Known = ["streets", "customs", "shoreline"];
+
+    private static readonly HashSet<string> BoostKinds = ["HealthRegeneration", "EnergyRegeneration", "HydrationRegeneration", "MaximumEnergyReserve"];
 
     private readonly object _gate = new();
 
@@ -254,6 +261,19 @@ public sealed class HideoutsService(
         {
             response.Levels[(int)area.Type] = area.Level ?? 0;
             var station = hideoutTable.Areas.FirstOrDefault(a => a.Type == area.Type);
+            // A level's bonus replaces the one of the level below it, so only the current level counts.
+            Stage? current = null;
+            if ((area.Level ?? 0) > 0 && station?.Stages != null && station.Stages.TryGetValue((area.Level ?? 0).ToString(), out current) && current?.Bonuses != null)
+            {
+                foreach (var bonus in current.Bonuses)
+                {
+                    string kind = bonus.Type.ToString();
+                    if (BoostKinds.Contains(kind))
+                    {
+                        response.Boosts[kind] = response.Boosts.GetValueOrDefault(kind) + (bonus.Value ?? 0);
+                    }
+                }
+            }
             Stage? next = null;
             if (station?.Stages != null && station.Stages.TryGetValue(((area.Level ?? 0) + 1).ToString(), out next) && next != null)
             {

@@ -213,6 +213,7 @@ namespace TradersInRaid
             TestHarness.Tick();
             RewardTable.Tick();
             WorldClock.Tick();
+            HideoutBoosts.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;

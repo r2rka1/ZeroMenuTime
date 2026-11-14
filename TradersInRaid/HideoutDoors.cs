@@ -228,6 +228,7 @@ namespace TradersInRaid
             }
             HideoutStations.Read(reply);
             HideoutStash.Read(id, reply);
+            HideoutBoosts.Read(reply);
 
             if (!HideoutBunker.Loaded)
             {
@@ -270,7 +271,9 @@ namespace TradersInRaid
             yield return new WaitForSecondsRealtime(0.3f);
             RoomDoor.PlayDoorSound(false, arrival);
             yield return RoomDoor.FadeTo(0f);
-            Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + exitGround.ToString("F1"));
+            Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + exitGround.ToString("F1") + "; boosts: " + HideoutBoosts.Describe());
+            HideoutBoosts.Announce();
+            WorldClock.Send("entered a hideout");
             _busy = false;
         }
 

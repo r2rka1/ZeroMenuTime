@@ -338,6 +338,7 @@ namespace TradersInRaid
                 {
                     state.Actions.Add(new InteractionAction { Name = "Open stash", Action = () => HideoutStash.Open(), Disabled = false });
                 }
+                AddSleep(state, station.Area, level);
                 state.Actions.Add(new InteractionAction
                 {
                     Name = station.StationName + " (level " + level + ", fully built)",
@@ -355,6 +356,7 @@ namespace TradersInRaid
                     Disabled = false,
                 });
             }
+            AddSleep(state, station.Area, level);
             var tally = Tally(player, station.Area);
             bool affordable = tally.All(pair => pair.Value >= pair.Key.Count);
             string verb = level == 0 ? "Build " + station.StationName : "Upgrade " + station.StationName + " to level " + (level + 1);
@@ -374,6 +376,28 @@ namespace TradersInRaid
                 Disabled = false,
             });
             return state;
+        }
+
+        /// <summary>A built Rest Space is somewhere to sleep.</summary>
+        private static void AddSleep(AvailableInteractionState state, int area, int level)
+        {
+            if (area != HideoutSleep.RestSpace || level < 1)
+            {
+                return;
+            }
+            foreach (float hours in new[] { 2f, 4f, 8f })
+            {
+                float slept = hours;
+                state.Actions.Add(new InteractionAction { Name = "Sleep " + hours.ToString("0") + " hours", Action = () => HideoutSleep.Sleep(slept), Disabled = false });
+            }
+            float untilMorning = HideoutSleep.HoursUntilMorning();
+            state.Actions.Add(new InteractionAction
+            {
+                Name = "Sleep until morning (" + untilMorning.ToString("0.#") + " hours)",
+                Action = () => HideoutSleep.Sleep(untilMorning),
+                Disabled = false,
+            });
+            state.Actions.Add(new InteractionAction { Name = "Save", Action = () => SaveGame.Save("at the bed"), Disabled = false });
         }
 
         /// <summary>Pays for and builds the next level of a station. Returns a line saying what happened.</summary>
@@ -428,6 +452,7 @@ namespace TradersInRaid
                     return "server refused: " + reply["Error"];
                 }
                 Read(reply);
+                HideoutBoosts.Read(reply);
                 HideoutStash.Send("after building");
                 int level;
                 Levels.TryGetValue(area, out level);

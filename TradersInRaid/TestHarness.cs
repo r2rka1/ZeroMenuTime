@@ -21,7 +21,7 @@ namespace TradersInRaid
     /// order, and what happened is appended to test/results.log. Off unless switched on.
     ///
     /// Commands: status | check | enter NAME | leave | goto X Y Z | look YAW PITCH | wait SECONDS |
-    /// startraid (from the menu) | clock [add HOURS] | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
+    /// startraid (from the menu) | clock [add HOURS] | vitals [hurt N] | sleep HOURS | use | target | stash [open|put TPL N|take TPL|save] | stations | build NUMBER | give TEMPLATE COUNT | hideout enter ID|leave | doors [R] | scenery [R] [WORD] | shot X Y Z NAME | aim | post ROUTE JSON | bunker load|where|move X Y Z|settings bunker|settings map|unload | lookat [NAME] | style NAME | savequit | screenshot NAME | lay TEMPLATE_ID [COUNT] | deliveries | table | quests | handin [QUEST_ID]
     /// </summary>
     public static class TestHarness
     {
@@ -392,6 +392,30 @@ namespace TradersInRaid
                     }
                     Report("hideout screen objects present: overlay " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenOverlay != null)
                            + ", rear " + (Comfort.Common.Singleton<EFT.UI.CommonUI>.Instantiated && Comfort.Common.Singleton<EFT.UI.CommonUI>.Instance.HideoutScreenRear != null));
+                    break;
+                }
+                case "sleep":
+                {
+                    // sleep HOURS: what choosing a Sleep action at the Rest Space does.
+                    HideoutSleep.Sleep(parts.Length > 1 ? Number(parts[1]) : 8f);
+                    yield return new WaitForSecondsRealtime(6f);
+                    goto case "vitals";
+                }
+                case "vitals":
+                {
+                    // Health, energy and water, and what the hideout is adding. vitals hurt N lowers them first, for testing.
+                    var hc = player.ActiveHealthController;
+                    if (parts.Length > 2 && parts[1].ToLowerInvariant() == "hurt")
+                    {
+                        float amount = Number(parts[2]);
+                        hc.ChangeEnergy(-amount);
+                        hc.ChangeHydration(-amount);
+                        hc.ChangeHealth(EBodyPart.Chest, -amount / 2f, default);
+                        hc.ChangeHealth(EBodyPart.LeftLeg, -amount / 2f, default);
+                    }
+                    Report("health " + hc.GetBodyPartHealth(EBodyPart.Common).Current.ToString("F1") + "/" + hc.GetBodyPartHealth(EBodyPart.Common).Maximum.ToString("F0")
+                           + ", energy " + hc.Energy.Current.ToString("F1") + ", water " + hc.Hydration.Current.ToString("F1")
+                           + " | hideout: " + (HideoutDoors.Inside ?? "none") + " gives " + HideoutBoosts.Describe() + " | clock " + WorldClock.Describe(WorldClock.Now));
                     break;
                 }
                 case "clock":
