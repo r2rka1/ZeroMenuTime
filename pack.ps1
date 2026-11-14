@@ -22,6 +22,9 @@ New-Item -ItemType Directory -Force $client, $server | Out-Null
 
 Copy-Item "$root\TradersInRaid\bin\Release\TradersInRaid.dll" $client
 Copy-Item "$root\TradersInRaid.Server\bin\Release\TradersInRaid.Server.dll" $server
+# The rooms are built in Unity, separately (see Unity\TraderRooms\README.md).
+$rooms = "$root\Unity\TraderRooms\Build\traderrooms"
+if (Test-Path $rooms) { Copy-Item $rooms $client } else { Write-Warning 'Rooms bundle not built; the zip will give plain rooms.' }
 Copy-Item "$root\README.md" $stage
 
 $zip = "$root\dist\TradersInRaid-$Version.zip"
