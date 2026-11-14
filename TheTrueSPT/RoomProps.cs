@@ -551,7 +551,7 @@ namespace TheTrueSPT
         /// </summary>
         public static string Survey(string file)
         {
-            if (!HideoutBunker.Loaded && !HideoutBunker.Adopt())
+            if (!HideoutBunker.Loaded)
             {
                 return "FAILED the hideout interior is not loaded";
             }
@@ -607,7 +607,7 @@ namespace TheTrueSPT
         /// <summary>Every material in the hideout, with what uses it most: for choosing wall and floor skins.</summary>
         public static string SurveyMaterials(string file)
         {
-            if (!HideoutBunker.Loaded && !HideoutBunker.Adopt())
+            if (!HideoutBunker.Loaded)
             {
                 return "FAILED the hideout interior is not loaded";
             }

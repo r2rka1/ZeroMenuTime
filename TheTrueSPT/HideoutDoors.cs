@@ -187,6 +187,42 @@ namespace TheTrueSPT
             }
         }
 
+        private static RoomDoor _securityExit;
+        // Where the Security station puts its door, across the way to the steps.
+        private static readonly Vector3 SecurityDoor = new Vector3(-8.7f, 1.1f, -8.5f);
+
+        /// <summary>
+        /// A built Security station shuts a door across the way to the steps and the old way out.
+        /// That door then is the way out. Called on entering and after anything is built.
+        /// </summary>
+        public static void RefreshExits()
+        {
+            int security;
+            HideoutStations.Levels.TryGetValue((int)EAreaType.Security, out security);
+            bool wanted = Inside != null || _busy;
+            if (security >= 1 && wanted && HideoutBunker.Loaded)
+            {
+                if (_securityExit == null)
+                {
+                    _securityExit = RoomDoor.Spawn("Leave hideout", HideoutBunker.Moved + SecurityDoor, 0f);
+                    // As deep as it is wide, so it is met from whichever side the door is come at.
+                    _securityExit.transform.localScale = new Vector3(1.3f, RoomDoor.Height, 1.3f);
+                    var drawn = _securityExit.GetComponent<MeshRenderer>();
+                    if (drawn != null)
+                    {
+                        drawn.enabled = false;
+                    }
+                    _securityExit.OnUse = Leave;
+                    Plugin.Log.LogInfo("Hideout: Security is built, so its door is a way out too");
+                }
+            }
+            else if (_securityExit != null)
+            {
+                UnityEngine.Object.Destroy(_securityExit.gameObject);
+                _securityExit = null;
+            }
+        }
+
         /// <summary>Testing aid: bring the interior in now and furnish the rooms again.</summary>
         public static IEnumerator Furnish()
         {
@@ -329,6 +365,7 @@ namespace TheTrueSPT
                 exitDrawn.enabled = false;
             }
             _exit.OnUse = Leave;
+            RefreshExits();
 
             _returnTo = returnTo;
             _returnYaw = returnYaw;
@@ -400,6 +437,11 @@ namespace TheTrueSPT
             {
                 UnityEngine.Object.Destroy(_exit.transform.root.gameObject);
                 _exit = null;
+                if (_securityExit != null)
+                {
+                    UnityEngine.Object.Destroy(_securityExit.gameObject);
+                    _securityExit = null;
+                }
             }
         }
 
@@ -425,6 +467,11 @@ namespace TheTrueSPT
                 {
                     UnityEngine.Object.Destroy(_exit.transform.root.gameObject);
                     _exit = null;
+                if (_securityExit != null)
+                {
+                    UnityEngine.Object.Destroy(_securityExit.gameObject);
+                    _securityExit = null;
+                }
                 }
                 if (_indoorBox != null)
                 {

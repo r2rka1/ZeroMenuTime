@@ -88,7 +88,9 @@ namespace TheTrueSPT
 
         public static async Task<string> Load()
         {
-            if (Loaded || Loading || Adopt())
+            // Never take over a copy left by an earlier load of this plugin: that load may still be
+            // letting it go, and would pull it out from under the player.
+            if (Loaded || Loading)
             {
                 return "already loaded";
             }

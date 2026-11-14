@@ -222,7 +222,7 @@ namespace TheTrueSPT
                 bool affordable = true;
                 foreach (var pair in tally)
                 {
-                    Row(left, HideoutStations.FullName(pair.Key.Tpl), Stock(pair.Value, pair.Key.Count));
+                    Row(left, pair.Key.Tpl, HideoutStations.FullName(pair.Key.Tpl), Stock(pair.Value, pair.Key.Count), 40f);
                     affordable &= pair.Value >= pair.Key.Count;
                 }
                 if (tally.Count == 0)
@@ -282,7 +282,10 @@ namespace TheTrueSPT
             else if (craft != null)
             {
                 var card = Card(right);
-                Text(card, Amount(craft.Product, craft.Count), 24f, Ink, true);
+                var making = Node(card, "making");
+                Horizontal(making, 14f);
+                Icon(making, craft.Product, 72f);
+                Flexible(Text(making, Amount(craft.Product, craft.Count), 24f, Ink, true).gameObject, 1f, 0f);
                 _status = Text(card, StatusText(craft), 18f, Ink, false);
                 Text(card, "The result goes into this hideout's stash.", 15f, Dim, false);
                 int area = _area;
@@ -302,23 +305,27 @@ namespace TheTrueSPT
                 {
                     var card = Card(list);
                     var top = Node(card, "top");
-                    Horizontal(top, 12f);
+                    Horizontal(top, 14f);
+                    Icon(top, recipe.Product, 64f);
                     Flexible(Text(top, Amount(recipe.Product, recipe.Count), 22f, Ink, true).gameObject, 1f, 0f);
                     Text(top, WorldClock.Span(recipe.Seconds) + "  <color=" + Faint + ">" + Played(recipe.Seconds) + "</color>", 16f, Ink, false).alignment = TextAlignmentOptions.MidlineRight;
 
-                    var needs = new List<string>();
                     foreach (var cost in recipe.Items)
                     {
                         int have = spendable.Where(item => item.TemplateId == cost.Tpl).Sum(item => item.StackObjectsCount);
                         have = HideoutStations.IsFree ? Mathf.Max(have, cost.Count) : have;
-                        needs.Add(HideoutStations.FullName(cost.Tpl) + " " + Stock(have, cost.Count));
+                        Row(card, cost.Tpl, HideoutStations.FullName(cost.Tpl), Stock(have, cost.Count), 32f);
                     }
                     foreach (string tool in recipe.Tools)
                     {
                         bool have = HideoutStations.IsFree || spendable.Any(item => item.TemplateId == tool);
-                        needs.Add(HideoutStations.FullName(tool) + " <color=" + (have ? Good : Bad) + ">" + (have ? "tool, at hand" : "tool, missing") + "</color>");
+                        Row(card, tool, HideoutStations.FullName(tool) + "  <color=" + Faint + ">tool, not used up</color>",
+                            "<color=" + (have ? Good : Bad) + ">" + (have ? "at hand" : "missing") + "</color>", 32f);
                     }
-                    Text(card, needs.Count == 0 ? "Needs nothing." : string.Join("   <color=" + Faint + ">|</color>   ", needs.ToArray()), 16f, Dim, false).enableWordWrapping = true;
+                    if (recipe.Items.Count == 0 && recipe.Tools.Count == 0)
+                    {
+                        Text(card, "Needs nothing.", 16f, Dim, false);
+                    }
                     var chosen = recipe;
                     Button(card, "CRAFT", () => Do(() => HideoutCrafting.Start(chosen)), HideoutCrafting.Missing(player, recipe) == null && !_busy, 180f);
                 }
@@ -483,13 +490,53 @@ namespace TheTrueSPT
             element.preferredHeight = element.minHeight = 1f;
         }
 
-        /// <summary>A name on the left and a figure on the right.</summary>
-        private static void Row(RectTransform parent, string name, string figure)
+        /// <summary>An item's picture, its name on the left and a figure on the right.</summary>
+        private static void Row(RectTransform parent, string template, string name, string figure, float picture)
         {
             var row = Node(parent, "row");
-            Horizontal(row, 10f);
-            Flexible(Text(row, name, 19f, Ink, false).gameObject, 1f, 0f);
-            Text(row, figure, 19f, Ink, false).alignment = TextAlignmentOptions.MidlineRight;
+            Horizontal(row, 12f);
+            Icon(row, template, picture);
+            float size = picture >= 40f ? 19f : 17f;
+            Flexible(Text(row, name, size, Ink, false).gameObject, 1f, 0f);
+            Text(row, figure, size, Ink, false).alignment = TextAlignmentOptions.MidlineRight;
+        }
+
+        private static readonly Dictionary<string, ItemIcon> Icons = new Dictionary<string, ItemIcon>();
+
+        /// <summary>The game's own picture of an item, in a dark square. It fills in when the game has drawn it.</summary>
+        private static void Icon(RectTransform parent, string template, float size)
+        {
+            var frame = Node(parent, "icon");
+            frame.gameObject.AddComponent<Image>().color = new Color32(0, 0, 0, 120);
+            var element = frame.gameObject.AddComponent<LayoutElement>();
+            element.preferredWidth = element.minWidth = size;
+            element.preferredHeight = element.minHeight = size;
+            element.flexibleWidth = 0f;
+            var picture = Node(frame, "picture");
+            Stretch(picture);
+            picture.offsetMin = new Vector2(3f, 3f);
+            picture.offsetMax = new Vector2(-3f, -3f);
+            var image = picture.gameObject.AddComponent<Image>();
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.enabled = false;
+            try
+            {
+                ItemIcon icon;
+                if (!Icons.TryGetValue(template, out icon) || icon == null)
+                {
+                    var item = Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), template, null);
+                    icon = EFT.UI.DragAndDrop.ItemViewFactory.LoadItemIcon(item);
+                    Icons[template] = icon;
+                }
+                var view = picture.gameObject.AddComponent<PanelIcon>();
+                view.Source = icon;
+                view.Target = image;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hideout panel: no picture for " + template + ": " + e.Message);
+            }
         }
 
         private static RectTransform Card(RectTransform parent)
@@ -589,6 +636,22 @@ namespace TheTrueSPT
                 }
             }
             return lines;
+        }
+    }
+
+    /// <summary>Shows an item's picture as soon as the game has drawn it.</summary>
+    public class PanelIcon : MonoBehaviour
+    {
+        public ItemIcon Source;
+        public Image Target;
+
+        private void Update()
+        {
+            if (Source != null && Target != null && Source.Sprite != null && Target.sprite != Source.Sprite)
+            {
+                Target.sprite = Source.Sprite;
+                Target.enabled = true;
+            }
         }
     }
 

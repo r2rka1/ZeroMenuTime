@@ -493,6 +493,13 @@ namespace TheTrueSPT
                     Show((EAreaType)area, visual, level, false);
                 }
                 Plugin.Log.LogInfo(name + " built to level " + level + " in hideout '" + HideoutDoors.Inside + "'");
+                HideoutDoors.RefreshExits();
+                // The wall comes down in several stages in the game's data; here it is one job.
+                if (area == (int)EAreaType.EmergencyWall && NextCosts.ContainsKey(area))
+                {
+                    _building = false;
+                    return await Build(area, name);
+                }
                 NotificationManager.DisplayMessageNotification(name + " is now level " + level + ".", ENotificationDurationType.Long);
                 return name + " is now level " + level;
             }

@@ -214,6 +214,8 @@ namespace TheTrueSPT
         /// <summary>Undo everything, so a reload does not leave old patches or trader boxes behind.</summary>
         private void OnDestroy()
         {
+            IndoorLight.Restore();
+            HideoutPanel.Close();
             try
             {
                 LocalTrade.Active = false;
@@ -272,6 +274,7 @@ namespace TheTrueSPT
             HideoutBoosts.Tick();
             MainMenu.Tick();
             HideoutPanel.Tick();
+            IndoorLight.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;
