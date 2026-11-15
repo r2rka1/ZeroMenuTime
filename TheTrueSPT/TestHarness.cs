@@ -733,6 +733,27 @@ namespace TheTrueSPT
                     }
                     break;
                 }
+                case "near":
+                {
+                    // near X Y Z [R]: what is drawn around a point, and whether it is ours. Does not move the player.
+                    var at = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+                    float r = parts.Length > 4 ? Number(parts[4]) : 2.5f;
+                    var seen = new HashSet<string>();
+                    foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
+                    {
+                        if (Vector3.Distance(renderer.bounds.center, at) > r)
+                        {
+                            continue;
+                        }
+                        string found = renderer.name + (renderer.enabled && renderer.gameObject.activeInHierarchy ? "" : " (not drawn)") + " under " + renderer.transform.root.name + " centre " + renderer.bounds.center.ToString("F1");
+                        if (seen.Add(found) && seen.Count <= 30)
+                        {
+                            Report("  " + found);
+                        }
+                    }
+                    Report(seen.Count + " drawn thing(s) within " + r + " m");
+                    break;
+                }
                 case "shelfput":
                     // shelfput STATION TEMPLATE: lay a made-up item in a station's container.
                     Report(HideoutShelves.PutTest((int)Number(parts[1]), parts[2]));

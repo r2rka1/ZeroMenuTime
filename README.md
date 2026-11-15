@@ -109,7 +109,7 @@ A raid has no time limit; it lasts until you leave, extract, die or quit. The co
 
 ## Doors
 
-The door is a real door of the game. Where a good one was picked by hand it is used (Prapor on Streets and Skier on Customs use doors that are part of the map). Elsewhere a door is stood against the nearest flat stretch of building wall near the trader's spot (fences, gates and low walls are passed over), and on the spot itself if there is none. Where that choice looks wrong, put the door by hand: stand where it should be, facing the way it should face, press F10, and copy the line from `captured_positions.txt` into `BepInEx/plugins/TheTrueSPT/doors.json` (a list, same format as `traders.json`) with the trader's id filled in.
+The door is a real door of the game. Where a good one was picked by hand it is used (Prapor and Fence on Streets, Skier on Customs and Ragman on Interchange use doors that are part of the map). Elsewhere a door is stood against the nearest flat stretch of building wall near the trader's spot (fences, gates and low walls are passed over), and on the spot itself if there is none. Where that choice looks wrong, put the door by hand: stand where it should be, facing the way it should face, press F10, and copy the line from `captured_positions.txt` into `BepInEx/plugins/TheTrueSPT/doors.json` (a list, same format as `traders.json`) with the trader's id filled in.
 
 ## Known limits
 

@@ -85,6 +85,12 @@ namespace TheTrueSPT
                     Name = "Fence", TraderId = Fence, Maps = new List<string> { "TarkovStreets" },
                     Position = new[] { 73.89f, -2.05f, 48.81f }, RotationY = 90f, Hidden = true, AtFeet = true,
                 });
+                doors.Add(new TraderSpot
+                {
+                    // A shut door of the mall by his spot on Interchange; picked in game, standing with the back to it.
+                    Name = "Ragman", TraderId = Ragman, Maps = new List<string> { "Interchange" },
+                    Position = new[] { -51.22f, 21.33f, 46.19f }, RotationY = 7f, Hidden = true, AtFeet = true,
+                });
                 foreach (var door in doors)
                 {
                     if (door.Enabled && door.TraderId == traderId && door.Position != null && door.Position.Length >= 3
