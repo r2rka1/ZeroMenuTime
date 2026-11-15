@@ -46,6 +46,8 @@ namespace TheTrueSPT
             {
                 return;
             }
+            // What the stash holds may have changed behind the window's back (a part fitted to a gun).
+            HideoutStash.Send("station window opened");
             _area = area;
             _name = name;
             _nextRedraw = Time.unscaledTime + 10f;
@@ -369,6 +371,34 @@ namespace TheTrueSPT
                 Text(left, "More cards mine faster. It works only while the generator runs.", 15f, Dim, false);
             }
 
+            if (_area == (int)EAreaType.Workbench && level >= 1)
+            {
+                Space(left, 14f);
+                Heading(left, "WEAPONS");
+                var guns = HideoutGunsmith.Weapons(player);
+                if (guns.Count == 0)
+                {
+                    Text(left, "Carry a weapon, or keep one in the stash, to work on it here.", 16f, Dim, false);
+                }
+                foreach (var gun in guns.Take(8))
+                {
+                    var row = Node(left, "gun");
+                    Horizontal(row, 12f);
+                    Icon(row, gun.TemplateId, 40f);
+                    Flexible(Text(row, HideoutStations.FullName(gun.TemplateId) + (HideoutGunsmith.InStash(gun) ? "  <color=" + Faint + ">in the stash</color>" : ""), 17f, Ink, false).gameObject, 1f, 0f);
+                    var chosen = gun;
+                    Button(row, "MODIFY", () =>
+                    {
+                        Close();
+                        string failed = HideoutGunsmith.Open(chosen);
+                        if (failed != null)
+                        {
+                            EFT.Communications.NotificationManager.DisplayWarningNotification(failed);
+                        }
+                    }, !_busy, 120f);
+                }
+                Text(left, "Parts come from what you carry and from the stash.", 15f, Dim, false);
+            }
             if (_area == HideoutPower.Gym && level >= 1)
             {
                 Space(left, 14f);

@@ -252,8 +252,83 @@ public sealed class HideoutsService(
     ICloner cloner,
     JsonUtil jsonUtil,
     SPTarkov.Server.Core.Generators.ScavCaseRewardGenerator scavCaseRewardGenerator,
-    SPTarkov.Server.Core.Services.Hideout.CircleOfCultistService circleOfCultistService)
+    SPTarkov.Server.Core.Services.Hideout.CircleOfCultistService circleOfCultistService,
+    SPTarkov.Server.Core.Helpers.Profile.InventoryHelper inventoryHelper)
 {
+    /// <summary>The BTR driver's id: what he delivers between maps arrives as mail from him.</summary>
+    public const string BtrDriver = "656f0f98d80a697f855d34b1";
+
+    /// <summary>
+    /// Things sent between maps by the BTR driver are put in the hideout's stash. Done on entering
+    /// the hideout, when the client reads the stash afresh. Whatever does not fit stays in the mail
+    /// for next time.
+    /// </summary>
+    private void TakeDeliveries(MongoId sessionId, PmcData pmc)
+    {
+        var full = profileHelper.GetFullProfile(sessionId);
+        if (full?.DialogueRecords == null || !full.DialogueRecords.TryGetValue(BtrDriver, out var dialogue) || dialogue?.Messages == null)
+        {
+            return;
+        }
+        int moved = 0, left = 0;
+        foreach (var message in dialogue.Messages)
+        {
+            var data = message?.Items?.Data;
+            if (data == null || data.Count == 0)
+            {
+                continue;
+            }
+            var ids = new HashSet<string>(data.Select(i => i.Id.ToString()));
+            foreach (var root in data.Where(i => i.ParentId == null || !ids.Contains(i.ParentId)).ToList())
+            {
+                var group = new List<Item> { root with { ParentId = null, SlotId = null, Location = null } };
+                var inGroup = new HashSet<string> { root.Id.ToString() };
+                bool grew = true;
+                while (grew)
+                {
+                    grew = false;
+                    foreach (var item in data)
+                    {
+                        if (item.ParentId != null && inGroup.Contains(item.ParentId) && inGroup.Add(item.Id.ToString()))
+                        {
+                            group.Add(item);
+                            grew = true;
+                        }
+                    }
+                }
+                int before = pmc.Inventory!.Items!.Count;
+                var output = eventOutputHolder.GetOutput(sessionId);
+                inventoryHelper.AddItemsToStash(sessionId, new SPTarkov.Server.Core.Models.Eft.Inventory.AddItemsDirectRequest
+                {
+                    ItemsWithModsToAdd = [group],
+                    FoundInRaid = true,
+                    UseSortingTable = false,
+                }, pmc, output);
+                if (pmc.Inventory.Items.Count > before)
+                {
+                    data.RemoveAll(i => inGroup.Contains(i.Id.ToString()));
+                    moved++;
+                }
+                else
+                {
+                    left++;
+                }
+            }
+            if (data.Count == 0)
+            {
+                message!.RewardCollected = true;
+            }
+        }
+        if (left == 0)
+        {
+            dialogue.AttachmentsNew = 0;
+        }
+        if (moved + left > 0)
+        {
+            Console.WriteLine("[TheTrueSPT] BTR deliveries: " + moved + " put in the hideout's stash" + (left > 0 ? ", " + left + " did not fit and wait in the mail" : "") + ".");
+        }
+    }
+
     public const string First = "streets";
     public static readonly string[] Known = ["streets", "customs", "shoreline"];
 
@@ -1090,6 +1165,14 @@ public sealed class HideoutsService(
             if (!File.Exists(PathFor(sessionId.ToString())))
             {
                 Save(sessionId.ToString(), store);
+            }
+            try
+            {
+                TakeDeliveries(sessionId, pmc);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("[TheTrueSPT] Putting BTR deliveries in the stash failed: " + e.Message);
             }
             return Describe(pmc, store);
         });

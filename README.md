@@ -14,6 +14,8 @@ Built and tested against SPT 4.1.6 (client 0.16.9.5) together with the open-worl
 
 The rooms are furnished from the game itself: walls, floor, tables, shelves, crates and the door are copies of pieces of the game's hideout interior, laid out differently for each trader. The layouts are plain text in `TheTrueSPT/RoomLayouts.cs`.
 
+Things the BTR driver carries for you between maps are put in the hideout's stash when you next enter it (whatever does not fit waits for the next visit); they never land on a trader's table.
+
 **Quests work at those traders.** Accept and hand in quests through the trader's Tasks tab. On hand-in the reward items land on the table at once; experience, standing and follow-up quests are paid when the raid ends. Trader sales totals and loyalty levels grow from in-raid trades.
 
 With "Put traders in rooms" switched off, traders stand in the open at their spots as figures, and deliveries go straight into your gear.
@@ -78,6 +80,7 @@ All three doors lead to the same hideout: the same stations, stash and crafts. I
 - **Crafting.** A built station offers **Craft...**, which turns its action list into the recipe list, a page at a time. Tools are needed but not used up. When the time is up, **Collect** puts the result in that hideout's stash. Recipes locked behind quests stay locked until those quests are done.
 - **Power.** The Generator takes fuel cans (put in and taken out in its window) and has a switch. While it is on, fuel burns on the world clock, also while you are away or asleep. Without power the lamps are out and nothing electric works: a craft cannot be started, a craft under way waits and carries on when power is back, and the bitcoin farm stops. Only the Lavatory is worked by hand. The lamps themselves (candles, bulbs, fluorescent) are put up from the Generator's window.
 - **Bitcoin farm.** Fit graphics cards in its window; while there is power it mines bitcoins at the game's rate for that many cards, up to three waiting, collected into the stash.
+- **Weapon modding.** A built Workbench lists the weapons you carry and those in the stash; MODIFY opens the game's own modding screen, with parts from your gear and the stash.
 - **Kept on stations.** The Weapon Stand (both racks), the Place of Fame and the Equipment Presets Stand each have a STORE / TAKE button in their window that opens what they keep beside your gear; it is saved when closed.
 - **While you are inside.** Every bot on the map is switched off and switched back on, where it stood, when you leave. The hideout's lamps cast no shadows, which is worth about a third of the frame rate with a map loaded above; outside, the interior itself is switched off.
 - **Water Collector.** At level 3 it takes a water filter in its window and fills bottles of clean water on the world clock, up to three waiting. It needs no power; the filter wears out as it works.

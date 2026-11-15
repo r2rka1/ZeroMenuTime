@@ -35,6 +35,9 @@ namespace TheTrueSPT
             {
                 if (!result.Failed && !string.IsNullOrEmpty(questId) && await HandOverItems(questId))
                 {
+                    // The game itself has already put the reward items into the player's gear. They
+                    // are laid on the trader's table instead, so the game's own copies go.
+                    await TakeBackGameRewards(result.Value.Rewards);
                     return result;
                 }
                 if (!result.Failed)
@@ -50,6 +53,37 @@ namespace TheTrueSPT
                 Plugin.Log.LogWarning("Quest hand-in notice failed: " + e.Message);
             }
             return result;
+        }
+
+        private static async Task TakeBackGameRewards(System.Collections.Generic.IEnumerable<MoveResult> rewards)
+        {
+            var player = EFT.GamePlayerOwner.MyPlayer;
+            if (player == null || rewards == null)
+            {
+                return;
+            }
+            int taken = 0, failed = 0;
+            foreach (var reward in rewards)
+            {
+                var item = reward != null ? reward.Item : null;
+                // Only what really ended up in the player's gear; a reward with nowhere to go was never given.
+                if (item == null || item.Parent == null || item.Parent.Container == null)
+                {
+                    continue;
+                }
+                if (await LocalTrade.Take(player, item, item.StackObjectsCount))
+                {
+                    taken++;
+                }
+                else
+                {
+                    failed++;
+                }
+            }
+            if (taken + failed > 0)
+            {
+                Plugin.Log.LogInfo("Quest reward items the game put in the player's gear taken back: " + taken + (failed > 0 ? ", could not take " + failed : ""));
+            }
         }
 
         /// <summary>

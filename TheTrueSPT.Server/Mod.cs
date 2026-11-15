@@ -269,8 +269,9 @@ public class TheTrueSPTRouter(
             yield break;
         }
         // An empty trader id means every sender: all traders, insurance returns and system mail.
+        // What the BTR driver carries between maps goes to the hideout's stash, never to a table.
         IEnumerable<Dialogue?> dialogues = string.IsNullOrEmpty(traderId)
-            ? profile.DialogueRecords.Values
+            ? profile.DialogueRecords.Where(d => d.Key.ToString() != HideoutsService.BtrDriver).Select(d => d.Value)
             : (profile.DialogueRecords.TryGetValue(traderId, out var single) ? new[] { single } : []);
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         foreach (var message in dialogues.Where(d => d?.Messages != null).SelectMany(d => d!.Messages!))
