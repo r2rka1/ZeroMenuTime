@@ -29,5 +29,13 @@ Copy-Item "$root\README.md", "$root\LICENSE" $stage
 
 $zip = "$root\dist\ZeroMenuTime-$Version.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path "$stage\*" -DestinationPath $zip
+# Entries use forward slashes, which every extractor and mod manager reads (Compress-Archive writes backslashes).
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$archive = [IO.Compression.ZipFile]::Open($zip, 'Create')
+try {
+    Get-ChildItem $stage -Recurse -File | ForEach-Object {
+        $name = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $_.FullName, $name, 'Optimal') | Out-Null
+    }
+} finally { $archive.Dispose() }
 Write-Host "Packed $zip"
