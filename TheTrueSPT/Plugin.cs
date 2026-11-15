@@ -122,7 +122,7 @@ namespace TheTrueSPT
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
-                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(),
+                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
             };
             foreach (var patch in _patches)
             {
@@ -220,6 +220,7 @@ namespace TheTrueSPT
             IndoorLight.Restore();
             HideoutPanel.Close();
             Photo.Restore();
+            HideoutGunsmith.Close();
             try
             {
                 LocalTrade.Active = false;

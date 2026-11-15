@@ -748,6 +748,37 @@ namespace TheTrueSPT
                     Report(failed ?? "modding opened for " + guns[n].ShortName.Localized() + (HideoutGunsmith.InStash(guns[n]) ? " (in the stash)" : " (carried)"));
                     break;
                 }
+                case "vitalcheck":
+                {
+                    // Would the game let a vital part of the first listed weapon be taken off into the stash?
+                    var guns = HideoutGunsmith.Weapons(player);
+                    int which = parts.Length > 1 ? (int)Number(parts[1]) : 0;
+                    if (which < guns.Count)
+                    {
+                        guns = new List<Weapon> { guns[which] };
+                    }
+                    var stash = HideoutStash.Current;
+                    Item part = null;
+                    foreach (var slot in guns.Count > 0 ? ((CompoundItem)guns[0]).AllSlots : new Slot[0])
+                    {
+                        if (slot.Required && slot.ContainedItem != null)
+                        {
+                            part = slot.ContainedItem;
+                            break;
+                        }
+                    }
+                    if (part == null || stash == null)
+                    {
+                        Report("FAILED no weapon with a vital part, or no stash");
+                        break;
+                    }
+                    var to = stash.Grids[0].FindLocationForItem(part);
+                    bool lifted = HideoutGunsmith.Lift();
+                    var check = ItemManipulator.MovePathCheck(part, to, player.InventoryController);
+                    HideoutGunsmith.Restore(lifted);
+                    Report("taking " + part.ShortName.Localized() + " off " + guns[0].ShortName.Localized() + ": " + (check.Failed ? "refused: " + check.Error.GetType().Name + " " + check.Error : "allowed"));
+                    break;
+                }
                 case "modclose":
                     HideoutGunsmith.Close();
                     yield return new WaitForSecondsRealtime(1f);
