@@ -4,6 +4,13 @@
 
 Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.com/mod/2642/vagabond)** (the open-world mod), which provides where traders stand and how maps connect.
 
+![The main menu](docs/screenshots/main-menu.jpg)
+
+| | |
+|---|---|
+| ![Trading in a trader's room](docs/screenshots/trading-in-the-room.jpg) | ![Quests at the trader](docs/screenshots/quests-at-the-trader.jpg) |
+| ![The Workbench window](docs/screenshots/workbench-window.jpg) | ![The Rest Space window](docs/screenshots/rest-space-window.jpg) |
+
 ---
 
 ## What it does
