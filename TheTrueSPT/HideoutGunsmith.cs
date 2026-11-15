@@ -15,6 +15,40 @@ namespace TheTrueSPT
     /// </summary>
     public static class HideoutGunsmith
     {
+        private static WeaponModdingScreen.WeaponModdingScreenController _open;
+
+        /// <summary>
+        /// Called every frame. The screen brings the menu's bottom bar with it (main menu, traders,
+        /// flea market), which must not be used from a raid; it is kept hidden while the screen is
+        /// open. When the screen closes, the stash is saved, since parts may have left it.
+        /// </summary>
+        public static void Tick()
+        {
+            if (_open == null)
+            {
+                return;
+            }
+            if (_open.Closed)
+            {
+                _open = null;
+                HideoutStash.Send("after modding a weapon");
+                return;
+            }
+            var preloader = MonoBehaviourSingleton<EFT.UI.PreloaderUI>.Instance;
+            if (preloader != null && preloader.MenuTaskBar != null && preloader.MenuTaskBar.gameObject.activeSelf)
+            {
+                preloader.SetMenuTaskBarVisibility(false);
+            }
+        }
+
+        public static void Close()
+        {
+            if (_open != null && !_open.Closed)
+            {
+                _open.CloseScreen();
+            }
+        }
+
         /// <summary>The weapons carried, at any depth, then those in the hideout's stash.</summary>
         public static List<Weapon> Weapons(Player player)
         {
@@ -59,7 +93,8 @@ namespace TheTrueSPT
                 {
                     collections.Add(HideoutStash.Current);
                 }
-                new WeaponModdingScreen.WeaponModdingScreenController(weapon, player.InventoryController, collections.ToArray()).ShowScreen(EScreenState.Queued);
+                _open = new WeaponModdingScreen.WeaponModdingScreenController(weapon, player.InventoryController, collections.ToArray());
+                _open.ShowScreen(EScreenState.Queued);
                 Plugin.Log.LogInfo("Weapon modding opened for " + weapon.ShortName.Localized() + (InStash(weapon) ? " (in the stash)" : " (carried)"));
                 return null;
             }

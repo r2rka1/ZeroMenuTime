@@ -283,6 +283,7 @@ namespace TheTrueSPT
             HideoutPower.Tick();
             BotFreeze.Tick();
             Photo.Tick();
+            HideoutGunsmith.Tick();
             if (!CaptureKey.Value.IsDown())
             {
                 return;

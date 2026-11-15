@@ -733,6 +733,26 @@ namespace TheTrueSPT
                     }
                     break;
                 }
+                case "modify":
+                {
+                    // modify [N]: open the weapon modding screen for the Nth weapon the Workbench would list.
+                    var guns = HideoutGunsmith.Weapons(player);
+                    int n = parts.Length > 1 ? (int)Number(parts[1]) : 0;
+                    if (n >= guns.Count)
+                    {
+                        Report("FAILED only " + guns.Count + " weapon(s)");
+                        break;
+                    }
+                    string failed = HideoutGunsmith.Open(guns[n]);
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    Report(failed ?? "modding opened for " + guns[n].ShortName.Localized() + (HideoutGunsmith.InStash(guns[n]) ? " (in the stash)" : " (carried)"));
+                    break;
+                }
+                case "modclose":
+                    HideoutGunsmith.Close();
+                    yield return new WaitForSecondsRealtime(1f);
+                    Report("modding closed");
+                    break;
                 case "relight":
                     Report(IndoorLight.Repair());
                     break;

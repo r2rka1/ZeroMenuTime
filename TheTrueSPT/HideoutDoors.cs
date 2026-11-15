@@ -521,6 +521,7 @@ namespace TheTrueSPT
         public static async System.Threading.Tasks.Task Close()
         {
             HideoutPanel.Close();
+            HideoutGunsmith.Close();
             BotFreeze.Set(false);
             if (Inside != null)
             {
