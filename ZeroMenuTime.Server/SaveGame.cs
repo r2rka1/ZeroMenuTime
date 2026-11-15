@@ -23,6 +23,8 @@ public sealed class SaveRequest : IRequestData
     public PmcData? Profile { get; set; }
     /// <summary>For "status": the client has acted on the wake-up-at-the-bed flag, clear it.</summary>
     public bool Consume { get; set; }
+    /// <summary>For "trader": the trader's extract the player chose "Save and go to menu" at.</summary>
+    public string Exit { get; set; } = "";
 }
 
 public sealed class SaveResponse
@@ -32,6 +34,8 @@ public sealed class SaveResponse
     /// <summary>Is there a save at all?</summary>
     public bool Has { get; set; }
     public string Hideout { get; set; } = "";
+    /// <summary>For a save made at a trader: the trader's extract (VGB_EXT_...); empty for a bed save.</summary>
+    public string Exit { get; set; } = "";
     public double Clock { get; set; }
     /// <summary>The next raid should begin at the bed of that hideout: the character died, or the game stopped without the raid ending.</summary>
     public bool Resume { get; set; }
@@ -40,7 +44,13 @@ public sealed class SaveResponse
 /// <summary>What is kept beside the saved character.</summary>
 public sealed class SaveMeta
 {
+    /// <summary>The hideout whose bed the save was made at; empty for a save made at a trader.</summary>
     public string Hideout { get; set; } = "";
+    /// <summary>For a save made at a trader: the map and the trader's extract, where the character continues.</summary>
+    public string Map { get; set; } = "";
+    public string Exit { get; set; } = "";
+    /// <summary>A trader save was put back after a death; until the next raid starts, the place is said again.</summary>
+    public bool Respawn { get; set; }
     public string SavedAtUtc { get; set; } = "";
     public bool Resume { get; set; }
 }
@@ -57,6 +67,24 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
     public static SaveGameService? Instance;
 
     private readonly object _gate = new();
+
+    /// <summary>Players who chose "Save and go to menu" at a trader in the raid now ending, and at which extract.</summary>
+    private readonly Dictionary<string, string> _traderSaves = new();
+
+    /// <summary>The client says the raid is about to end by "Save and go to menu" at a trader.</summary>
+    public SaveResponse TraderSaveComing(MongoId sessionId, SaveRequest request)
+    {
+        string exit = request.Exit ?? "";
+        if (!exit.StartsWith("VGB_EXT_", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SaveResponse { Error = "Not a trader's extract: " + exit };
+        }
+        lock (_gate)
+        {
+            _traderSaves[sessionId.ToString()] = exit;
+        }
+        return new SaveResponse { Ok = true };
+    }
 
     private static string Dir(string sessionId) => System.IO.Path.Combine("user", "profileData", sessionId);
     private static string CharacterFile(string sessionId) => System.IO.Path.Combine(Dir(sessionId), "zeromenutime.save.character.json");
@@ -101,6 +129,48 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         Vagabond.Common.Api.Api.SaveState(sessionId, state);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void TellVagabondExit(string sessionId, string map, string exit)
+    {
+        var state = Vagabond.Common.Api.Api.GetState(sessionId);
+        if (state == null)
+        {
+            return;
+        }
+        state.CurrentMap = map;
+        state.LastExit = exit;
+        state.TransitState = null;
+        Vagabond.Common.Api.Api.SaveState(sessionId, state);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string? VagabondMap(string sessionId)
+    {
+        return Vagabond.Common.Api.Api.GetState(sessionId)?.CurrentMap;
+    }
+
+    /// <summary>Where the character continues from a save: the bed of its hideout, or the trader it was made at.</summary>
+    private static void PlaceAt(string sessionId, SaveMeta meta)
+    {
+        if (!string.IsNullOrEmpty(meta.Hideout))
+        {
+            PlaceAt(sessionId, meta.Hideout);
+            return;
+        }
+        if (string.IsNullOrEmpty(meta.Map) || string.IsNullOrEmpty(meta.Exit))
+        {
+            return;
+        }
+        try
+        {
+            TellVagabondExit(sessionId, meta.Map, meta.Exit);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not tell Vagabond where the trader save was made: " + e.Message);
+        }
+    }
+
     private static void PlaceAt(string sessionId, string hideout)
     {
         try
@@ -132,7 +202,7 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
 
     private SaveResponse Describe(string sessionId, SaveMeta? meta)
     {
-        return new SaveResponse { Ok = true, Has = meta != null, Hideout = meta?.Hideout ?? "", Resume = meta?.Resume ?? false };
+        return new SaveResponse { Ok = true, Has = meta != null, Hideout = meta?.Hideout ?? "", Exit = meta?.Exit ?? "", Resume = meta?.Resume ?? false };
     }
 
     public SaveResponse Save(MongoId sessionId, SaveRequest request)
@@ -197,6 +267,45 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         }
     }
 
+    /// <summary>
+    /// "Save and go to menu" at a trader ends the raid at the trader's extract, and the server has
+    /// just written the character as it left. That is kept as the save, with the hideout and the
+    /// clock as they are now, so dying later puts it back and the character continues at that trader.
+    /// </summary>
+    private void SaveAtTrader(MongoId sessionId, string id, string exit)
+    {
+        var full = saveServer.GetProfile(sessionId);
+        var pmc = full?.CharacterData?.PmcData;
+        if (pmc == null)
+        {
+            return;
+        }
+        string map = "";
+        try
+        {
+            map = VagabondMap(id) ?? "";
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not ask Vagabond which map the trader save was made on: " + e.Message);
+        }
+        Directory.CreateDirectory(Dir(id));
+        foreach (string file in new[] { CharacterFile(id), HideoutsFile(id) })
+        {
+            if (File.Exists(file))
+            {
+                File.Copy(file, file + ".previous", true);
+            }
+        }
+        File.WriteAllText(CharacterFile(id), jsonUtil.Serialize(pmc));
+        if (File.Exists(LiveHideoutsFile(id)))
+        {
+            File.Copy(LiveHideoutsFile(id), HideoutsFile(id), true);
+        }
+        WriteMeta(id, new SaveMeta { Hideout = "", Map = map, Exit = exit, SavedAtUtc = DateTime.UtcNow.ToString("u") });
+        Console.WriteLine("[ZeroMenuTime] Game saved at the trader (" + exit + " on " + map + ").");
+    }
+
     public SaveResponse Status(MongoId sessionId, SaveRequest request)
     {
         try
@@ -206,17 +315,18 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
             {
                 var meta = ReadMeta(id);
                 var response = Describe(id, meta);
-                if (meta != null && meta.Resume)
+                if (meta != null && (meta.Resume || meta.Respawn))
                 {
                     if (request.Consume)
                     {
                         meta.Resume = false;
+                        meta.Respawn = false;
                         WriteMeta(id, meta);
                     }
                     else
                     {
                         // Other mods settle where the character is after a death; say it again.
-                        PlaceAt(id, meta.Hideout);
+                        PlaceAt(id, meta);
                     }
                 }
                 return response;
@@ -236,6 +346,13 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
             string id = sessionId.ToString();
             lock (_gate)
             {
+                // Whatever happened, a "Save and go to menu" from this raid is settled now.
+                bool atTrader = _traderSaves.Remove(id, out string? traderExit);
+                if (!died && atTrader && traderExit != null)
+                {
+                    SaveAtTrader(sessionId, id, traderExit);
+                    return;
+                }
                 var meta = ReadMeta(id);
                 if (meta == null)
                 {
@@ -243,9 +360,10 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                 }
                 if (!died)
                 {
-                    if (meta.Resume)
+                    if (meta.Resume || meta.Respawn)
                     {
                         meta.Resume = false;
+                        meta.Respawn = false;
                         WriteMeta(id, meta);
                     }
                     return;
@@ -262,10 +380,13 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                 {
                     File.Copy(HideoutsFile(id), LiveHideoutsFile(id), true);
                 }
-                meta.Resume = true;
+                bool atBed = !string.IsNullOrEmpty(meta.Hideout);
+                meta.Resume = atBed;
+                meta.Respawn = !atBed;
                 WriteMeta(id, meta);
-                PlaceAt(id, meta.Hideout);
-                Console.WriteLine("[ZeroMenuTime] The character died; the save from " + meta.SavedAtUtc + " at the '" + meta.Hideout + "' hideout was put back.");
+                PlaceAt(id, meta);
+                Console.WriteLine("[ZeroMenuTime] The character died; the save from " + meta.SavedAtUtc + " at "
+                    + (atBed ? "the '" + meta.Hideout + "' hideout" : meta.Exit + " on " + meta.Map) + " was put back.");
             }
         }
         catch (Exception e)

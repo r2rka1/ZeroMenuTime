@@ -87,6 +87,23 @@ namespace ZeroMenuTime
             await SaveNow(reason);
         }
 
+        /// <summary>Tells the server the raid is ending by "Save and go to menu" at this trader's extract, so it keeps that as the save.</summary>
+        public static async Task TraderSave(string exit)
+        {
+            try
+            {
+                var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/save/trader", new JObject { ["Exit"] = exit }.ToString()));
+                if (!((bool?)reply["Ok"] ?? false))
+                {
+                    Plugin.Log.LogWarning("Trader save not taken: " + (string)reply["Error"]);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Trader save not sent: " + e.Message);
+            }
+        }
+
         /// <summary>Asks the server whether there is a save and whether the next raid should begin at its bed.</summary>
         public static async Task<JObject> Status(bool consume)
         {

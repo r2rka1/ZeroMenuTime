@@ -170,6 +170,10 @@ public class ZeroMenuTimeRouter(
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.Save(sessionId, payload)) ?? "{}")
     ),
     new RouteAction<SaveRequest>(
+        "/zeromenutime/save/trader",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.TraderSaveComing(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<SaveRequest>(
         "/zeromenutime/save/status",
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.Status(sessionId, payload)) ?? "{}")
     ),

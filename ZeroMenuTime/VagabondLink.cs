@@ -92,8 +92,10 @@ namespace ZeroMenuTime
             {
                 return;
             }
-            // Leaving at a trader is the "save and quit to menu" choice: the next raid does not auto-start.
+            // Leaving at a trader is the "save and quit to menu" choice: the next raid does not auto-start,
+            // and the server keeps the character as it leaves as the save.
             Seamless.SaveAndMenuRequested = true;
+            _ = SaveGame.TraderSave(exfil.gameObject.name);
             LeaveRequested.Add(exfil.GetInstanceID());
             if (!exfil.Entered.Contains(player))
             {

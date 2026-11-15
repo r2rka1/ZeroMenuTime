@@ -53,6 +53,14 @@ namespace ZeroMenuTime
             if (status != null && ((bool?)status["Has"] ?? false))
             {
                 string bed = (string)status["Hideout"];
+                if (string.IsNullOrEmpty(bed))
+                {
+                    Plugin.Log.LogInfo("Died with a save made at a trader (" + (string)status["Exit"] + ")");
+                    NotificationManager.DisplayMessageNotification("You died. Your last save was put back; you will continue at the trader where you saved.",
+                        ENotificationDurationType.Long);
+                    _asking = false;
+                    yield break;
+                }
                 Plugin.Log.LogInfo("Died with a save; the next raid begins at the bed of hideout '" + bed + "'");
                 NotificationManager.DisplayMessageNotification("You died. Your last save was put back; you will wake up at your bed in the "
                     + char.ToUpper(bed[0]) + bed.Substring(1) + " hideout.", ENotificationDurationType.Long);

@@ -41,7 +41,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 
 - **One world clock**. The time of day carries on from raid to raid, and **raids have no time limit**.
 - **Sleep** at the Rest Space: the clock jumps, you heal, and you get hungry and thirsty as if the hours had passed.
-- **Save** at the bed (sleeping saves too). If you die, or the game stops mid-raid, you **wake at your bed** with the gear, health, skills, quests, hideout and clock of that save.
+- **Save** at the bed (sleeping saves too), or with **Save and go to menu** at a trader. If you die, your **last save** is put back: you wake at your bed, or continue at the trader you saved at, with the gear, health, skills, quests, hideout and clock of that save. If the game stops mid-raid after a bed save, you wake at your bed.
 
 ### A menu of its own
 
