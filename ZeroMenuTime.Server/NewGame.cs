@@ -1,4 +1,8 @@
+using System.Reflection;
+using HarmonyLib;
 using SPTarkov.DI.Annotations;
+using SPTarkov.Server.Core.DI;
+using SPTarkov.Reflection.Patching;
 using SPTarkov.Server.Core.Helpers.Items;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
@@ -36,6 +40,47 @@ public sealed class NewGameService(SaveServer saveServer, CreateProfileService c
 {
     /// <summary>Which door of the hideout a new character starts behind.</summary>
     public const string StartDoor = "customs";
+
+    /// <summary>Set once the server has loaded, for the profile-creation patch.</summary>
+    public static NewGameService? Instance;
+
+    /// <summary>True while Reset makes the character afresh; Reset then sets up the new character itself.</summary>
+    public static bool Resetting;
+
+    /// <summary>
+    /// A character the server has just made, either from the game's own character screen or by
+    /// Reset: the small starting kit, and the first raid begins in the hideout by its Customs door.
+    /// </summary>
+    public async ValueTask SetUpNewCharacter(MongoId sessionId)
+    {
+        string id = sessionId.ToString();
+        var made = saveServer.GetProfile(sessionId)?.CharacterData?.PmcData;
+        if (made?.Inventory?.Items == null || made.Inventory.Equipment == null)
+        {
+            Console.WriteLine("[ZeroMenuTime] New character: no inventory to set up");
+            return;
+        }
+        // Whatever this mod kept for an earlier character on the same account goes.
+        string dir = System.IO.Path.Combine("user", "profileData", id);
+        if (Directory.Exists(dir))
+        {
+            foreach (string file in Directory.GetFiles(dir, "zeromenutime.*"))
+            {
+                File.Delete(file);
+            }
+        }
+        TableRewards.Clear(id);
+        try
+        {
+            GiveStartingKit(made);
+            saveGame.StartFresh(id, made, StartDoor);
+            await saveServer.SaveProfileAsync(sessionId);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] New character: the starting kit or the starting place could not be set: " + e);
+        }
+    }
 
     private const string Alpha = "544a11ac4bdc2d470e8b456a", Roubles = "5449016a4bdc2d6f028b456f";
     private const string Pistol = "5448bd6b4bdc2dfc2f8b4569", PistolMag = "5448c12b4bdc2d02308b456f", PistolRound = "5737201124597760fc4431f1";
@@ -216,29 +261,18 @@ public sealed class NewGameService(SaveServer saveServer, CreateProfileService c
                 HeadId = pmc.Customization.Head!.Value,
                 VoiceId = pmc.Customization.Voice!.Value,
             };
-            await createProfile.CreateProfile(sessionId, fresh);
-
-            // Our own state: hideouts, clock, save.
-            foreach (string file in Directory.GetFiles(dir, "zeromenutime.*"))
+            Resetting = true;
+            try
             {
-                File.Delete(file);
+                await createProfile.CreateProfile(sessionId, fresh);
             }
-            TableRewards.Clear(id);
-
-            // The new character: a small kit and nothing else, waking in the hideout by its Customs door.
-            var made = saveServer.GetProfile(sessionId)?.CharacterData?.PmcData;
-            if (made?.Inventory?.Items != null && made.Inventory.Equipment != null)
+            finally
             {
-                try
-                {
-                    GiveStartingKit(made);
-                    saveGame.StartFresh(id, made, StartDoor);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("[ZeroMenuTime] New game: the starting kit or the starting place could not be set: " + e);
-                }
+                Resetting = false;
             }
+
+            // Our own state goes; the new character gets a small kit and wakes in the hideout by its Customs door.
+            await SetUpNewCharacter(sessionId);
             Console.WriteLine("[ZeroMenuTime] New game started for " + fresh.Nickname + "; the old character is kept in " + backup);
             return new NewGameResponse { Ok = true, Backup = System.IO.Path.GetFullPath(backup) };
         }
@@ -247,5 +281,60 @@ public sealed class NewGameService(SaveServer saveServer, CreateProfileService c
             Console.WriteLine("[ZeroMenuTime] New game failed: " + e);
             return new NewGameResponse { Error = e.GetType().Name + ": " + e.Message };
         }
+    }
+}
+
+/// <summary>
+/// A character made on the game's own character screen gets the same start as Reset gives, so a new
+/// player does not have to Reset first. Runs after other mods' own handling of a new profile
+/// (Vagabond sets its starting place there), so the hideout start is not overwritten.
+/// </summary>
+public sealed class NewCharacterPatch : AbstractPatch
+{
+    protected override MethodBase GetTargetMethod()
+    {
+        return typeof(CreateProfileService).GetMethod(nameof(CreateProfileService.CreateProfile), BindingFlags.Instance | BindingFlags.Public)!;
+    }
+
+    [PatchPostfix]
+    [HarmonyPriority(Priority.Last)]
+    public static void Postfix(MongoId sessionId, ref ValueTask<string> __result)
+    {
+        if (NewGameService.Resetting || NewGameService.Instance == null)
+        {
+            return;
+        }
+        __result = After(__result, sessionId);
+    }
+
+    private static async ValueTask<string> After(ValueTask<string> original, MongoId sessionId)
+    {
+        string result = await original;
+        var service = NewGameService.Instance;
+        if (service != null)
+        {
+            await service.SetUpNewCharacter(sessionId);
+            Console.WriteLine("[ZeroMenuTime] New character: starting kit given, first raid begins in the hideout.");
+        }
+        return result;
+    }
+}
+
+/// <summary>Makes the new-game service known to the profile-creation patch and switches that patch on.</summary>
+[Injectable(TypePriority = OnLoadOrder.PostLoad)]
+public sealed class NewGameLoader(NewGameService newGame) : IOnLoad
+{
+    public Task OnLoadAsync(CancellationToken cancellationToken)
+    {
+        NewGameService.Instance = newGame;
+        try
+        {
+            new NewCharacterPatch().Enable();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not enable the new-character patch: " + e.Message);
+        }
+        return Task.CompletedTask;
     }
 }

@@ -47,6 +47,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 
 - The main menu is **Continue / Reset / Settings / Exit** over a live view of your own hideout. Under Continue it says where and when you will pick up.
 - **Continue** starts a raid where your character is.
+- A **new character** gets the same start as Reset, without asking.
 - **Reset** starts over, keeping a backup of the old character: you wake in the hideout by its Customs door with a pistol and three magazines, soft armour, a rig, a backpack, medicine, water, food, and the Alpha container with 30,000 roubles.
 - Result screens after a raid are skipped and the next raid starts by itself (hold Backspace to stay in the menu).
 
@@ -75,7 +76,8 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
    - `BepInEx/plugins/ZeroMenuTime/` (client)
    - `SPT_Runtime/user/mods/ZeroMenuTime/` (server)
 3. Start the SPT server, then the game.
-4. **Start a fresh character:** choose **Reset** in the main menu. The game closes; start it again and choose **Continue**. You wake in your hideout at Customs.
+4. Make a new character as usual. It starts with the small starting kit and wakes in your hideout at Customs.
+   With a character you already have, choose **Reset** in the main menu for the same start: the game closes; start it again and choose **Continue**.
 
 Reset keeps the old character in `SPT_Runtime/user/profileData/<profile id>/newgame-backups/`. To remove the mod, delete the two folders above.
 
