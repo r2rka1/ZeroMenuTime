@@ -87,6 +87,35 @@ namespace ZeroMenuTime
             return Defaults();
         }
 
+        /// <summary>
+        /// Some maps keep a door's collider and shadow but switch its mesh off, which looks like a
+        /// blank wall. The hideout door has to be seen, so the map's own door at that spot is drawn.
+        /// </summary>
+        private static void ShowMapDoor(Vector3 centre)
+        {
+            int shown = 0;
+            foreach (var hit in Physics.OverlapSphere(centre, 1.5f, ~0, QueryTriggerInteraction.Collide))
+            {
+                var root = hit.transform.parent != null ? hit.transform.parent : hit.transform;
+                foreach (var renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (!renderer.enabled && renderer.gameObject.activeInHierarchy
+                        && renderer.name.IndexOf("door", StringComparison.OrdinalIgnoreCase) >= 0
+                        && renderer.name.IndexOf("SHADOW", StringComparison.OrdinalIgnoreCase) < 0
+                        && !renderer.name.StartsWith("ZeroMenuTime", StringComparison.Ordinal)
+                        && Vector3.Distance(renderer.bounds.center, centre) < 1.5f)
+                    {
+                        renderer.enabled = true;
+                        shown++;
+                    }
+                }
+            }
+            if (shown > 0)
+            {
+                Plugin.Log.LogInfo("Hideout door: the map's own door drawn again (" + shown + " part(s))");
+            }
+        }
+
         /// <summary>Puts this map's hideout doors in place. Called when the raid starts.</summary>
         public static int Spawn(string map)
         {
@@ -122,6 +151,7 @@ namespace ZeroMenuTime
                 {
                     renderer.enabled = false;
                 }
+                ShowMapDoor(ground + Vector3.up * (RoomDoor.Height / 2f));
                 string id = spot.Id;
                 var back = ground + facing * new Vector3(0f, 0.05f, 1.0f);
                 float backYaw = yaw;

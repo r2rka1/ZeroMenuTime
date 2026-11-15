@@ -1023,7 +1023,7 @@ namespace ZeroMenuTime
                             var spot = target + direction * (wantedReach * share);
                             RaycastHit floor;
                             // Look for ground from just above the door's height first, so roofs and branches are passed by.
-                            var low = new Vector3(spot.x, target.y + 3f, spot.z);
+                            var low = new Vector3(spot.x, target.y + 1.2f, spot.z);
                             bool ground = Physics.Raycast(low, Vector3.down, out floor, 15f, solid, QueryTriggerInteraction.Ignore)
                                           || Physics.Raycast(spot + Vector3.up * 25f, Vector3.down, out floor, 45f, solid, QueryTriggerInteraction.Ignore);
                             if (!ground || floor.point.y < target.y - 10f || floor.point.y > target.y + 12f)
@@ -1067,6 +1067,19 @@ namespace ZeroMenuTime
                 {
                     // body hide | body show: the player's own arms and gun, out of pictures.
                     bool show = parts.Length > 1 && parts[1].ToLowerInvariant() == "show";
+                    if (!show)
+                    {
+                        // Put the gun away first; the hands are drawn again with every weapon change.
+                        try
+                        {
+                            player.SetEmptyHands(null);
+                        }
+                        catch (Exception e)
+                        {
+                            Report("hands not emptied: " + e.Message);
+                        }
+                        yield return new WaitForSecondsRealtime(2f);
+                    }
                     int count = 0;
                     foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
                     {

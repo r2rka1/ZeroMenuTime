@@ -91,6 +91,37 @@ namespace ZeroMenuTime
                     Name = "Ragman", TraderId = Ragman, Maps = new List<string> { "Interchange" },
                     Position = new[] { -51.22f, 21.33f, 46.19f }, RotationY = 7f, Hidden = true, AtFeet = true,
                 });
+                // The rest were measured in game on the door itself: position on the ground at the door, facing out.
+                doors.Add(new TraderSpot
+                {
+                    // The steel door of the stone bunker in the rock face.
+                    Name = "Jaeger", TraderId = Jaeger, Maps = new List<string> { "Woods" },
+                    Position = new[] { -156.25f, 51.2f, -272.45f }, RotationY = 357f, Hidden = true,
+                });
+                doors.Add(new TraderSpot
+                {
+                    // The wooden door in the side wall of the basement corridor.
+                    Name = "Mechanic", TraderId = Mechanic, Maps = new List<string> { "factory4_day", "factory4_night" },
+                    Position = new[] { 1.09f, -2.63f, 57.45f }, RotationY = 270f, Hidden = true,
+                });
+                doors.Add(new TraderSpot
+                {
+                    // The office door at the end of the corridor, second floor of the TerraGroup building.
+                    Name = "Therapist", TraderId = Therapist, Maps = new List<string> { "Sandbox", "Sandbox_high" },
+                    Position = new[] { -26.85f, 29.72f, 92.94f }, RotationY = 180f, Hidden = true,
+                });
+                doors.Add(new TraderSpot
+                {
+                    // The steel gate of checkpoint 11.
+                    Name = "Peacekeeper", TraderId = Peacekeeper, Maps = new List<string> { "Shoreline" },
+                    Position = new[] { -968.6f, -59.6f, 378.95f }, RotationY = 162f, Hidden = true,
+                });
+                doors.Add(new TraderSpot
+                {
+                    // The doors of the shipping container in the drug lab.
+                    Name = "Fence", TraderId = Fence, Maps = new List<string> { "Lighthouse" },
+                    Position = new[] { -125.39f, 10.6f, -839.8f }, RotationY = 90f, Hidden = true,
+                });
                 foreach (var door in doors)
                 {
                     if (door.Enabled && door.TraderId == traderId && door.Position != null && door.Position.Length >= 3
