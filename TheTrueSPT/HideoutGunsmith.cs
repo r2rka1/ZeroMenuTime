@@ -16,6 +16,21 @@ namespace TheTrueSPT
     public static class HideoutGunsmith
     {
         private static WeaponModdingScreen.WeaponModdingScreenController _open;
+        private static WeaponModdingScreen _screen;
+        private static Weapon _weapon;
+        private static int _shape;
+        private static float _nextScreenLook;
+
+        /// <summary>Which parts the weapon is made of right now, as one number.</summary>
+        private static int Shape(Weapon weapon)
+        {
+            int shape = 17;
+            foreach (var part in weapon.GetAllItems())
+            {
+                shape = unchecked(shape * 31 + part.Id.GetHashCode() + (part.Parent != null && part.Parent.Container != null ? part.Parent.Container.ID.GetHashCode() : 0));
+            }
+            return shape;
+        }
 
         /// <summary>Inside the hideout, the in-raid rules on vital parts do not apply. Returns whether they were lifted.</summary>
         public static bool Lift()
@@ -106,9 +121,34 @@ namespace TheTrueSPT
             if (_open.Closed)
             {
                 _open = null;
+                _screen = null;
+                _weapon = null;
                 MenuLike(false);
                 HideoutStash.Send("after modding a weapon");
                 return;
+            }
+            // In a raid a change of part is carried out a moment after the screen has redrawn the
+            // gun, so the screen showed each change one step late. Redraw once the change is in.
+            if (_screen == null && UnityEngine.Time.unscaledTime >= _nextScreenLook)
+            {
+                _nextScreenLook = UnityEngine.Time.unscaledTime + 0.25f;
+                _screen = UnityEngine.Object.FindObjectOfType<WeaponModdingScreen>();
+            }
+            if (_screen != null && _weapon != null)
+            {
+                int shape = Shape(_weapon);
+                if (shape != _shape)
+                {
+                    _shape = shape;
+                    try
+                    {
+                        _screen.WeaponUpdate();
+                    }
+                    catch (System.Exception e)
+                    {
+                        Plugin.Log.LogWarning("Redrawing the modding screen failed: " + e.Message);
+                    }
+                }
             }
             var preloader = MonoBehaviourSingleton<EFT.UI.PreloaderUI>.Instance;
             if (preloader != null && preloader.MenuTaskBar != null && preloader.MenuTaskBar.gameObject.activeSelf)
@@ -190,6 +230,9 @@ namespace TheTrueSPT
                 }
                 _open = new WeaponModdingScreen.WeaponModdingScreenController(weapon, player.InventoryController, collections.ToArray());
                 _open.ShowScreen(EScreenState.Queued);
+                _weapon = weapon;
+                _shape = Shape(weapon);
+                _screen = null;
                 MenuLike(true);
                 Plugin.Log.LogInfo("Weapon modding opened for " + weapon.ShortName.Localized() + (InStash(weapon) ? " (in the stash)" : " (carried)"));
                 return null;
