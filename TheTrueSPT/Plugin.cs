@@ -145,6 +145,8 @@ namespace TheTrueSPT
             {
                 if (Singleton<GameWorld>.Instantiated && Singleton<GameWorld>.Instance.MainPlayer != null)
                 {
+                    // An earlier copy of this plugin may have switched the sky off for a room or the hideout.
+                    IndoorLight.Repair();
                     SpawnTradersPatch.Postfix(Singleton<GameWorld>.Instance);
                     NotificationManager.DisplayMessageNotification("The True SPT reloaded (" + BuildStamp + ")", ENotificationDurationType.Long);
                 }

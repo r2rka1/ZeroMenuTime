@@ -95,6 +95,45 @@ namespace TheTrueSPT
             RenderSettings.reflectionIntensity = Mathf.Min(_reflection, 0.25f);
         }
 
+        /// <summary>
+        /// Puts the map's daylight back as the map has it: its sun and moon switched on and its own
+        /// level settings applied. Used after a reload of this plugin, which forgets what an earlier
+        /// copy had switched off.
+        /// </summary>
+        public static string Repair()
+        {
+            int lit = 0;
+            string applied = "none";
+            try
+            {
+                foreach (var light in UnityEngine.Object.FindObjectsOfType<Light>(true))
+                {
+                    if (light.type == LightType.Directional && !light.enabled && !HideoutBunker.Owns(light.gameObject)
+                        && !light.gameObject.scene.name.StartsWith("bunker", StringComparison.OrdinalIgnoreCase))
+                    {
+                        light.enabled = true;
+                        lit++;
+                    }
+                }
+                foreach (var settings in UnityEngine.Object.FindObjectsOfType<LevelSettings>(true))
+                {
+                    if (!HideoutBunker.Owns(settings.gameObject) && !settings.gameObject.scene.name.StartsWith("bunker", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Comfort.Common.Singleton<LevelSettings>.Create(settings);
+                        settings.ApplySettings();
+                        applied = settings.gameObject.scene.name;
+                        break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                return "FAILED " + e.Message;
+            }
+            Plugin.Log.LogInfo("Daylight repaired: " + lit + " sky light(s) back on, level settings of " + applied);
+            return "sky lights back on " + lit + ", level settings of " + applied;
+        }
+
         public static void Restore()
         {
             if (!_dark)

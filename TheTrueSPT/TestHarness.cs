@@ -733,6 +733,9 @@ namespace TheTrueSPT
                     }
                     break;
                 }
+                case "relight":
+                    Report(IndoorLight.Repair());
+                    break;
                 case "near":
                 {
                     // near X Y Z [R]: what is drawn around a point, and whether it is ours. Does not move the player.
