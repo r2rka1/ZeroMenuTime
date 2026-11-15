@@ -48,7 +48,7 @@ namespace ZeroMenuTime
         public static string Inside;
 
         /// <summary>For each hideout with a door on this map: where one stands in front of it, and the way one faces.</summary>
-        private static readonly Dictionary<string, KeyValuePair<Vector3, float>> Fronts = new Dictionary<string, KeyValuePair<Vector3, float>>();
+        internal static readonly Dictionary<string, KeyValuePair<Vector3, float>> Fronts = new Dictionary<string, KeyValuePair<Vector3, float>>();
 
         private static Vector3 _returnTo;
         private static float _returnYaw;
@@ -243,8 +243,9 @@ namespace ZeroMenuTime
         private static readonly Vector3 SecurityDoor = new Vector3(-8.7f, 1.1f, -8.5f);
 
         /// <summary>
-        /// A built Security station shuts a door across the way to the steps and the old way out.
-        /// That door then is the way out. Called on entering and after anything is built.
+        /// A built Security station shuts a door across the way to the steps, which lead up to the
+        /// cultists' circle and the way out. That door can be gone through either way. Called on
+        /// entering and after anything is built.
         /// </summary>
         public static void RefreshExits()
         {
@@ -255,7 +256,7 @@ namespace ZeroMenuTime
             {
                 if (_securityExit == null)
                 {
-                    _securityExit = RoomDoor.Spawn("Leave hideout", HideoutBunker.Moved + SecurityDoor, 0f);
+                    _securityExit = RoomDoor.Spawn("Go through", HideoutBunker.Moved + SecurityDoor, 0f);
                     // As deep as it is wide, so it is met from whichever side the door is come at.
                     _securityExit.transform.localScale = new Vector3(1.3f, RoomDoor.Height, 1.3f);
                     var drawn = _securityExit.GetComponent<MeshRenderer>();
@@ -263,8 +264,8 @@ namespace ZeroMenuTime
                     {
                         drawn.enabled = false;
                     }
-                    _securityExit.OnUse = Leave;
-                    Plugin.Log.LogInfo("Hideout: Security is built, so its door is a way out too");
+                    _securityExit.OnUse = ThroughSecurityDoor;
+                    Plugin.Log.LogInfo("Hideout: Security is built; its door can be gone through");
                 }
             }
             else if (_securityExit != null)
@@ -272,6 +273,23 @@ namespace ZeroMenuTime
                 UnityEngine.Object.Destroy(_securityExit.gameObject);
                 _securityExit = null;
             }
+        }
+
+        /// <summary>Steps the player to the other side of the Security station's door.</summary>
+        private static void ThroughSecurityDoor()
+        {
+            var player = GamePlayerOwner.MyPlayer;
+            if (player == null || !HideoutBunker.Loaded)
+            {
+                return;
+            }
+            var door = HideoutBunker.Moved + SecurityDoor;
+            // The hall lies on the door's +z side, the steps on its -z side.
+            bool fromHall = player.Transform.position.z > door.z;
+            // Both sides are on the hall's floor; the first step of the stairs starts just beyond.
+            var to = new Vector3(door.x, HideoutBunker.Moved.y + 0.1f, door.z + (fromHall ? -1.7f : 1.5f));
+            player.Teleport(to, false);
+            player.Rotation = new Vector2(fromHall ? 180f : 0f, 0f);
         }
 
         /// <summary>Brings the interior in now, if it is not there yet, and furnishes the rooms still bare.</summary>

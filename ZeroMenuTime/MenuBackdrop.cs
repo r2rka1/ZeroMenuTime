@@ -43,6 +43,8 @@ namespace ZeroMenuTime
 
         private static Camera _camera;
         private static bool _loading, _ready;
+        // A raid was started while the interior was still loading: it is let go as soon as it is in.
+        private static bool _released;
         private static float _started;
 
         /// <summary>For testing: hold the view at one spot.</summary>
@@ -71,6 +73,7 @@ namespace ZeroMenuTime
                 if (!_loading)
                 {
                     _loading = true;
+                    _released = false;
                     Plugin.Instance.StartCoroutine(Prepare());
                 }
                 return;
@@ -147,7 +150,7 @@ namespace ZeroMenuTime
                 }
                 Plugin.Log.LogInfo("Menu backdrop: " + loading.Result);
             }
-            if (GamePlayerOwner.MyPlayer != null)
+            if (GamePlayerOwner.MyPlayer != null || _released)
             {
                 _loading = false;
                 yield break;
@@ -262,8 +265,14 @@ namespace ZeroMenuTime
                 UnityEngine.Object.Destroy(_camera.gameObject);
                 _camera = null;
             }
+            _released = true;
             try
             {
+                // Continue can be chosen before the interior has finished loading for the menu.
+                while (HideoutBunker.Loading)
+                {
+                    await System.Threading.Tasks.Task.Yield();
+                }
                 HideoutStations.Clear();
                 if (HideoutBunker.Loaded)
                 {

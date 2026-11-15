@@ -25,6 +25,8 @@ public sealed class SaveRequest : IRequestData
     public bool Consume { get; set; }
     /// <summary>For "trader": the trader's extract the player chose "Save and go to menu" at.</summary>
     public string Exit { get; set; } = "";
+    /// <summary>For the testing route "travel": the map (Vagabond's name) to continue on.</summary>
+    public string Map { get; set; } = "";
 }
 
 public sealed class SaveResponse
@@ -130,6 +132,21 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+    /// <summary>Testing aid: the next raid starts on this map, at this extract or transit.</summary>
+    public SaveResponse Travel(MongoId sessionId, SaveRequest request)
+    {
+        try
+        {
+            TellVagabondExit(sessionId.ToString(), request.Map, request.Exit);
+            Console.WriteLine("[ZeroMenuTime] Test travel: next raid on " + request.Map + " at " + request.Exit);
+            return new SaveResponse { Ok = true, Exit = request.Exit };
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.Message };
+        }
+    }
+
     private static void TellVagabondExit(string sessionId, string map, string exit)
     {
         var state = Vagabond.Common.Api.Api.GetState(sessionId);

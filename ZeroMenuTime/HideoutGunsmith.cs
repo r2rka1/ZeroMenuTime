@@ -296,6 +296,7 @@ namespace ZeroMenuTime
     {
         protected override System.Reflection.MethodBase GetTargetMethod()
         {
+            // Without UI Fixes there is nothing to lift; Plugin skips a patch whose target is missing.
             var plugin = HarmonyLib.AccessTools.TypeByName("UIFixes.Plugin");
             return plugin != null ? HarmonyLib.AccessTools.Method(plugin, "InRaid") : null;
         }

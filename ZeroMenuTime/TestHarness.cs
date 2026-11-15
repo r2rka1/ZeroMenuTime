@@ -235,7 +235,7 @@ namespace ZeroMenuTime
                 yield return Seamless.AfterMenuShown();
                 yield break;
             }
-            if (player == null && verb != "wait")
+            if (player == null && verb != "wait" && verb != "post")
             {
                 Report("not in a raid");
                 yield break;
@@ -960,6 +960,128 @@ namespace ZeroMenuTime
                     }
                     break;
                 }
+                case "frame":
+                {
+                    // frame trader NAME DIST [TURN] | frame hideout N DIST [TURN] | frame point X Y Z YAW DIST [TURN]:
+                    // stand about DIST metres off a door, on the ground, with a clear view of it, look at it
+                    // and take a clean picture. TURN (degrees) starts the search off to one side.
+                    Vector3 target = Vector3.zero;
+                    float yaw = 0f;
+                    int at = 0;
+                    bool known = false;
+                    string kind = parts.Length > 1 ? parts[1].ToLowerInvariant() : "";
+                    if (kind == "trader" && parts.Length > 3)
+                    {
+                        foreach (var room in TraderRoom.Rooms)
+                        {
+                            if (room.OutsideDoor != null && TraderConfig.NameOf(room.TraderId).ToLowerInvariant().StartsWith(parts[2].ToLowerInvariant()))
+                            {
+                                target = room.OutsideDoor.transform.position;
+                                yaw = room.OutsideDoor.transform.eulerAngles.y;
+                                known = true;
+                                break;
+                            }
+                        }
+                        at = 3;
+                    }
+                    else if (kind == "hideout" && parts.Length > 3)
+                    {
+                        int wanted = (int)Number(parts[2]), index = 0;
+                        foreach (var front in HideoutDoors.Fronts.Values)
+                        {
+                            if (index++ == wanted)
+                            {
+                                target = front.Key + Vector3.up * 1.0f;
+                                yaw = front.Value;
+                                known = true;
+                            }
+                        }
+                        at = 3;
+                    }
+                    else if (kind == "point" && parts.Length > 6)
+                    {
+                        target = new Vector3(Number(parts[2]), Number(parts[3]), Number(parts[4]));
+                        yaw = Number(parts[5]);
+                        known = true;
+                        at = 6;
+                    }
+                    if (!known)
+                    {
+                        Report("FAILED no such door");
+                        break;
+                    }
+                    float wantedReach = Number(parts[at]);
+                    float turn = parts.Length > at + 1 ? Number(parts[at + 1]) : 0f;
+                    int solid = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain");
+                    bool placed = false;
+                    Vector3 eye = Vector3.zero;
+                    foreach (float share in new[] { 1f, 0.8f, 0.6f, 0.45f, 0.3f })
+                    {
+                        foreach (float side in new[] { 0f, 20f, -20f, 40f, -40f, 60f, -60f, 180f, 160f, -160f, 140f, -140f, 90f, -90f })
+                        {
+                            var direction = Quaternion.Euler(0f, yaw + turn + side, 0f) * Vector3.forward;
+                            var spot = target + direction * (wantedReach * share);
+                            RaycastHit floor;
+                            // Look for ground from just above the door's height first, so roofs and branches are passed by.
+                            var low = new Vector3(spot.x, target.y + 3f, spot.z);
+                            bool ground = Physics.Raycast(low, Vector3.down, out floor, 15f, solid, QueryTriggerInteraction.Ignore)
+                                          || Physics.Raycast(spot + Vector3.up * 25f, Vector3.down, out floor, 45f, solid, QueryTriggerInteraction.Ignore);
+                            if (!ground || floor.point.y < target.y - 10f || floor.point.y > target.y + 12f)
+                            {
+                                continue;
+                            }
+                            var candidate = floor.point + Vector3.up * 1.6f;
+                            var toDoor = target - candidate;
+                            // A clear view up to the door; its own frame does not count.
+                            if (Physics.Linecast(candidate, target - toDoor.normalized * 0.8f, solid, QueryTriggerInteraction.Ignore))
+                            {
+                                continue;
+                            }
+                            player.Teleport(floor.point + Vector3.up * 0.05f, false);
+                            eye = candidate;
+                            placed = true;
+                            Report("standing " + toDoor.magnitude.ToString("F0") + " m off at " + floor.point.ToString("F1") + " (turned " + (turn + side).ToString("F0") + ")");
+                            break;
+                        }
+                        if (placed)
+                        {
+                            break;
+                        }
+                    }
+                    if (!placed)
+                    {
+                        Report("FAILED no clear place to stand");
+                        break;
+                    }
+                    for (int i = 0; i < 8; i++)
+                    {
+                        // Turn again once the player has settled on the ground.
+                        var to = target - (player.Transform.position + Vector3.up * 1.6f);
+                        player.Rotation = new Vector2(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, -Mathf.Asin(Mathf.Clamp(to.normalized.y, -1f, 1f)) * Mathf.Rad2Deg);
+                        yield return new WaitForSecondsRealtime(0.25f);
+                    }
+                    ReportOnScreen(target);
+                    break;
+                }
+                case "body":
+                {
+                    // body hide | body show: the player's own arms and gun, out of pictures.
+                    bool show = parts.Length > 1 && parts[1].ToLowerInvariant() == "show";
+                    int count = 0;
+                    foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+                    {
+                        renderer.forceRenderingOff = !show;
+                        count++;
+                    }
+                    Report((show ? "shown " : "hidden ") + count + " parts of the player");
+                    break;
+                }
+                case "where":
+                {
+                    // where X Y Z: where that point is on the screen now, as fractions from the top left.
+                    ReportOnScreen(new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3])));
+                    break;
+                }
                 case "shot":
                 {
                     // shot X Y Z NAME: stand a couple of metres from a point with a clear view, look at it, take a picture.
@@ -1283,6 +1405,20 @@ namespace ZeroMenuTime
                     Report("FAILED unknown command");
                     break;
             }
+        }
+
+        private static void ReportOnScreen(Vector3 point)
+        {
+            var camera = Camera.main;
+            if (camera == null)
+            {
+                Report("no camera");
+                return;
+            }
+            var screen = camera.WorldToScreenPoint(point);
+            Report("on screen at " + (screen.x / Screen.width).ToString("F3", CultureInfo.InvariantCulture) + " "
+                   + (1f - screen.y / Screen.height).ToString("F3", CultureInfo.InvariantCulture) + (screen.z > 0f ? "" : " (behind)")
+                   + ", " + screen.z.ToString("F0") + " m");
         }
 
         private static float Health(Player player)

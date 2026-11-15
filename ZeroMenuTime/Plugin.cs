@@ -25,6 +25,8 @@ namespace ZeroMenuTime
 {
     [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.1.1")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
+    // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
+    [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource Log;
@@ -82,9 +84,18 @@ namespace ZeroMenuTime
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
                 new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
             };
-            foreach (var patch in _patches)
+            foreach (var patch in _patches.ToArray())
             {
-                patch.Enable();
+                // One patch that cannot be applied (another mod missing or changed) must not stop the rest.
+                try
+                {
+                    patch.Enable();
+                }
+                catch (Exception e)
+                {
+                    _patches.Remove(patch);
+                    Log.LogWarning(patch.GetType().Name + " not applied: " + e.Message);
+                }
             }
             Log.LogInfo("Zero Menu Time loaded (" + BuildStamp + ")");
 
