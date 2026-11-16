@@ -33,6 +33,7 @@ namespace ZeroMenuTime
 
         private static MenuScreen _screen;
         private static GameObject _panel;
+        private static TextMeshProUGUI _font;
         private static TextMeshProUGUI _whereLabel;
         private static float _nextCheck;
         private static bool _working;
@@ -131,6 +132,7 @@ namespace ZeroMenuTime
                     _whereLabel.text = Where;
                 }
                 MenuBackdrop.KeepStockHidden();
+                Guide.Offer(screen, _font);
             }
             catch (Exception e)
             {
@@ -156,6 +158,7 @@ namespace ZeroMenuTime
                 }
             }
             var font = screen._playButton != null ? screen._playButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+            _font = font;
 
             _panel = new GameObject(PanelName, typeof(RectTransform));
             var panel = (RectTransform)_panel.transform;
@@ -206,8 +209,10 @@ namespace ZeroMenuTime
             y -= 66f;
             Item(panel, "Settings", font, new Vector2(left0, y), () => Open(EMenuType.Settings));
             y -= 66f;
+            Item(panel, "Guide", font, new Vector2(left0, y), () => Guide.Open(_screen, _font));
+            y -= 66f;
             Item(panel, "Exit", font, new Vector2(left0, y), () => Open(EMenuType.Exit));
-            Plugin.Log.LogInfo("Main menu built: Continue, Reset, Settings, Exit");
+            Plugin.Log.LogInfo("Main menu built: Continue, Reset, Settings, Guide, Exit");
         }
 
         private static TextMeshProUGUI Text(RectTransform parent, string name, string words, TextMeshProUGUI like, float size, Color colour, Vector2 at, Vector2 box)
@@ -264,6 +269,11 @@ namespace ZeroMenuTime
             item.Label = label;
             item.Bar = bar;
             item.Clicked = onClick;
+        }
+
+        public static void OpenGuide()
+        {
+            Guide.Open(_screen, _font);
         }
 
         private static void Open(EMenuType what)
@@ -331,6 +341,7 @@ namespace ZeroMenuTime
 
         public static void Continue()
         {
+            Guide.Close();
             if (_working || Plugin.Instance == null)
             {
                 return;

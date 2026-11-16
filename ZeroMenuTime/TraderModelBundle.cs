@@ -112,6 +112,20 @@ namespace ZeroMenuTime
             return null;
         }
 
+        /// <summary>The folder of the player's own copy of the 1.0 game, if the trader bundle is there; else null.</summary>
+        public static string FoundAt()
+        {
+            try
+            {
+                string path = ResolvePath();
+                return path == null ? null : Path.GetFullPath(path.Substring(0, path.Length - BundleInGame.Length)).TrimEnd('\\', '/');
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         /// <summary>Where Windows says the game is installed. Read by reflection: the registry is not in this profile's references.</summary>
         private static string InstalledFolder()
         {

@@ -271,6 +271,19 @@ namespace ZeroMenuTime
                 yield return MainMenu.NewGame();
                 yield break;
             }
+            if (verb == "guide")
+            {
+                // guide open | next | back | close | page N | dontshow on|off: the guide over the main menu.
+                string what = parts.Length > 1 ? parts[1] : "";
+                if (what == "open") { MainMenu.OpenGuide(); }
+                else if (what == "next") { Guide.Next(); }
+                else if (what == "back") { Guide.Back(); }
+                else if (what == "close") { Guide.Close(); }
+                else if (what == "page" && parts.Length > 2) { Guide.Go((int)Number(parts[2]) - 1); }
+                else if (what == "dontshow" && parts.Length > 2) { Guide.SetDontShow(parts[2] == "on"); }
+                Report("guide " + (Guide.IsOpen ? "open at page " + Guide.PageNumber : "closed") + "; shown at start: " + Guide.Show.Value + "; when you die: " + Death.OnDeath.Value);
+                yield break;
+            }
             if (player == null && verb == "screenshot")
             {
                 yield return new WaitForEndOfFrame();

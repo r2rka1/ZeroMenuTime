@@ -25,6 +25,8 @@ Copy-Item "$root\ZeroMenuTime.Server\bin\Release\ZeroMenuTime.Server.dll" $serve
 # The rooms are built in Unity, separately (see Unity\TraderRooms\README.md).
 $rooms = "$root\Unity\TraderRooms\Build\traderrooms"
 if (Test-Path $rooms) { Copy-Item $rooms $client } else { Write-Warning 'Rooms bundle not built; the zip will give plain rooms.' }
+# The guide's pictures: short loops of the mod in use, shown over the main menu.
+if (Test-Path "$root\guide") { Copy-Item "$root\guide" $client -Recurse } else { Write-Warning 'No guide pictures; the guide will show words only.' }
 Copy-Item "$root\README.md", "$root\LICENSE" $stage
 
 $zip = "$root\dist\ZeroMenuTime-$Version.zip"
