@@ -53,15 +53,70 @@ Needs **[Vagabond](https://sp-mod.com/mod/2642/vagabond)**. Report bugs in the *
 
 ### Where the doors are
 
-| Who | Map | Where |
+Every door is one of the map's own doors. With **[Dynamic Maps](https://sp-mod.com/mod/1431/dynamic-maps)** installed, the doors of the map you are on are also marked on its map (a door with a key; hideout doors in gold).
+
+| Door | Map | Where |
 |---|---|---|
 | Skier | Customs | The trailer door just north of the Crackhouse, between the Crackhouse and the Repair Shop |
 | Hideout | Customs | The ZB-1011 bunker on the east edge, past Warehouse 7: down the stairs, the steel door at the end of the tunnel |
+| Prapor | Streets | First floor of the building by the Beluga restaurant on Primorsky Ave., the grey office door |
+| Fence | Streets | The red door at the end of the alley between the Post Office and Cardinal Bank |
+| Hideout | Streets | Under Prapor's building, the dark red double door at the end of the covered walkway |
+| Ragman | Interchange | Parking garage, section C, below Avokado: the white door in the end wall |
+| Jaeger | Woods | The stone bunker in the rock face between the Lumber mill and the Crash Site |
+| Mechanic | Factory | Basement, by the caged electrical room: the door in the corridor wall |
+| Therapist | Ground Zero | TerraGroup building by the Science Offices, 2nd floor, end of the corridor, next to the big 2 |
+| Peacekeeper | Shoreline | The gate of checkpoint 11, at the west end of the map |
+| Hideout | Shoreline | The red shed next to checkpoint 11, the steel door on its north side |
+| Fence | Lighthouse | The drug lab: the shipping container doors behind the plant tables |
 
-The full list with a picture of every door is in the **[door guide](https://github.com/r2rka1/ZeroMenuTime#where-the-doors-are)**. With Dynamic Maps installed, the doors of the map you are on are marked on its map.
+**Skier, Customs.** The trailer door just north of the Crackhouse, between the Crackhouse and the Repair Shop.
 
 ![Skier, Customs](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/01-skier-customs.jpg)
+
+**Hideout, Customs.** The ZB-1011 bunker on the east edge, past Warehouse 7: down the stairs, the steel door at the end of the tunnel.
+
 ![Hideout, Customs](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/02-hideout-customs.jpg)
+
+**Prapor, Streets.** First floor of the building by the Beluga restaurant on Primorsky Ave., the grey office door.
+
+![Prapor, Streets](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/03-prapor-streets.jpg)
+
+**Fence, Streets.** The red door at the end of the alley between the Post Office and Cardinal Bank.
+
+![Fence, Streets](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/04-fence-streets.jpg)
+
+**Hideout, Streets.** Under Prapor's building, the dark red double door at the end of the covered walkway.
+
+![Hideout, Streets](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/05-hideout-streets.jpg)
+
+**Ragman, Interchange.** Parking garage, section C, below Avokado: the white door in the end wall.
+
+![Ragman, Interchange](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/06-ragman-interchange.jpg)
+
+**Jaeger, Woods.** The stone bunker in the rock face between the Lumber mill and the Crash Site.
+
+![Jaeger, Woods](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/07-jaeger-woods.jpg)
+
+**Mechanic, Factory.** Basement, by the caged electrical room: the door in the corridor wall.
+
+![Mechanic, Factory](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/08-mechanic-factory.jpg)
+
+**Therapist, Ground Zero.** TerraGroup building by the Science Offices, 2nd floor, end of the corridor, next to the big 2.
+
+![Therapist, Ground Zero](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/09-therapist-ground-zero.jpg)
+
+**Peacekeeper, Shoreline.** The gate of checkpoint 11, at the west end of the map.
+
+![Peacekeeper, Shoreline](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/10-peacekeeper-shoreline.jpg)
+
+**Hideout, Shoreline.** The red shed next to checkpoint 11, the steel door on its north side.
+
+![Hideout, Shoreline](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/11-hideout-shoreline.jpg)
+
+**Fence, Lighthouse.** The drug lab: the shipping container doors behind the plant tables.
+
+![Fence, Lighthouse](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/12-fence-lighthouse.jpg)
 
 ### Install
 
