@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 
 namespace ZeroMenuTime
 {
-    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.2.0")]
+    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.2.1")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
     // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
     [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]
@@ -498,8 +498,25 @@ namespace ZeroMenuTime
                         door.Destination = room.Entry;
                         door.DestinationYaw = room.EntryYaw;
                         // Coming back out, the player stands just in front of the door, facing away from it.
-                        room.ExitDoor.Destination = doorGround + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0.05f, 1.0f);
-                        room.ExitDoor.DestinationYaw = doorFacing;
+                        var outside = doorGround + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0.05f, 1.0f);
+                        float outsideYaw = doorFacing;
+                        // The trader's spot is where the player is meant to stand, so it is outside. When
+                        // it lies close by on the other side of the door from the way the door was
+                        // recorded as facing, that record is the wrong way round: come out on the
+                        // spot's side (Jaeger's bunker door and Prapor's office door were such).
+                        var spot = exfil.transform.position;
+                        var behind = doorGround + Quaternion.Euler(0f, doorFacing + 180f, 0f) * new Vector3(0f, 0.05f, 1.0f);
+                        float toFront = Vector2.Distance(new Vector2(outside.x, outside.z), new Vector2(spot.x, spot.z));
+                        float toBehind = Vector2.Distance(new Vector2(behind.x, behind.z), new Vector2(spot.x, spot.z));
+                        if (Mathf.Abs(spot.y - doorGround.y) < 2.5f && toBehind < 6f && toBehind + 0.5f < toFront)
+                        {
+                            outside = behind;
+                            outsideYaw = doorFacing + 180f;
+                            Plugin.Log.LogInfo("Door for " + name + ": the way out is on the trader's side, facing " + (outsideYaw % 360f).ToString("F0"));
+                        }
+                        RoomDoor.KeepClear(ref outside);
+                        room.ExitDoor.Destination = outside;
+                        room.ExitDoor.DestinationYaw = outsideYaw;
                         ground = room.TraderStand;
                         facing = room.TraderYaw;
                     }

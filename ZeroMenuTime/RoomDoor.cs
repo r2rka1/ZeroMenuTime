@@ -335,6 +335,28 @@ namespace ZeroMenuTime
             return door;
         }
 
+        /// <summary>
+        /// Moves a spot where the player is to be put clear of any wall closer than half a metre, so
+        /// they do not arrive with their face, or half their body, in one.
+        /// </summary>
+        public static void KeepClear(ref Vector3 feet)
+        {
+            int solid = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain");
+            const float Room = 0.5f;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                for (int i = 0; i < 16; i++)
+                {
+                    var way = Quaternion.Euler(0f, i * 22.5f, 0f) * Vector3.forward;
+                    RaycastHit hit;
+                    if (Physics.Raycast(feet + Vector3.up * 1.2f, way, out hit, Room, solid, QueryTriggerInteraction.Ignore))
+                    {
+                        feet -= way * (Room - hit.distance);
+                    }
+                }
+            }
+        }
+
         public void Use()
         {
             if (OnUse != null)
