@@ -464,6 +464,23 @@ namespace ZeroMenuTime
                         }
                         Report("moved " + moved + " into the stash");
                     }
+                    else if (what == "add" && parts.Length > 2)
+                    {
+                        // stash add TEMPLATE: a new thing of that kind, made straight into the stash. For tests only.
+                        var made = Comfort.Common.Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), parts[2], null);
+                        var spot = stash.Grids[0].FindLocationForItem(made);
+                        var put = spot == null ? default : ItemManipulator.Add(made, spot, player.InventoryController, false);
+                        if (spot == null || put.Failed)
+                        {
+                            Report("FAILED could not add it: " + (spot == null ? "no room in the stash" : put.Error.ToString()));
+                        }
+                        else
+                        {
+                            put.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                            put.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                            Report("added " + HideoutStations.ItemName(parts[2]) + " to the stash");
+                        }
+                    }
                     else if (what == "sort")
                     {
                         Report(HideoutStash.Sort() ? "stash sorted" : "FAILED stash not sorted");
@@ -1461,6 +1478,41 @@ namespace ZeroMenuTime
                     {
                         Report("  " + point.gameObject.name + " '" + point.Settings.Name + "' status " + point.Status + " active " + point.gameObject.activeInHierarchy
                                + " at " + point.transform.position.ToString("F0"));
+                    }
+                    break;
+                }
+                case "repair":
+                {
+                    // repair WORD [POINTS|window]: the carried thing whose name holds WORD: how worn, which kits would do;
+                    // with POINTS, repaired by that many kit points the way the Repair window does it; with "window", the window is opened.
+                    string named = parts.Length > 1 ? parts[1].Replace('_', ' ') : "";
+                    var worn = LocalTrade.CarriedItems(player).FirstOrDefault(i => i.GetItemComponent<RepairableComponent>() != null
+                                   && i.ShortName.Localized().IndexOf(named, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (worn == null)
+                    {
+                        Report("FAILED nothing repairable carried matches '" + named + "'");
+                        break;
+                    }
+                    var part = worn.GetItemComponent<RepairableComponent>();
+                    var repairs = SPT.Reflection.Utils.ClientAppUtils.GetClientApp().Session.RepairController;
+                    var kinds = repairs.GetSuitableRepairersCollections(worn).ToList();
+                    Report(worn.ShortName.Localized() + " " + part.Durability.ToString("F1") + "/" + part.MaxDurability.ToString("F1") + " of " + part.TemplateDurability
+                           + "; kits that fit: " + (kinds.Count == 0 ? "none" : string.Join(", ", kinds.Select(k => k.LocalizedName + " " + k.GetRepairPoints().ToString("F0") + " pts")))
+                           + "; kits at hand: " + Repairs.KitsAtHand().Count() + "; traders offered: " + repairs.TraderRepairers.Count());
+                    if (parts.Length > 2 && parts[2] == "window")
+                    {
+                        EFT.UI.ItemUiContext.Instance.OpenRepairWindow(repairs, new DefaultItemContext(worn, EItemViewType.Inventory));
+                        Report("repair window asked for");
+                    }
+                    else if (parts.Length > 2 && kinds.Count > 0)
+                    {
+                        var job = kinds[0].RepairItems(new RepairItem(worn.Id, Number(parts[2])), null);
+                        while (!job.IsCompleted)
+                        {
+                            yield return null;
+                        }
+                        Report((job.Result != null && job.Result.Succeed ? "repaired: now " : "FAILED repair (" + (job.Result != null ? job.Result.Error : "no result") + "): now ")
+                               + part.Durability.ToString("F1") + "/" + part.MaxDurability.ToString("F1") + "; kit points left " + kinds[0].GetRepairPoints().ToString("F1"));
                     }
                     break;
                 }

@@ -138,7 +138,15 @@ public class ZeroMenuTimeRouter(
     NewGameService newGame,
     SPTarkov.Server.Core.Services.Commerce.MailSendService mailSend,
     SPTarkov.Server.Core.Helpers.Quest.QuestRewardHelper questRewards,
-    SPTarkov.Server.Core.Routers.EventOutputHolder outputs) : StaticRouter(jsonUtil, [
+    SPTarkov.Server.Core.Routers.EventOutputHolder outputs,
+    SPTarkov.Server.Core.Services.Commerce.RepairService repairService,
+    SPTarkov.Server.Core.Helpers.Ragfair.RepairHelper repairHelper,
+    SPTarkov.Server.Core.Models.Spt.Tables.TemplateTable templates) : StaticRouter(jsonUtil, [
+    new RouteAction<KitRepairRequest>(
+        "/zeromenutime/repair/kit",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(Repairs.ByKit(sessionId, payload, profileHelper, repairService, repairHelper, templates)) ?? "{}")
+    ),
     new RouteAction<TradeReport>(
         "/zeromenutime/trade",
         (_, payload, sessionId, _, _) =>
