@@ -320,9 +320,68 @@ namespace ZeroMenuTime
             // The hall lies on the door's +z side, the steps on its -z side.
             bool fromHall = player.Transform.position.z > door.z;
             // Both sides are on the hall's floor; the first step of the stairs starts just beyond.
-            var to = new Vector3(door.x, HideoutBunker.Moved.y + 0.1f, door.z + (fromHall ? -1.7f : 1.5f));
+            var to = new Vector3(door.x, HideoutBunker.Moved.y + 0.1f, door.z + (fromHall ? -1.1f : 1.1f));
+            float yaw;
+            if (fromHall)
+            {
+                // Beyond the door the walls have nothing to feel for, so this side is set by hand:
+                // clear of the gap in the east wall, facing up the steps.
+                to.x -= 0.45f;
+                yaw = 232f;
+            }
+            else
+            {
+                yaw = StandClear(ref to, door);
+            }
             player.Teleport(to, false);
-            player.Rotation = new Vector2(fromHall ? 180f : 0f, 0f);
+            player.Rotation = new Vector2(yaw, 0f);
+            Plugin.Log.LogInfo("Hideout: through the Security door to " + to.ToString("F1") + " facing " + yaw.ToString("F0"));
+        }
+
+        /// <summary>
+        /// Having stepped through a door, the player must not stand with their face in a wall: the
+        /// spot is moved clear of anything closer than half a metre, and they face the most open
+        /// way that is not back at the door. Returns that way.
+        /// </summary>
+        private static float StandClear(ref Vector3 feet, Vector3 door)
+        {
+            int solid = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain");
+            const float Room = 0.55f;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                for (int i = 0; i < 16; i++)
+                {
+                    var way = Quaternion.Euler(0f, i * 22.5f, 0f) * Vector3.forward;
+                    RaycastHit hit;
+                    if (Physics.Raycast(feet + Vector3.up * 1.5f, way, out hit, Room, solid, QueryTriggerInteraction.Ignore))
+                    {
+                        feet -= way * (Room - hit.distance);
+                    }
+                }
+            }
+            var back = door - feet;
+            back.y = 0f;
+            back.Normalize();
+            float best = -1f, bestYaw = 0f;
+            for (int i = 0; i < 16; i++)
+            {
+                float yaw = i * 22.5f;
+                var way = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+                if (Vector3.Dot(way, back) > 0.3f)
+                {
+                    continue;
+                }
+                RaycastHit hit;
+                float open = Physics.Raycast(feet + Vector3.up * 1.5f, way, out hit, 12f, solid, QueryTriggerInteraction.Ignore) ? hit.distance : 12f;
+                // Straight on from the door is preferred when it is about as open as anything else.
+                open += Vector3.Dot(way, -back) * 0.75f;
+                if (open > best)
+                {
+                    best = open;
+                    bestYaw = yaw;
+                }
+            }
+            return bestYaw;
         }
 
         /// <summary>Brings the interior in now, if it is not there yet, and furnishes the rooms still bare.</summary>
@@ -471,13 +530,35 @@ namespace ZeroMenuTime
                     HideoutBunker.BunkerSettings.ApplySettings();
                 }
 
+                // Coming in, the player stands just inside the door they will leave by, back to it.
                 var arrival = origin + Arrival;
-                // Arriving, the player faces the way they always have: out from the nearest wall.
-                Vector3 wallGround;
-                float exitYaw;
-                if (!RoomDoor.FindWall(arrival, out wallGround, out exitYaw))
+                float exitYaw = ExitDoorYaw;
+                bool byDoor = false;
+                var doorCentre = origin + ExitDoor;
+                int solid = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain");
+                foreach (float side in new[] { 1f, -1f })
                 {
-                    exitYaw = 0f;
+                    float yaw = ExitDoorYaw + (side > 0f ? 0f : 180f);
+                    var spot = doorCentre + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, 0f, 1.1f);
+                    RaycastHit floor;
+                    // Room to stand: open between the door and the spot, and a floor under it.
+                    if (!Physics.Linecast(doorCentre + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, 0f, 0.35f), spot, solid, QueryTriggerInteraction.Ignore)
+                        && Physics.Raycast(spot, Vector3.down, out floor, 3f, solid, QueryTriggerInteraction.Ignore))
+                    {
+                        arrival = floor.point + Vector3.up * 0.05f;
+                        exitYaw = yaw;
+                        byDoor = true;
+                        break;
+                    }
+                }
+                if (!byDoor)
+                {
+                    Vector3 wallGround;
+                    if (!RoomDoor.FindWall(arrival, out wallGround, out exitYaw))
+                    {
+                        exitYaw = 0f;
+                    }
+                    Plugin.Log.LogWarning("Hideout: no room to stand by the exit door; arriving in the hall instead");
                 }
                 // The way out is the closed door at the end of the small room up the steps (the one
                 // the cultists' room lies behind): something to use, laid over that door and not drawn.

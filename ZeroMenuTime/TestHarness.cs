@@ -67,6 +67,57 @@ namespace ZeroMenuTime
             }
         }
 
+        private static Coroutine _film;
+        private static string _filmName = "";
+        private static int _filmFps = 12, _filmWidth = 960, _filmFrames;
+
+        private static void FilmStop()
+        {
+            if (_film != null && Plugin.Instance != null)
+            {
+                Plugin.Instance.StopCoroutine(_film);
+            }
+            _film = null;
+            Time.captureFramerate = 0;
+        }
+
+        /// <summary>Saves each frame once it is fully drawn. The game's clock is tied to the frame rate meanwhile, so motion stays even.</summary>
+        private static IEnumerator Film(string folder)
+        {
+            var wait = new WaitForEndOfFrame();
+            while (true)
+            {
+                yield return wait;
+                Texture2D full = null, small = null;
+                RenderTexture target = null;
+                try
+                {
+                    full = ScreenCapture.CaptureScreenshotAsTexture();
+                    int width = Mathf.Min(_filmWidth, full.width);
+                    int height = Mathf.RoundToInt(full.height * (width / (float)full.width));
+                    target = RenderTexture.GetTemporary(width, height, 0);
+                    Graphics.Blit(full, target);
+                    var previous = RenderTexture.active;
+                    RenderTexture.active = target;
+                    small = new Texture2D(width, height, TextureFormat.RGB24, false);
+                    small.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    small.Apply();
+                    RenderTexture.active = previous;
+                    File.WriteAllBytes(Path.Combine(folder, (++_filmFrames).ToString("D5") + ".jpg"), small.EncodeToJPG(88));
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning("Film frame failed: " + e.Message);
+                }
+                finally
+                {
+                    if (full != null) UnityEngine.Object.Destroy(full);
+                    if (small != null) UnityEngine.Object.Destroy(small);
+                    if (target != null) RenderTexture.ReleaseTemporary(target);
+                }
+            }
+        }
+
         public static void Report(string text)
         {
             try
@@ -1087,6 +1138,199 @@ namespace ZeroMenuTime
                         count++;
                     }
                     Report((show ? "shown " : "hidden ") + count + " parts of the player");
+                    break;
+                }
+                case "film":
+                {
+                    // film start NAME [FPS] [WIDTH] | film stop: saves every frame as the screen shows it,
+                    // interface and all, to test/film/NAME, while other commands go on.
+                    if (parts.Length > 2 && parts[1] == "start")
+                    {
+                        FilmStop();
+                        _filmName = parts[2];
+                        _filmFps = parts.Length > 3 ? (int)Number(parts[3]) : 12;
+                        _filmWidth = parts.Length > 4 ? (int)Number(parts[4]) : 960;
+                        _filmFrames = 0;
+                        string folder = Path.Combine(Dir, "film", _filmName);
+                        if (Directory.Exists(folder))
+                        {
+                            Directory.Delete(folder, true);
+                        }
+                        Directory.CreateDirectory(folder);
+                        Time.captureFramerate = _filmFps;
+                        _film = Plugin.Instance.StartCoroutine(Film(folder));
+                        Report("filming " + _filmName + " at " + _filmFps + " frames a second");
+                    }
+                    else
+                    {
+                        Report("film " + _filmName + " stopped: " + _filmFrames + " frame(s)");
+                        FilmStop();
+                    }
+                    break;
+                }
+                case "walk":
+                {
+                    // walk X Y Z [SECONDS]: really walk to a point, turning towards it, as a player would.
+                    var goal = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+                    float until = Time.time + (parts.Length > 4 ? Number(parts[4]) : 12f);
+                    float left = 99f;
+                    while (Time.time < until)
+                    {
+                        var to = goal - player.Transform.position;
+                        to.y = 0f;
+                        left = to.magnitude;
+                        if (left < 0.35f)
+                        {
+                            break;
+                        }
+                        float want = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+                        var now = player.Rotation;
+                        float yaw = Mathf.MoveTowardsAngle(now.x, want, 200f * Time.deltaTime);
+                        player.Rotation = new Vector2(yaw, Mathf.MoveTowards(now.y, 0f, 60f * Time.deltaTime));
+                        // Only step off once roughly facing the way to go.
+                        player.Move(Mathf.Abs(Mathf.DeltaAngle(yaw, want)) < 35f ? new Vector2(0f, 1f) : Vector2.zero);
+                        yield return null;
+                    }
+                    player.Move(Vector2.zero);
+                    Report((left < 0.35f ? "walked to " : "FAILED walk stopped " + left.ToString("F1") + " m short of ") + goal.ToString("F1")
+                           + ", now at " + player.Transform.position.ToString("F1"));
+                    break;
+                }
+                case "turn":
+                {
+                    // turn YAW PITCH [SECONDS]: look round smoothly.
+                    float wantYaw = Number(parts[1]), wantPitch = parts.Length > 2 ? Number(parts[2]) : 0f;
+                    float seconds = parts.Length > 3 ? Number(parts[3]) : 1f;
+                    var from = player.Rotation;
+                    for (float t = 0f; t < seconds; t += Time.deltaTime)
+                    {
+                        float k = Mathf.SmoothStep(0f, 1f, t / seconds);
+                        player.Rotation = new Vector2(Mathf.LerpAngle(from.x, wantYaw, k), Mathf.Lerp(from.y, wantPitch, k));
+                        yield return null;
+                    }
+                    player.Rotation = new Vector2(wantYaw, wantPitch);
+                    break;
+                }
+                case "act":
+                {
+                    // act [N]: the Nth action (first by default) the game offers for the thing looked at.
+                    var seenNow = player.InteractableObject;
+                    if (seenNow == null)
+                    {
+                        Report("FAILED nothing offered");
+                        break;
+                    }
+                    var offered = InteractionContextHelper.GetAvailableActions(player.GetComponent<GamePlayerOwner>(), seenNow);
+                    int which = parts.Length > 1 ? (int)Number(parts[1]) - 1 : 0;
+                    if (offered == null || offered.Actions.Count <= which || offered.Actions[which].Disabled)
+                    {
+                        Report("FAILED no such action on " + seenNow.name);
+                        break;
+                    }
+                    Report("doing '" + offered.Actions[which].Name + "' on " + seenNow.name + " (offered: "
+                           + string.Join(", ", offered.Actions.Select(x => x.Name)) + ")");
+                    offered.Actions[which].Action();
+                    break;
+                }
+                case "turnto":
+                {
+                    // turnto X Y Z [SECONDS]: look smoothly at a point.
+                    var point = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+                    float time = parts.Length > 4 ? Number(parts[4]) : 0.8f;
+                    var view = Camera.main;
+                    var eyes = view != null ? view.transform.position : player.Transform.position + Vector3.up * 1.55f;
+                    var way = point - eyes;
+                    float toYaw = Mathf.Atan2(way.x, way.z) * Mathf.Rad2Deg;
+                    float toPitch = -Mathf.Atan2(way.y, new Vector2(way.x, way.z).magnitude) * Mathf.Rad2Deg;
+                    var start = player.Rotation;
+                    for (float t = 0f; t < time; t += Time.deltaTime)
+                    {
+                        float k = Mathf.SmoothStep(0f, 1f, t / time);
+                        player.Rotation = new Vector2(Mathf.LerpAngle(start.x, toYaw, k), Mathf.Lerp(start.y, toPitch, k));
+                        yield return null;
+                    }
+                    player.Rotation = new Vector2(toYaw, toPitch);
+                    break;
+                }
+                case "trade":
+                {
+                    // trade open | trade close | trade list [WORD] | trade buy WORD [COUNT]: the trade screen of the
+                    // room's trader, and a purchase made the way the screen makes it: select, pay from carried money, deal.
+                    var roomNow = RoomHolding(player.Transform.position);
+                    string what = parts.Length > 1 ? parts[1] : "";
+                    if (what == "close")
+                    {
+                        if (TradeOpener.Screen != null)
+                        {
+                            TradeOpener.Screen.CloseScreen();
+                        }
+                        Report("trade screen closed");
+                        break;
+                    }
+                    if (roomNow == null)
+                    {
+                        Report("FAILED not in a trader's room");
+                        break;
+                    }
+                    if (what == "open")
+                    {
+                        TradeOpener.Open(roomNow.TraderId, TraderConfig.NameOf(roomNow.TraderId));
+                        yield return new WaitForSecondsRealtime(1.5f);
+                        Report(TradeOpener.Screen != null ? "trade screen open" : "FAILED trade screen did not open");
+                        break;
+                    }
+                    var dealer = SPT.Reflection.Utils.ClientAppUtils.GetClientApp().Session.GetTrader(roomNow.TraderId);
+                    var goods = dealer?.CurrentAssortment;
+                    if (goods == null)
+                    {
+                        Report("FAILED the trader's goods are not loaded; trade open first");
+                        break;
+                    }
+                    var onSale = ((CompoundItem)goods.TraderController.RootItem).Grids.SelectMany(g => g.Items).ToList();
+                    string word = parts.Length > 2 ? parts[2].Replace('_', ' ') : "";
+                    var matching = onSale.Where(i => i.ShortName.Localized().IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0
+                                                     || i.TemplateId.ToString() == word).ToList();
+                    if (what == "list")
+                    {
+                        Report(onSale.Count + " on sale; matching: " + string.Join(", ", matching.Take(40).Select(i => i.ShortName.Localized())));
+                        break;
+                    }
+                    if (what != "buy" || matching.Count == 0)
+                    {
+                        Report("FAILED nothing on sale matches '" + word + "'");
+                        break;
+                    }
+                    goods.SelectItem(matching[0]);
+                    goods.CurrentQuantity = parts.Length > 3 ? (int)Number(parts[3]) : 1;
+                    yield return new WaitForSecondsRealtime(1.2f);
+                    foreach (var need in goods.CurrentRequisites)
+                    {
+                        foreach (var carried in LocalTrade.CarriedItems(player))
+                        {
+                            if (need.Enough)
+                            {
+                                break;
+                            }
+                            if (need.IsRequired(carried))
+                            {
+                                need.PrepareItem(carried);
+                            }
+                        }
+                    }
+                    yield return new WaitForSecondsRealtime(1.2f);
+                    if (!goods.IsValid)
+                    {
+                        Report("FAILED cannot pay for " + matching[0].ShortName.Localized() + ": needs "
+                               + string.Join(", ", goods.CurrentRequisites.Select(r => r.RequiredItemsCount + " x " + r.RequiredItem.ShortName.Localized())));
+                        break;
+                    }
+                    var deal = goods.Purchase();
+                    while (!deal.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report((deal.Result != null && deal.Result.Succeed ? "bought " : "FAILED buying ") + matching[0].ShortName.Localized()
+                           + (deal.Result != null && !deal.Result.Succeed ? ": " + deal.Result.Error : ""));
                     break;
                 }
                 case "traderbundle":

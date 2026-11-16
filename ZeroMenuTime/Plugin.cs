@@ -285,6 +285,9 @@ namespace ZeroMenuTime
     /// <summary>Opens the normal trader screen while in a raid.</summary>
     public static class TradeOpener
     {
+        /// <summary>The trade screen that is open now, if any.</summary>
+        public static TraderScreensGroup.TraderScreenController Screen;
+
         public static void Open(string traderId, string traderName)
         {
             try
@@ -347,6 +350,7 @@ namespace ZeroMenuTime
                 {
                     LocalTrade.Active = false;
                     LocalTrade.ForgetPackView();
+                    Screen = null;
                     if (lentStash)
                     {
                         inventory.Stash = null;
@@ -358,6 +362,7 @@ namespace ZeroMenuTime
                     Plugin.Log.LogInfo("Closed " + traderName);
                     QuestSync.Send("trader closed");
                 };
+                Screen = controller;
                 controller.ShowScreen(EScreenState.Queued);
                 TraderModelBundle.Speak(traderId, player.Position);
             }

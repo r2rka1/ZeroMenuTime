@@ -9,3 +9,6 @@ temp/
 
 # SPT launcher files written when testing from this folder
 /user/
+
+# The private dev kit lives in its own repository
+/devkit/
