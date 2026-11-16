@@ -32,6 +32,19 @@ namespace ZeroMenuTime
         public const string Ragman = "5ac3b934156ae10c4430e83c";
         public const string Jaeger = "5c0647fdd443bc2504c2d371";
 
+        /// <summary>The id of the trader whose name holds the word, or the word itself.</summary>
+        public static string IdOf(string word)
+        {
+            foreach (string id in new[] { Prapor, Therapist, Fence, Skier, Peacekeeper, Mechanic, Ragman, Jaeger })
+            {
+                if (NameOf(id).IndexOf(word, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return id;
+                }
+            }
+            return word;
+        }
+
         public static string NameOf(string traderId)
         {
             switch (traderId)

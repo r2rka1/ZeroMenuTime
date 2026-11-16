@@ -359,6 +359,7 @@ namespace ZeroMenuTime
                     QuestSync.Send("trader closed");
                 };
                 controller.ShowScreen(EScreenState.Queued);
+                TraderModelBundle.Speak(traderId, player.Position);
             }
             catch (Exception e)
             {

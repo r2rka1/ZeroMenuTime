@@ -1089,6 +1089,22 @@ namespace ZeroMenuTime
                     Report((show ? "shown " : "hidden ") + count + " parts of the player");
                     break;
                 }
+                case "traderbundle":
+                    // traderbundle [again]: what the 1.0 game's trader bundle gave; "again" opens it afresh.
+                    if (parts.Length > 1 && parts[1] == "again")
+                    {
+                        TraderModelBundle.Forget();
+                    }
+                    Report(TraderModelBundle.Report());
+                    break;
+                case "say":
+                {
+                    // say WORD [greeting]: the trader whose name holds WORD speaks.
+                    string who = TraderConfig.IdOf(parts[1]);
+                    TraderModelBundle.Speak(who, player.Position, parts.Length > 2);
+                    Report("asked " + parts[1] + " (" + who + ") to speak");
+                    break;
+                }
                 case "where":
                 {
                     // where X Y Z: where that point is on the screen now, as fractions from the top left.
