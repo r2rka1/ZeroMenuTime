@@ -6,3 +6,6 @@ dist/
 # Game screenshots: BSG imagery, for the mod page only, never in the repository.
 media/
 temp/
+
+# SPT launcher files written when testing from this folder
+/user/
