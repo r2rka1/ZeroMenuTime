@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 
 namespace ZeroMenuTime
 {
-    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.1.4")]
+    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.2.0")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
     // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
     [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>ZeroMenuTime.Server</AssemblyName>
-    <Version>1.1.4</Version>
+    <Version>1.2.0</Version>
     <RootNamespace>ZeroMenuTime.Server</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -13,9 +13,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- The SPT copy of the game. Override with: dotnet build -p:TarkovDir=X:\path\ -->
-    <TarkovDir Condition=" '$(TarkovDir)' == '' ">F:\SPT\</TarkovDir>
-    <SptRuntime>$(TarkovDir)SPT_Runtime\</SptRuntime>
+    <!-- The SPT copy of the game. Override with: dotnet build -p:GameDir=X:\path\ -->
+    <GameDir Condition=" '$(GameDir)' == '' ">F:\SPT\</GameDir>
+    <SptRuntime>$(GameDir)SPT_Runtime\</SptRuntime>
   </PropertyGroup>
 
   <ItemDefinitionGroup>

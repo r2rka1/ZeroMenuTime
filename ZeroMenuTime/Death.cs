@@ -24,7 +24,7 @@ namespace ZeroMenuTime
             /// <summary>The save is put back as it was, gear and all.</summary>
             KeepItems,
             /// <summary>The save is put back, but the gear is what the game leaves after a death.</summary>
-            LoseGearLikeTarkov,
+            LoseCarriedGear,
             /// <summary>As above, and the secure container is emptied too.</summary>
             LoseEverything,
         }
@@ -33,7 +33,7 @@ namespace ZeroMenuTime
 
         private static string ModeName(Loss loss)
         {
-            return loss == Loss.LoseEverything ? "everything" : loss == Loss.LoseGearLikeTarkov ? "tarkov" : "keep";
+            return loss == Loss.LoseEverything ? "everything" : loss == Loss.LoseCarriedGear ? "tarkov" : "keep";
         }
 
         /// <summary>Tells the server what a death takes; it applies that when the raid ends.</summary>
@@ -65,7 +65,7 @@ namespace ZeroMenuTime
                 "After dying, ask whether to continue at the hideout or where you died, instead of being moved automatically.");
             OnDeath = config.Bind("Death", "When you die", Loss.KeepItems,
                 "What a death takes. KeepItems: your last save is put back with the gear you had then. "
-                + "LoseGearLikeTarkov: the save is put back, but what you wore and carried is lost (the secure container is kept, insurance works). "
+                + "LoseCarriedGear: the save is put back, but what you wore and carried is lost (the secure container is kept, insurance works). "
                 + "LoseEverything: the same, and the secure container is emptied too. Gear kept in the hideout is never lost.");
             OnDeath.SettingChanged += (_, __) => SendMode();
         }
@@ -136,7 +136,7 @@ namespace ZeroMenuTime
         {
             switch (OnDeath.Value)
             {
-                case Loss.LoseGearLikeTarkov:
+                case Loss.LoseCarriedGear:
                     return ", but the gear you carried is lost";
                 case Loss.LoseEverything:
                     return ", but everything you carried is lost, the secure container too";

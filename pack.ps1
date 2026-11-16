@@ -1,17 +1,17 @@
 # Builds both halves of the mod and makes a zip that unpacks straight into the SPT game folder.
-# Usage:  .\pack.ps1 [-TarkovDir F:\SPT\] [-Version 1.1.4]
+# Usage:  .\pack.ps1 [-GameDir F:\SPT\] [-Version 1.2.0]
 param(
-    [string]$TarkovDir = 'F:\SPT\',
-    [string]$Version = '1.1.4'
+    [string]$GameDir = 'F:\SPT\',
+    [string]$Version = '1.2.0'
 )
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-if (-not $TarkovDir.EndsWith('\')) { $TarkovDir += '\' }
+if (-not $GameDir.EndsWith('\')) { $GameDir += '\' }
 
-dotnet build "$root\ZeroMenuTime\ZeroMenuTime.csproj" -c Release -nologo -v q "-p:TarkovDir=$TarkovDir"
+dotnet build "$root\ZeroMenuTime\ZeroMenuTime.csproj" -c Release -nologo -v q "-p:GameDir=$GameDir"
 if ($LASTEXITCODE -ne 0) { throw 'Client build failed' }
-dotnet build "$root\ZeroMenuTime.Server\ZeroMenuTime.Server.csproj" -c Release -nologo -v q "-p:TarkovDir=$TarkovDir"
+dotnet build "$root\ZeroMenuTime.Server\ZeroMenuTime.Server.csproj" -c Release -nologo -v q "-p:GameDir=$GameDir"
 if ($LASTEXITCODE -ne 0) { throw 'Server build failed' }
 
 $stage = "$root\dist\ZeroMenuTime-$Version"

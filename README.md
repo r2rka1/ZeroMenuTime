@@ -4,6 +4,11 @@
 
 Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.com/mod/2642/vagabond)** (the open-world mod), which provides where traders stand and how maps connect.
 
+| | |
+|---|---|
+| ![Walking into a trader's room and opening trade](docs/preview/trader.gif) | ![Buying, and taking the purchase from the table](docs/preview/table.gif) |
+| ![Entering the hideout from the map](docs/preview/hideout.gif) | ![Building a station in the hideout](docs/preview/build.gif) |
+
 ![The main menu](docs/screenshots/main-menu.jpg)
 
 | | |
@@ -20,6 +25,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - Every trader has a **door** at their spot on the map. Through it is the trader's **own room**, furnished in their style (Prapor's armoury, Therapist's clinic, Skier's den, Jaeger's cabin, ...). Bots cannot follow you in.
 - Inside, talk to the trader: **Trade**, **Collect deliveries**, **Save and go to menu**.
 - Trades are paid from what you carry, and what you buy is **laid on the trader's table**, to pick up by hand. The stash is not involved.
+- You can **sell what you wear** as well as what you carry: a slung rifle, a holstered pistol, a helmet, armour. It comes off you when sold. A pack, rig or case is only offered once it is empty, the secure container never, and the weapon in your hands is left out.
 - **Quests** are accepted and handed in at the trader. Items a quest gives when you accept it, and the **reward items** when you hand it in, are **laid on the table** in front of you; experience and standing follow when the raid ends.
 - Mail from traders (quest rewards, insurance returns) waits **on the table**. Anything you leave there is still there next time.
 - If you own the 1.0 game, the traders are their **real models** and **speak a line** when you start to trade. See [Real trader models and voices](#real-trader-models-and-voices).
@@ -35,20 +41,22 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - **Bitcoin farm**, **Water Collector** with filters, **Solar Power**, **Scav Case**, **Cultist Circle**, **Gym** workouts, **Shooting Range** controls.
 - **Weapon modding** at the Workbench with the game's own modding screen, vital parts included, using parts from your gear and the stash.
 - **Weapon Stand, Place of Fame, Equipment Stand** hold and display what you put on them.
-- **Stash** in the hideout. Things sent between maps by the BTR driver arrive there.
-- While you are inside, the hideout's stations **heal and feed you** at the game's own bonus rates, and every bot on the map is paused.
+- **Stash** in the hideout, with a **Sort stash** choice on the Stash station. Things sent between maps by the BTR driver arrive there.
+- **Repair kits** work on what you carry: right-click a weapon or armour piece and choose **Repair** for the game's own repair window. The kits counted are those you carry, and those in the stash while you are in the hideout. As in the menus, weapons need the Workbench built and armour the Lavatory. Traders do not repair yet.
+- While you are inside, the hideout's stations **heal and feed you** at the game's own bonus rates, and every bot on the map is paused. The map's outdoor sounds are hushed down there, and the game's own **Hideout volume** setting applies.
 
 ### Time, sleep and saving
 
 - **One world clock**. The time of day carries on from raid to raid, and **raids have no time limit**.
 - **Sleep** at the Rest Space: the clock jumps, you heal, and you get hungry and thirsty as if the hours had passed.
 - **Save** at the bed (sleeping saves too), or with **Save and go to menu** at a trader. If you die, your **last save** is put back: you wake at your bed, or continue at the trader you saved at, with the gear, health, skills, quests, hideout and clock of that save. If the game stops mid-raid after a bed save, you wake at your bed.
-- Want deaths to hurt? Set **When you die** to lose the gear you carried (like Tarkov: the secure container is kept) or everything, the secure container too. The save still puts back skills, quests, the hideout and the clock; what you keep in the hideout is never lost.
+- Want deaths to hurt? Set **When you die** to lose the gear you carried (the secure container is kept) or everything, the secure container too. The save still puts back skills, quests, the hideout and the clock; what you keep in the hideout is never lost.
 
 ### A menu of its own
 
-- The main menu is **Continue / Reset / Settings / Exit** over a live view of your own hideout. Under Continue it says where and when you will pick up.
+- The main menu is **Continue / Reset / Settings / Guide / Exit** over a live view of your own hideout. Under Continue it says where and when you will pick up.
 - **Continue** starts a raid where your character is.
+- A **guide** in ten short steps opens when the game starts: where the first trader is, trading, the hideout, building, crafting, repairs, the real trader models, and a choice of what a death takes. Tick **Don't show again** to switch it off; **Guide** in the menu opens it at any time.
 - A **new character** gets the same start as Reset, without asking.
 - **Reset** starts over, keeping a backup of the old character: you wake in the hideout by its Customs door with a pistol and three magazines, soft armour, a rig, a backpack, medicine, water, food, and the Alpha container with 30,000 roubles.
 - Result screens after a raid are skipped and the next raid starts by itself (hold Backspace to stay in the menu).
@@ -128,7 +136,7 @@ Peacekeeper has no model or voice of this kind in the 1.0 game and stays a stand
 ## Install
 
 1. Install SPT 4.1.6 and Vagabond first, and start the game once with Vagabond.
-2. Extract the Zero Menu Time zip **into your SPT folder** (the one with `EscapeFromTarkov.exe`). It adds:
+2. Extract the Zero Menu Time zip **into your SPT folder** (the one that holds the game's `.exe`). It adds:
    - `BepInEx/plugins/ZeroMenuTime/` (client)
    - `SPT_Runtime/user/mods/ZeroMenuTime/` (server)
 
@@ -185,6 +193,8 @@ Press **F12** in game and open **r2rka1-ZeroMenuTime**.
 | General | Show trader figures | on | Stand a figure for each trader |
 | General | Show trader markers | on | Show a box at a trader spot until its figure has loaded |
 | General | Also use traders.json spots | off | Add hand-placed trader spots on top of Vagabond's |
+| General | Show the guide at start | on | Show the guide over the main menu when the game starts |
+| General | Remove the hideout exits of Vagabond | on | Switch off Vagabond's own exits to its menu hideout, which serve no purpose with this mod's hideout |
 | General | Capture position key | F10 | Write your position to `captured_positions.txt`, for placing doors and spots |
 | Trader rooms | Put traders in rooms | on | Off: traders stand in the open and deliveries go straight into your gear |
 | Trader rooms | Furnish rooms from the game | on | Off: plain rooms |
@@ -197,7 +207,7 @@ Press **F12** in game and open **r2rka1-ZeroMenuTime**.
 | No menus | Seconds before continuing | 4 | Countdown in the main menu |
 | No menus | Stay in menu key | Backspace | Hold during the countdown to stay in the menu |
 | Death | Ask where to continue | on | Without a save, ask whether to continue at the hideout or where you died |
-| Death | When you die | KeepItems | KeepItems: the save is put back with its gear. LoseGearLikeTarkov: what you carried is lost, the secure container is kept. LoseEverything: the secure container is emptied too |
+| Death | When you die | KeepItems | KeepItems: the save is put back with its gear. LoseCarriedGear: what you carried is lost, the secure container is kept. LoseEverything: the secure container is emptied too |
 | Metabolism | Slow hunger and thirst as they empty | on | Food and water drain more slowly as they run low |
 | Pictures | Take a picture key | F11 | Save the view without the interface to `BepInEx/plugins/ZeroMenuTime/screenshots` |
 | Pictures | Hide the interface key | F9 | Hide the interface until pressed again |
@@ -235,8 +245,8 @@ Hideout doors can be moved the same way in `hideouts.json`.
 Needs the .NET 10 SDK and an SPT 4.1.6 install to reference.
 
 ```
-dotnet build ZeroMenuTime/ZeroMenuTime.csproj -c Release -p:TarkovDir=C:\path\to\SPT\
-dotnet build ZeroMenuTime.Server/ZeroMenuTime.Server.csproj -c Release -p:TarkovDir=C:\path\to\SPT\
+dotnet build ZeroMenuTime/ZeroMenuTime.csproj -c Release -p:GameDir=C:\path\to\SPT\
+dotnet build ZeroMenuTime.Server/ZeroMenuTime.Server.csproj -c Release -p:GameDir=C:\path\to\SPT\
 ```
 
 - The server project references `Vagabond.Common.dll` from the Vagabond server mod folder.
