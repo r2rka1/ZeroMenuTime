@@ -173,7 +173,7 @@ namespace ZeroMenuTime
                 TableTop = origin + new Vector3(tableCentre.x, TableHeight, tableCentre.z),
                 TableSize = new Vector2(0.8f, 1.6f),
             };
-            room.ExitDoor = RoomDoor.Spawn("Leave", origin + new Vector3(0f, RoomDoor.Height / 2f, -Length / 2f + RoomDoor.Thickness / 2f), 0f);
+            room.ExitDoor = RoomDoor.Spawn("Leave the room", origin + new Vector3(0f, RoomDoor.Height / 2f, -Length / 2f + RoomDoor.Thickness / 2f), 0f);
             Rooms.Add(room);
             Plugin.Log.LogInfo("Room for " + traderName + " built at " + origin.ToString("F1"));
             return room;
@@ -371,7 +371,7 @@ namespace ZeroMenuTime
                 TableSize = new Vector2(0.8f, 1.6f),
                 TableSlots = slots.Count > 0 ? slots : null,
             };
-            room.ExitDoor = RoomDoor.Attach(exit.gameObject, "Leave");
+            room.ExitDoor = RoomDoor.Attach(exit.gameObject, "Leave the room");
             Rooms.Add(room);
             Plugin.Log.LogInfo("Room for " + traderName + " placed from the bundle at " + origin.ToString("F1") + " with " + slots.Count + " table slots");
             return room;

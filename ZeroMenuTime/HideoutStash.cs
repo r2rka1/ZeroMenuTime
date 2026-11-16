@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Comfort.Common;
 using EFT;
+using EFT.Communications;
 using EFT.InventoryLogic;
 using JsonType;
 using Newtonsoft.Json.Linq;
@@ -96,6 +97,62 @@ namespace ZeroMenuTime
             owner.ShowInventoryScreenLoot(_stash, () => Send("closed"), false);
             Plugin.Log.LogInfo("Stash of hideout '" + _hideout + "' opened");
             return true;
+        }
+
+        private static readonly HashSet<System.Reflection.MethodBase> SortAllowed = new HashSet<System.Reflection.MethodBase>();
+
+        /// <summary>
+        /// In a raid the game sorts nothing. Its check is given one exception, this hideout's stash,
+        /// and is otherwise left to answer as it always has.
+        /// </summary>
+        private static void AllowSorting(InventoryController controller)
+        {
+            var check = controller.GetType().GetMethod("IsAllowedToSort", new[] { typeof(CompoundItem) });
+            if (check == null || !SortAllowed.Add(check))
+            {
+                return;
+            }
+            new HarmonyLib.Harmony("com.r2rka1.zeromenutime.stashsort").Patch(check,
+                postfix: new HarmonyLib.HarmonyMethod(typeof(HideoutStash).GetMethod(nameof(SortCheck), System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)));
+        }
+
+        private static void SortCheck(CompoundItem item, ref bool __result)
+        {
+            if (item != null && item == _stash)
+            {
+                __result = true;
+            }
+        }
+
+        /// <summary>Packs the stash tight, the way the Sort button of the old stash screen did.</summary>
+        public static bool Sort()
+        {
+            try
+            {
+                var player = GamePlayerOwner.MyPlayer;
+                if (_stash == null || player == null)
+                {
+                    return false;
+                }
+                AllowSorting(player.InventoryController);
+                var sorted = ItemManipulator.Sort(_stash, player.InventoryController, false);
+                if (sorted.Failed)
+                {
+                    Plugin.Log.LogWarning("Stash not sorted: " + sorted.Error);
+                    NotificationManager.DisplayWarningNotification("The stash could not be sorted.");
+                    return false;
+                }
+                sorted.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                sorted.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                NotificationManager.DisplayMessageNotification("Stash sorted.");
+                Send("sorted");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Sorting the stash failed: " + e);
+                return false;
+            }
         }
 
         /// <summary>Tells the server what the stash holds now.</summary>

@@ -30,6 +30,32 @@ namespace ZeroMenuTime
             EquipmentSlot.Backpack, EquipmentSlot.TacticalVest, EquipmentSlot.Pockets, EquipmentSlot.SecuredContainer,
         };
 
+        /// <summary>Worn things that can be sold straight off the body: weapons and what protects.</summary>
+        private static readonly EquipmentSlot[] SellableWornSlots =
+        {
+            EquipmentSlot.FirstPrimaryWeapon, EquipmentSlot.SecondPrimaryWeapon, EquipmentSlot.Holster, EquipmentSlot.Scabbard,
+            EquipmentSlot.Headwear, EquipmentSlot.Earpiece, EquipmentSlot.FaceCover, EquipmentSlot.Eyewear, EquipmentSlot.ArmorVest,
+            EquipmentSlot.TacticalVest, EquipmentSlot.Backpack,
+        };
+
+        /// <summary>True for a container (pack, rig, case) that has something in one of its grids.</summary>
+        public static bool HasThingsInside(Item item)
+        {
+            var holder = item as CompoundItem;
+            if (holder?.Grids == null)
+            {
+                return false;
+            }
+            foreach (var grid in holder.Grids)
+            {
+                if (grid.Items.Any())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static readonly EquipmentSlot[] WearSlots =
         {
             EquipmentSlot.Backpack, EquipmentSlot.TacticalVest, EquipmentSlot.ArmorVest, EquipmentSlot.Headwear,
@@ -63,11 +89,34 @@ namespace ZeroMenuTime
             {
                 foreach (var item in grid.Items.ToList())
                 {
+                    // A case or pouch with things in it is not for sale as it is: it would take its
+                    // contents with it. Emptied, it is listed.
+                    if (HasThingsInside(item))
+                    {
+                        continue;
+                    }
                     var added = list.AddAnywhere(item, EErrorHandlingType.Ignore);
                     if (added.Failed)
                     {
                         Plugin.Log.LogWarning("Could not list " + item.TemplateId + " for trading: " + added.Error);
                     }
+                }
+            }
+            // What is worn can be sold too: a rifle picked up and slung is not in any pack. The
+            // weapon in the hands is left out: it cannot be taken away while it is held.
+            var inHands = player.HandsController != null ? player.HandsController.Item : null;
+            foreach (var slot in SellableWornSlots)
+            {
+                var worn = player.Profile.Inventory.Equipment.GetSlot(slot).ContainedItem;
+                // A pack or rig is only for sale once it is empty. The secure container is never listed.
+                if (worn == null || worn == inHands || HasThingsInside(worn))
+                {
+                    continue;
+                }
+                var added = list.AddAnywhere(worn, EErrorHandlingType.Ignore);
+                if (added.Failed)
+                {
+                    Plugin.Log.LogWarning("Could not list worn " + worn.TemplateId + " for trading: " + added.Error);
                 }
             }
             return list;

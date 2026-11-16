@@ -67,6 +67,10 @@ namespace ZeroMenuTime
             Seamless.Bind(Config);
             Death.Bind(Config);
             TraderModelBundle.Bind(Config);
+            VagabondLink.RemoveHideoutExits = Config.Bind("General", "Remove the hideout exits of Vagabond", true,
+                "Vagabond's own exits to its hideout serve no purpose with this mod's hideout. On: they are switched off in the raid.");
+            HideoutSigns.Enabled = Config.Bind("Hideout", "Signs over stations not built", true,
+                "In the hideout, a small sign hangs over each place where a station can still be built.");
             Metabolism.Bind(Config);
             TraderRoom.Bind(Config);
             RoomProps.Bind(Config);
@@ -252,6 +256,8 @@ namespace ZeroMenuTime
             MapMarkers.Tick();
             HideoutPower.Tick();
             BotFreeze.Tick();
+            HideoutSigns.Tick();
+            HideoutSound.Tick();
             Photo.Tick();
             HideoutGunsmith.Tick();
             if (!CaptureKey.Value.IsDown())
@@ -436,6 +442,7 @@ namespace ZeroMenuTime
                 TraderInteractable.DestroyAll();
                 VagabondLink.Reset();
                 var extracts = VagabondLink.LoadTraderExtracts();
+                VagabondLink.SwitchOffHideoutExits(__instance);
                 foreach (var extract in extracts)
                 {
                     var exfil = VagabondLink.FindExfil(__instance, extract.ExfilIdentifier);

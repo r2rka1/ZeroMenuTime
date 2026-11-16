@@ -640,7 +640,7 @@ namespace ZeroMenuTime
 
         // ---------------------------------------------------------------- pieces
 
-        private static TMP_FontAsset Font()
+        public static TMP_FontAsset Font()
         {
             if (_font == null)
             {

@@ -28,6 +28,7 @@ namespace ZeroMenuTime
             public Item Item;
             public LootItem Loot;
             public TraderRoom Room;
+            public Vector3 At;
         }
 
         private static readonly List<Laid> OnTables = new List<Laid>();
@@ -137,9 +138,62 @@ namespace ZeroMenuTime
                     body.position = loot.transform.position;
                 }
             }
-            OnTables.Add(new Laid { RootId = rootId, Item = item, Loot = loot, Room = room });
+            // Some things (a compass, other items made for the special slots) have nothing solid on
+            // them: let go, they fall through the table and the floor and are never seen again.
+            // Those are set down by hand and given something to be looked at.
+            bool solid = false;
+            foreach (var part in loot.GetComponentsInChildren<Collider>())
+            {
+                solid |= part.enabled && !part.isTrigger;
+            }
+            if (!solid)
+            {
+                Rest(loot, at);
+                Plugin.Log.LogInfo(item.ShortName.Localized() + " has nothing solid on it; set down by hand");
+            }
+            OnTables.Add(new Laid { RootId = rootId, Item = item, Loot = loot, Room = room, At = at });
             Plugin.Log.LogInfo("Laid " + item.ShortName.Localized() + " on the table at " + at.ToString("F2"));
             return loot;
+        }
+
+        /// <summary>Sets the object down on a spot and holds it there, with a box round it to look at and take it by.</summary>
+        private static void Rest(LootItem loot, Vector3 at)
+        {
+            var body = loot.GetComponent<Rigidbody>();
+            if (body != null)
+            {
+                body.velocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                body.isKinematic = true;
+            }
+            Bounds seen;
+            if (VisibleBounds(loot, out seen))
+            {
+                loot.transform.position += at - new Vector3(seen.center.x, seen.min.y, seen.center.z);
+                VisibleBounds(loot, out seen);
+            }
+            else
+            {
+                loot.transform.position = at;
+                seen = new Bounds(at, Vector3.zero);
+            }
+            if (body != null)
+            {
+                body.position = loot.transform.position;
+            }
+            bool any = false;
+            foreach (var part in loot.GetComponentsInChildren<Collider>())
+            {
+                any |= part.enabled && !part.isTrigger;
+            }
+            if (!any)
+            {
+                var box = loot.gameObject.AddComponent<BoxCollider>();
+                var size = Vector3.Max(seen.size, Vector3.one * 0.1f);
+                box.center = loot.transform.InverseTransformPoint(seen.center);
+                var scale = loot.transform.lossyScale;
+                box.size = new Vector3(size.x / Mathf.Max(0.01f, Mathf.Abs(scale.x)), size.y / Mathf.Max(0.01f, Mathf.Abs(scale.y)), size.z / Mathf.Max(0.01f, Mathf.Abs(scale.z)));
+            }
         }
 
         private static bool VisibleBounds(LootItem loot, out Bounds bounds)
@@ -219,6 +273,12 @@ namespace ZeroMenuTime
                 for (int i = OnTables.Count - 1; i >= 0; i--)
                 {
                     var laid = OnTables[i];
+                    // Anything that has slipped through the table and the floor is put back.
+                    if (laid.Loot != null && laid.Room != null && laid.Loot.transform.position.y < laid.Room.Entry.y - 0.6f)
+                    {
+                        Rest(laid.Loot, laid.At);
+                        Plugin.Log.LogInfo(laid.Item.ShortName.Localized() + " had fallen through the floor; put back on the table");
+                    }
                     if (carried.Contains(laid.Item))
                     {
                         if (laid.RootId != null)
@@ -229,7 +289,14 @@ namespace ZeroMenuTime
                     }
                     else if (laid.Loot == null)
                     {
-                        // Gone without being picked up; the trader still holds it.
+                        // The object is gone from the table while the room still stands: it was picked
+                        // up. Money and ammunition join a stack the player already has, and food can
+                        // be eaten on the spot, so the item itself is then no longer to be found in
+                        // what is carried. Counting those as still held let them be collected again.
+                        if (laid.RootId != null && laid.Room != null && laid.Room.Root != null && player.HealthController.IsAlive)
+                        {
+                            taken.Add(laid.RootId);
+                        }
                         OnTables.RemoveAt(i);
                     }
                 }

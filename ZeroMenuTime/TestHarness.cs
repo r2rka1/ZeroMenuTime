@@ -464,6 +464,10 @@ namespace ZeroMenuTime
                         }
                         Report("moved " + moved + " into the stash");
                     }
+                    else if (what == "sort")
+                    {
+                        Report(HideoutStash.Sort() ? "stash sorted" : "FAILED stash not sorted");
+                    }
                     else if (what == "close")
                     {
                         player.GetComponent<GamePlayerOwner>().CloseInventoryIfOpen();
@@ -1366,6 +1370,28 @@ namespace ZeroMenuTime
                     string word = parts.Length > 2 ? parts[2].Replace('_', ' ') : "";
                     var matching = onSale.Where(i => i.ShortName.Localized().IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0
                                                      || i.TemplateId.ToString() == word).ToList();
+                    if (what == "sell")
+                    {
+                        // trade sell WORD: sells a carried or worn thing, the way dragging it to the table and pressing Deal would.
+                        var mine = LocalTrade.CarriedItems(player).FirstOrDefault(i => i.ShortName.Localized().IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0);
+                        if (mine == null)
+                        {
+                            Report("FAILED nothing carried matches '" + word + "'");
+                            break;
+                        }
+                        if (!goods.QuickFindTradingAppropriatePlace(mine))
+                        {
+                            Report("FAILED " + mine.ShortName.Localized() + " could not be put on the selling table");
+                            break;
+                        }
+                        yield return new WaitForSecondsRealtime(1f);
+                        int price = goods.PreparedSum.Amount;
+                        goods.Sell();
+                        yield return new WaitForSecondsRealtime(2f);
+                        bool still = LocalTrade.CarriedItems(player).Contains(mine);
+                        Report((still ? "FAILED still carrying " : "sold ") + mine.ShortName.Localized() + " for " + price);
+                        break;
+                    }
                     if (what == "list")
                     {
                         Report(onSale.Count + " on sale; matching: " + string.Join(", ", matching.Take(40).Select(i => i.ShortName.Localized())));
@@ -1409,6 +1435,33 @@ namespace ZeroMenuTime
                     }
                     Report((deal.Result != null && deal.Result.Succeed ? "bought " : "FAILED buying ") + matching[0].ShortName.Localized()
                            + (deal.Result != null && !deal.Result.Succeed ? ": " + deal.Result.Error : ""));
+                    break;
+                }
+                case "sounds":
+                {
+                    // sounds [WORD]: every sound source that is playing now: where from, how loud, through what.
+                    var playing = UnityEngine.Object.FindObjectsOfType<AudioSource>().Where(x => x.isPlaying && !x.mute).ToList();
+                    float hideoutDb;
+                    Report("mixer HideoutVolume: " + (EFT.Settings.Sound.SoundSettingsController.MasterMixer.GetFloat("HideoutVolume", out hideoutDb) ? hideoutDb.ToString("F0") + " dB" : "?"));
+                    Report(playing.Count + " source(s) playing; listener volume " + AudioListener.volume.ToString("F2"));
+                    foreach (var group in playing.GroupBy(x => (x.outputAudioMixerGroup != null ? x.outputAudioMixerGroup.name : "NO MIXER") + " | scene " + x.gameObject.scene.name)
+                                 .OrderByDescending(g => g.Count()))
+                    {
+                        Report("  " + group.Count() + " x " + group.Key + ": " + string.Join(", ", group.Take(6).Select(x =>
+                            (x.clip != null ? x.clip.name : "?") + "@" + x.volume.ToString("F2") + (x.spatialBlend < 0.5f ? " 2D" : " " + Vector3.Distance(x.transform.position, player.Transform.position).ToString("F0") + "m")
+                            + " on " + x.gameObject.name)));
+                    }
+                    break;
+                }
+                case "exits":
+                {
+                    // exits: every way out the game knows on this map, and its state.
+                    var points = Comfort.Common.Singleton<GameWorld>.Instance.ExfiltrationController.ExfiltrationPoints;
+                    foreach (var point in points)
+                    {
+                        Report("  " + point.gameObject.name + " '" + point.Settings.Name + "' status " + point.Status + " active " + point.gameObject.activeInHierarchy
+                               + " at " + point.transform.position.ToString("F0"));
+                    }
                     break;
                 }
                 case "traderbundle":

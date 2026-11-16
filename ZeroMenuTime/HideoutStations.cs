@@ -94,7 +94,7 @@ namespace ZeroMenuTime
             return null;
         }
 
-        private static string Name(EAreaType type)
+        public static string Name(EAreaType type)
         {
             // "IntelligenceCenter" -> "Intelligence Center"
             return System.Text.RegularExpressions.Regex.Replace(type.ToString(), "(?<=[a-z])(?=[A-Z])", " ");
@@ -372,6 +372,7 @@ namespace ZeroMenuTime
             if (stationArea == (int)EAreaType.Stash && HideoutStash.Current != null)
             {
                 state.Actions.Add(new InteractionAction { Name = "Open stash", Action = () => HideoutStash.Open(), Disabled = false });
+                state.Actions.Add(new InteractionAction { Name = "Sort stash", Action = () => HideoutStash.Sort(), Disabled = false });
             }
             string what = level == 0 ? stationName + " (not built)" : stationName;
             if (craft != null && craft.Due > WorldClock.Now)

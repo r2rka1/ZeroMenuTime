@@ -66,7 +66,7 @@ namespace ZeroMenuTime
 
         private static void Sweep()
         {
-            _nextSweep = Time.unscaledTime + 5f;
+            _nextSweep = Time.unscaledTime + 1f;
             try
             {
                 var world = Singleton<GameWorld>.Instance;

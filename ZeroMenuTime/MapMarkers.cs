@@ -24,6 +24,7 @@ namespace ZeroMenuTime
         // Searching a whole map's scene for the map view is slow enough to feel; it is done
         // rarely, and the views found are remembered.
         private static readonly List<UnityEngine.Object> Views = new List<UnityEngine.Object>();
+        private static readonly HashSet<string> Added = new HashSet<string>();
 
         private static bool Ready()
         {
@@ -97,25 +98,21 @@ namespace ZeroMenuTime
                     {
                         continue;
                     }
-                    bool any = false;
-                    foreach (var _ in (IEnumerable)_byCategory.Invoke(found, new object[] { Category }))
-                    {
-                        any = true;
-                        break;
-                    }
-                    if (any)
-                    {
-                        continue;
-                    }
+                    // Each door is added once per map view; a door that appears later (the rooms are
+                    // built a little after the raid starts) is added when it does.
+                    int viewId = found.GetInstanceID();
                     int added = 0;
                     foreach (var place in HideoutDoors.DoorPlaces())
                     {
-                        Add(found, "Hideout", place, new Color(0.77f, 0.63f, 0.28f), "Markers/door_with_key.png");
-                        added++;
+                        if (Added.Add(viewId + "|hideout|" + place.ToString("F0")))
+                        {
+                            Add(found, "Hideout", place, new Color(0.77f, 0.63f, 0.28f), "Markers/door_with_key.png");
+                            added++;
+                        }
                     }
                     foreach (var room in TraderRoom.Rooms)
                     {
-                        if (room.OutsideDoor != null)
+                        if (room.OutsideDoor != null && Added.Add(viewId + "|" + room.TraderId + "|" + room.OutsideDoor.transform.position.ToString("F0")))
                         {
                             Add(found, room.TraderName, room.OutsideDoor.transform.position, new Color(0.91f, 0.90f, 0.83f), "Markers/door_with_key.png");
                             added++;

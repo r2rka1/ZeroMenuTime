@@ -33,6 +33,44 @@ namespace ZeroMenuTime
         public static string ConfigPath =>
             Path.Combine(BepInEx.Paths.GameRootPath, "SPT_Runtime", "user", "mods", "Vagabond", "config", "trader_locations.json");
 
+        public static BepInEx.Configuration.ConfigEntry<bool> RemoveHideoutExits;
+
+        /// <summary>
+        /// Vagabond lets the player set up exits that lead to its hideout in the menus. With this
+        /// mod the hideout is behind a door on the map, so those exits lead nowhere useful; they are
+        /// switched off. The trader exits stay: the traders' doors stand at them.
+        /// </summary>
+        public static int SwitchOffHideoutExits(GameWorld world)
+        {
+            int off = 0;
+            try
+            {
+                var points = world?.ExfiltrationController?.ExfiltrationPoints;
+                if (points == null || RemoveHideoutExits == null || !RemoveHideoutExits.Value)
+                {
+                    return 0;
+                }
+                foreach (var point in points)
+                {
+                    if (point != null && point.gameObject.name.StartsWith("VGB_HO_", StringComparison.OrdinalIgnoreCase) && point.gameObject.activeSelf)
+                    {
+                        point.Disable();
+                        point.gameObject.SetActive(false);
+                        off++;
+                    }
+                }
+                if (off > 0)
+                {
+                    Plugin.Log.LogInfo("Vagabond's hideout exits switched off: " + off);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Switching off Vagabond's hideout exits failed: " + e.Message);
+            }
+            return off;
+        }
+
         public static void Reset()
         {
             TraderExfils.Clear();
