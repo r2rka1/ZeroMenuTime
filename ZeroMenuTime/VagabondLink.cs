@@ -39,17 +39,49 @@ namespace ZeroMenuTime
             LeaveRequested.Clear();
         }
 
+        /// <summary>
+        /// Vagabond's trader_locations.json. It lives in the server's mod folder, which is often not
+        /// inside the game's folder, so the server is asked for it first; the file beside the game is
+        /// only a fallback for when the server cannot answer.
+        /// </summary>
+        private static string ReadTraderLocations()
+        {
+            string why = "";
+            try
+            {
+                var reply = JObject.Parse(SPT.Common.Http.RequestHandler.PostJson("/zeromenutime/vagabond/traders", "{}"));
+                if ((bool?)reply["Ok"] ?? false)
+                {
+                    Plugin.Log.LogInfo("Vagabond's trader list read by the server from " + (string)reply["Path"]);
+                    return (string)reply["Json"] ?? "";
+                }
+                why = (string)reply["Error"] ?? "no answer";
+            }
+            catch (Exception e)
+            {
+                why = e.GetType().Name + ": " + e.Message;
+            }
+            if (File.Exists(ConfigPath))
+            {
+                return File.ReadAllText(ConfigPath);
+            }
+            Plugin.Log.LogError("Vagabond's trader list could not be read, so no trader doors are placed. Server: " + why
+                                + "; not beside the game either (" + ConfigPath + ")");
+            return null;
+        }
+
         public static List<TraderExtract> LoadTraderExtracts()
         {
             var result = new List<TraderExtract>();
             try
             {
-                if (!File.Exists(ConfigPath))
+                string json = ReadTraderLocations();
+                if (string.IsNullOrEmpty(json))
                 {
                     return result;
                 }
                 // Vagabond's config has // comments; JArray.Parse skips them.
-                foreach (var entry in JArray.Parse(File.ReadAllText(ConfigPath)))
+                foreach (var entry in JArray.Parse(json))
                 {
                     var traderId = (string)entry["traderId"];
                     var exfil = (string)entry["exfilIdentifier"];

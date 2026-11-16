@@ -115,6 +115,8 @@ Every door is one of the map's own doors. With [Dynamic Maps](https://sp-mod.com
 2. Extract the Zero Menu Time zip **into your SPT folder** (the one with `EscapeFromTarkov.exe`). It adds:
    - `BepInEx/plugins/ZeroMenuTime/` (client)
    - `SPT_Runtime/user/mods/ZeroMenuTime/` (server)
+
+   If your SPT server lives in a folder of its own, put `BepInEx/plugins/ZeroMenuTime/` in the game folder and `ZeroMenuTime` in the server's `user/mods/`, beside Vagabond.
 3. Start the SPT server, then the game.
 4. Make a new character as usual. It starts with the small starting kit and wakes in your hideout at Customs.
    With a character you already have, choose **Reset** in the main menu for the same start: the game closes; start it again and choose **Continue**.
