@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>ZeroMenuTime</AssemblyName>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <RootNamespace>ZeroMenuTime</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>

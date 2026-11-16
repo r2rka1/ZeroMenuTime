@@ -58,6 +58,45 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 
 ---
 
+## Where the doors are
+
+Every door is one of the map's own doors. With [Dynamic Maps](https://sp-mod.com/mod/1431/dynamic-maps), the doors of the map you are on are also marked on its map (a door with a key; hideout doors in gold).
+
+| Door | Map | Where |
+|---|---|---|
+| Skier | Customs | The trailer door just north of the Crackhouse, between the Crackhouse and the Repair Shop |
+| Hideout | Customs | The ZB-1011 bunker on the east edge, past Warehouse 7: down the stairs, the steel door at the end of the tunnel |
+| Prapor | Streets | First floor of the building by the Beluga restaurant on Primorsky Ave., the grey office door |
+| Fence | Streets | The red door at the end of the alley between the Post Office and Cardinal Bank |
+| Hideout | Streets | Under Prapor's building, the dark red double door at the end of the covered walkway |
+| Ragman | Interchange | Parking garage, section C, below Avokado: the white door in the end wall |
+| Jaeger | Woods | The stone bunker in the rock face between the Lumber mill and the Crash Site |
+| Mechanic | Factory | Basement, by the caged electrical room: the door in the corridor wall |
+| Therapist | Ground Zero | TerraGroup building by the Science Offices, 2nd floor, end of the corridor, next to the big 2 |
+| Peacekeeper | Shoreline | The gate of checkpoint 11, at the west end of the map |
+| Hideout | Shoreline | The red shed next to checkpoint 11, the steel door on its north side |
+| Fence | Lighthouse | The drug lab: the shipping container doors behind the plant tables |
+
+<details>
+<summary>Pictures of every door, with the map</summary>
+
+![Skier, Customs](docs/doors/01-skier-customs.jpg)
+![Hideout, Customs](docs/doors/02-hideout-customs.jpg)
+![Prapor, Streets](docs/doors/03-prapor-streets.jpg)
+![Fence, Streets](docs/doors/04-fence-streets.jpg)
+![Hideout, Streets](docs/doors/05-hideout-streets.jpg)
+![Ragman, Interchange](docs/doors/06-ragman-interchange.jpg)
+![Jaeger, Woods](docs/doors/07-jaeger-woods.jpg)
+![Mechanic, Factory](docs/doors/08-mechanic-factory.jpg)
+![Therapist, Ground Zero](docs/doors/09-therapist-ground-zero.jpg)
+![Peacekeeper, Shoreline](docs/doors/10-peacekeeper-shoreline.jpg)
+![Hideout, Shoreline](docs/doors/11-hideout-shoreline.jpg)
+![Fence, Lighthouse](docs/doors/12-fence-lighthouse.jpg)
+
+</details>
+
+---
+
 ## Requirements
 
 | Mod | | Version tested |
@@ -145,7 +184,7 @@ Press **F12** in game and open **r2rka1-ZeroMenuTime**.
 
 ### Placing doors yourself
 
-Doors are placed on a real door of the map where one was picked by hand (Prapor and Fence on Streets, Skier on Customs, Ragman on Interchange). Elsewhere they stand against the nearest building wall. To move one:
+Every trader door is placed on a real door of the map (see "Where the doors are"). A trader added at a new spot gets a door against the nearest building wall. To move one:
 
 1. Stand with your back to the door you want, and press **F10**.
 2. Copy the line from `BepInEx/plugins/ZeroMenuTime/captured_positions.txt` into `doors.json` in the same folder (a list), and fill in the trader's id.
