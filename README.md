@@ -22,6 +22,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - Trades are paid from what you carry, and what you buy is **laid on the trader's table**, to pick up by hand. The stash is not involved.
 - **Quests** are accepted and handed in at the trader. Items a quest gives when you accept it, and the **reward items** when you hand it in, are **laid on the table** in front of you; experience and standing follow when the raid ends.
 - Mail from traders (quest rewards, insurance returns) waits **on the table**. Anything you leave there is still there next time.
+- If you own the 1.0 game, the traders are their **real models** and **speak a line** when you start to trade. See [Real trader models and voices](#real-trader-models-and-voices).
 - Every trader stocks a few **field supplies** (basic meds, food, water, a surgical kit) and the **map of the area they stand in**, so you are never stranded.
 
 ### One hideout, behind real doors
@@ -98,6 +99,20 @@ Every door is one of the map's own doors. With [Dynamic Maps](https://sp-mod.com
 
 ---
 
+## Real trader models and voices
+
+Seven traders (Prapor, Therapist, Skier, Mechanic, Ragman, Jaeger, Fence) can stand in their rooms as their **real models from the 1.0 game** and say one of their own lines when you open trade.
+
+**This mod does not contain those models or voices, and never will.** They belong to the makers of the game, so they are not in the download. The mod reads them, when a raid starts, from **your own installed copy of the 1.0 game**:
+
+- **If you own the 1.0 game and it is installed**, there is usually nothing to do: the mod finds it by itself.
+- **If the models do not show up**, tell the mod where the game is: press **F12** in game, open **r2rka1-ZeroMenuTime → Trader models → Folder of the 1.0 game**, and enter the folder the 1.0 game is installed in (the one that holds the game's `.exe`). This is needed when the game was installed through Steam, or was moved or copied by hand. The change applies from the next raid.
+- **If you do not own the 1.0 game**, nothing is missing or broken: the traders are stand-in figures as before, and they do not speak.
+
+The folder of the 1.0 game is only read. Nothing in it is changed, and nothing from it is copied.
+
+Peacekeeper has no model or voice of this kind in the 1.0 game and stays a stand-in figure. The voice lines are in Russian.
+
 ## Requirements
 
 | Mod | | Version tested |
@@ -106,6 +121,7 @@ Every door is one of the map's own doors. With [Dynamic Maps](https://sp-mod.com
 | **[Vagabond](https://sp-mod.com/mod/2642/vagabond)** | required | 0.8.3 |
 | [UI Fixes](https://sp-mod.com/mod/1342/ui-fixes) | optional, supported | 6.0.4 |
 | [Dynamic Maps](https://sp-mod.com/mod/1431/dynamic-maps) | optional, supported | 1.2.1 |
+| Your own installed copy of the 1.0 game | optional: only for the real trader models and voices | 1.3.0 |
 
 **Fika** (multiplayer) is **not supported**: the hideout, world clock and save game are single-player.
 
@@ -173,7 +189,10 @@ Press **F12** in game and open **r2rka1-ZeroMenuTime**.
 | Trader rooms | Put traders in rooms | on | Off: traders stand in the open and deliveries go straight into your gear |
 | Trader rooms | Furnish rooms from the game | on | Off: plain rooms |
 | Trader rooms | Room depth below the door | 300 | How far under the map the rooms are built, in metres |
-| Trader models | Use trader models from a bundle | on | Use real trader models if you built a bundle from your own copy of the game |
+| Trader models | Use the real trader models | on | Stand the traders' own models in their rooms, read from your own installed copy of the 1.0 game |
+| Trader models | Folder of the 1.0 game | empty | Where your copy of the 1.0 game is installed. Empty: the mod finds it by itself. Fill it in if the models do not show up |
+| Trader models | Trader voices | on | A trader says a line of their own when you start to trade. Needs your own copy of the 1.0 game |
+| Trader models | Voice volume | 0.8 | How loud the traders speak |
 | No menus | Enabled | on | Skip result screens and continue automatically |
 | No menus | Seconds before continuing | 4 | Countdown in the main menu |
 | No menus | Stay in menu key | Backspace | Hold during the countdown to stay in the menu |
@@ -205,7 +224,8 @@ Hideout doors can be moved the same way in `hideouts.json`.
 - Air filters and the Equipment Stand's outfits are not built.
 - With **When you die** on KeepItems, gear lost in a death is still reported to insurance, so insured items can come back twice after the save is restored.
 - If the game crashes after a quest hand-in, the reward items you picked up are kept although the quest is not recorded as done.
-- Trader figures are stand-ins dressed in the game's own clothing.
+- Without your own copy of the 1.0 game, trader figures are stand-ins dressed in the game's own clothing, and they do not speak.
+- The 1.0 game is found only where Windows says it is installed. A Steam install, or a copy moved by hand, has to be entered in the setting.
 - Post-raid healing is skipped along with the other result screens.
 
 ---
