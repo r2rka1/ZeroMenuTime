@@ -78,7 +78,7 @@ Every door is one of the map's own doors. With [Dynamic Maps](https://sp-mod.com
 | Fence | Lighthouse | The drug lab: the shipping container doors behind the plant tables |
 
 <details>
-<summary>Pictures of every door, with the map</summary>
+<summary>Pictures of every door</summary>
 
 ![Skier, Customs](docs/doors/01-skier-customs.jpg)
 ![Hideout, Customs](docs/doors/02-hideout-customs.jpg)
