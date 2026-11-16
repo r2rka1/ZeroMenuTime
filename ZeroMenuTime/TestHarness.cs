@@ -67,6 +67,9 @@ namespace ZeroMenuTime
             }
         }
 
+        /// <summary>While frames are being saved for the mod's page, the test notices in windows are left out.</summary>
+        public static bool Filming => _film != null;
+
         private static Coroutine _film;
         private static string _filmName = "";
         private static int _filmFps = 12, _filmWidth = 960, _filmFrames;
@@ -460,6 +463,11 @@ namespace ZeroMenuTime
                             moved++;
                         }
                         Report("moved " + moved + " into the stash");
+                    }
+                    else if (what == "close")
+                    {
+                        player.GetComponent<GamePlayerOwner>().CloseInventoryIfOpen();
+                        Report("stash screen closed");
                     }
                     else if (what == "take" && parts.Length > 2)
                     {
@@ -1232,6 +1240,74 @@ namespace ZeroMenuTime
                     offered.Actions[which].Action();
                     break;
                 }
+                case "pick":
+                {
+                    // pick [WORD] [SECONDS]: look at the thing on the table whose name holds WORD, and take it
+                    // through the game's own menu, as a player would.
+                    var thing = RewardTable.Find(parts.Length > 1 ? parts[1].Replace('_', ' ') : "");
+                    if (thing == null)
+                    {
+                        Report("FAILED nothing like that on a table");
+                        break;
+                    }
+                    // Where the eye may rest on it: the middle of what can be touched, then of what can be
+                    // seen, then where the object itself says it is, each also a little lower.
+                    var spots = new List<Vector3>();
+                    foreach (var solidPart in thing.GetComponentsInChildren<Collider>())
+                    {
+                        if (solidPart.enabled)
+                        {
+                            spots.Add(solidPart.bounds.center);
+                        }
+                    }
+                    foreach (var shown in thing.GetComponentsInChildren<Renderer>())
+                    {
+                        spots.Add(shown.bounds.center);
+                    }
+                    spots.Add(thing.transform.position);
+                    foreach (var spot in spots.ToArray())
+                    {
+                        spots.Add(spot + Vector3.down * 0.03f);
+                    }
+                    float took = parts.Length > 2 ? Number(parts[2]) : 0.8f;
+                    var cam = Camera.main;
+                    bool found = false;
+                    for (int n = 0; n < spots.Count && !found; n++)
+                    {
+                        var first = player.Rotation;
+                        float turnTime = n == 0 ? took : 0.25f;
+                        for (float t = 0f; t < turnTime + 0.7f; t += Time.deltaTime)
+                        {
+                            // Aimed afresh each frame: the eyes move as the head tilts.
+                            var from = cam != null ? cam.transform.position : player.Transform.position + Vector3.up * 1.55f;
+                            var sight = spots[n] - from;
+                            float aimYaw = Mathf.Atan2(sight.x, sight.z) * Mathf.Rad2Deg;
+                            float aimPitch = -Mathf.Atan2(sight.y, new Vector2(sight.x, sight.z).magnitude) * Mathf.Rad2Deg;
+                            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / turnTime));
+                            player.Rotation = new Vector2(Mathf.LerpAngle(first.x, aimYaw, k), Mathf.Lerp(first.y, aimPitch, k));
+                            if (t > turnTime + 0.3f && player.InteractableObject != null
+                                && player.InteractableObject.transform.IsChildOf(thing.transform.root))
+                            {
+                                found = true;
+                                break;
+                            }
+                            yield return null;
+                        }
+                    }
+                    var got = player.InteractableObject;
+                    var menu = found && got != null ? InteractionContextHelper.GetAvailableActions(player.GetComponent<GamePlayerOwner>(), got) : null;
+                    if (menu == null || menu.Actions.Count == 0 || menu.Actions[0].Disabled)
+                    {
+                        Report("FAILED the game offers nothing usable for " + thing.name + " from here ("
+                               + Vector3.Distance(player.Transform.position, thing.transform.position).ToString("F1") + " m, tried " + spots.Count + " spots, "
+                               + (found ? "seen but " + (menu == null || menu.Actions.Count == 0 ? "no actions" : "'" + menu.Actions[0].Name + "' is off") : "never under the eye") + ")");
+                        break;
+                    }
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    Report("doing '" + menu.Actions[0].Name + "' on " + got.name);
+                    menu.Actions[0].Action();
+                    break;
+                }
                 case "turnto":
                 {
                     // turnto X Y Z [SECONDS]: look smoothly at a point.
@@ -1300,9 +1376,11 @@ namespace ZeroMenuTime
                         Report("FAILED nothing on sale matches '" + word + "'");
                         break;
                     }
+                    // Of several with the same name, the whole weapon rather than a part of one.
+                    matching = matching.OrderByDescending(i => i is Weapon).ToList();
                     goods.SelectItem(matching[0]);
                     goods.CurrentQuantity = parts.Length > 3 ? (int)Number(parts[3]) : 1;
-                    yield return new WaitForSecondsRealtime(1.2f);
+                    yield return new WaitForSecondsRealtime(0.3f);
                     foreach (var need in goods.CurrentRequisites)
                     {
                         foreach (var carried in LocalTrade.CarriedItems(player))

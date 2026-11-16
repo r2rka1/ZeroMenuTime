@@ -278,6 +278,19 @@ namespace ZeroMenuTime
         }
 
         /// <summary>What lies on the tables, for the test harness.</summary>
+        /// <summary>For the test harness: the laid-out object whose name holds the word (any, if empty).</summary>
+        public static LootItem Find(string word)
+        {
+            foreach (var laid in OnTables)
+            {
+                if (laid.Loot != null && laid.Item.ShortName.Localized().IndexOf(word ?? "", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return laid.Loot;
+                }
+            }
+            return null;
+        }
+
         public static List<string> Describe()
         {
             var lines = new List<string>();

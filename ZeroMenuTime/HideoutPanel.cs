@@ -256,7 +256,7 @@ namespace ZeroMenuTime
                 {
                     Text(left, "Needs nothing.", 18f, Dim, false);
                 }
-                Text(left, HideoutStations.IsFree ? "Free hideout is switched on (F12, Testing): nothing is taken." : "Taken from what you carry, then from this hideout's stash. Built at once.", 15f, Dim, false);
+                Text(left, HideoutStations.IsFree && !TestHarness.Filming ? "Free hideout is switched on (F12, Testing): nothing is taken." : "Taken from what you carry, then from this hideout's stash. Built at once.", 15f, Dim, false);
                 int area = _area;
                 string name = _name;
                 Button(left, level == 0 ? "BUILD" : "UPGRADE", () => Do(() => HideoutStations.Build(area, name)), affordable && !_busy, 220f);
