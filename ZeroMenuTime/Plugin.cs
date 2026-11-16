@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 
 namespace ZeroMenuTime
 {
-    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.1.2")]
+    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.1.3")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
     // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
     [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]
@@ -76,10 +76,10 @@ namespace ZeroMenuTime
                 "Stand a character at each trader spot. The marker box is hidden once the figure has loaded.");
             _patches = new List<ModulePatch>
             {
-                new SaveStashPatch(), new SpawnTradersPatch(), new TraderActionsPatch(),
+                new SaveStashPatch(), new SpawnTradersPatch(), new TraderActionsPatch(), new DoorLookPatch(),
                 new TraderExfilEnterPatch(), new TraderExfilExitPatch(),
                 new LocalPurchasePatch(), new LocalSellPatch(), new CarriedPaymentPatch(), new DrawPackItemsPatch(),
-                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(),
+                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestStartItemsPatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
                 new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
@@ -524,6 +524,7 @@ namespace ZeroMenuTime
                 TraderRoom.ExtendPhysics();
                 Plugin.Log.LogInfo("Raid started on '" + map + "', traders placed: " + count);
                 QuestSync.Send("raid start");
+                Death.SendMode();
                 if (count > 0 && Plugin.Instance != null)
                 {
                     Plugin.Instance.StartCoroutine(Plugin.NotifyLater("Traders in this area: " + count, 12f));
@@ -532,6 +533,64 @@ namespace ZeroMenuTime
             catch (Exception e)
             {
                 Plugin.Log.LogError("SpawnTradersPatch: " + e);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Our doors are laid over the map's own doors, and the game takes the first interactive thing
+    /// its look ray meets: the map's door leaf, a door left open, or the frame in front could take
+    /// the place of ours, and from the far side ours could not be met at all. After the game's own
+    /// look, a door of ours in reach along the same ray, with nothing solid in between, is chosen
+    /// over the map's door there and over anything farther away.
+    /// </summary>
+    public class DoorLookPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(GameWorld), nameof(GameWorld.FindInteractable));
+        }
+
+        [PatchPostfix]
+        public static void Postfix(Ray ray, ref RaycastHit hit, ref GameObject __result)
+        {
+            try
+            {
+                if (RoomDoor.All.Count == 0)
+                {
+                    return;
+                }
+                var settings = EFTHardSettings.Instance;
+                float reach = settings != null ? settings.LOOT_RAYCAST_DISTANCE + settings.BEHIND_CAST : 1.5f;
+                float distance;
+                var door = RoomDoor.Seen(ray, reach, out distance);
+                if (door == null)
+                {
+                    return;
+                }
+                if (__result != null)
+                {
+                    var other = __result.GetComponentInParent<InteractableObject>();
+                    if (other == door)
+                    {
+                        return;
+                    }
+                    // Loot, a body or a trader in front of the door keeps its place. The map's own
+                    // door at ours does not, nor a hideout station's box, which can reach through a
+                    // wall up to a door (the cultists' circle does, at the way out).
+                    bool mapDoorHere = other is WorldInteractiveObject && Vector3.Distance(other.transform.position, door.transform.position) < 2.0f;
+                    if (!mapDoorHere && !(other is StationInteractable) && hit.distance < distance - 0.05f)
+                    {
+                        return;
+                    }
+                }
+                __result = door.gameObject;
+                hit.distance = distance;
+                hit.point = ray.GetPoint(distance);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("DoorLookPatch: " + e.Message);
             }
         }
     }

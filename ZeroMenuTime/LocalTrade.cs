@@ -372,7 +372,10 @@ namespace ZeroMenuTime
                     remaining -= amount;
                 }
 
-                if (FindRoom(player, goods[0]) == null)
+                // With rooms, what is bought is put on the trader's table, as quest rewards are.
+                string traderId = assortment._traderId;
+                bool toTable = TraderRoom.For(traderId) != null;
+                if (!toTable && FindRoom(player, goods[0]) == null)
                 {
                     NotificationManager.DisplayWarningNotification("No room in your gear for that.");
                     return new FailedResult("No room");
@@ -392,11 +395,18 @@ namespace ZeroMenuTime
                 }
 
                 int delivered = 0;
-                foreach (var item in goods)
+                if (toTable && await LeaveOnTable(traderId, goods))
                 {
-                    if (await Give(player, item))
+                    delivered = goods.Count;
+                }
+                else
+                {
+                    foreach (var item in goods)
                     {
-                        delivered++;
+                        if (await Give(player, item))
+                        {
+                            delivered++;
+                        }
                     }
                 }
                 if (delivered < goods.Count)
@@ -420,6 +430,34 @@ namespace ZeroMenuTime
             finally
             {
                 assortment.TransactionInProgress = false;
+            }
+        }
+
+        /// <summary>
+        /// Leaves bought items with the trader (in their mail, on the server) and lays them on the
+        /// table in the trader's room. Whatever is not picked up waits there for the next visit.
+        /// False if the server could not take them; the caller then hands them over directly.
+        /// </summary>
+        private static async Task<bool> LeaveOnTable(string traderId, List<Item> goods)
+        {
+            try
+            {
+                var flat = Newtonsoft.Json.Linq.JArray.Parse(Singleton<ItemFactory>.Instance.TreeToFlatItems(goods.ToArray()).ToJson());
+                var body = new Newtonsoft.Json.Linq.JObject { ["TraderId"] = traderId, ["Items"] = flat };
+                var reply = Newtonsoft.Json.Linq.JObject.Parse(await SPT.Common.Http.RequestHandler.PostJsonAsync(
+                    "/zeromenutime/mail/purchase", body.ToString(Newtonsoft.Json.Formatting.None)));
+                if (!((bool?)reply["Ok"] ?? false))
+                {
+                    Plugin.Log.LogWarning("Bought items not left with the trader: " + reply["Error"]);
+                    return false;
+                }
+                Mail.Collect(traderId, TraderConfig.NameOf(traderId));
+                return true;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Bought items not left with the trader: " + e.Message);
+                return false;
             }
         }
 

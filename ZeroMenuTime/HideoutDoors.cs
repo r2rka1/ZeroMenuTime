@@ -121,6 +121,9 @@ namespace ZeroMenuTime
         {
             int placed = 0;
             Fronts.Clear();
+            // A new raid: nothing is under way, whatever the last one was doing when it ended.
+            _busy = false;
+            Inside = null;
             foreach (var spot in Load())
             {
                 if (!spot.Enabled || spot.Position == null || spot.Position.Length < 3
@@ -409,135 +412,163 @@ namespace ZeroMenuTime
         private static IEnumerator Going(string id, Vector3 returnTo, float returnYaw, bool atBed)
         {
             _busy = true;
-            var player = GamePlayerOwner.MyPlayer;
-            RoomDoor.PlayDoorSound(true, player.Transform.position);
-            yield return RoomDoor.FadeTo(1f);
-
-            // Tell the server which hideout this is; it brings that one's stations and stash forward.
-            var call = RequestHandler.PostJsonAsync("/zeromenutime/hideout/enter", JsonConvert.SerializeObject(new { Id = id }));
-            while (!call.IsCompleted)
-            {
-                yield return null;
-            }
-            JObject reply = null;
             try
             {
-                reply = JObject.Parse(call.Result);
-            }
-            catch (Exception e)
-            {
-                Plugin.Log.LogError("Hideout enter: " + e.Message);
-            }
-            if (reply == null || !((bool?)reply["Ok"] ?? false))
-            {
-                Plugin.Log.LogWarning("Hideout '" + id + "' could not be entered: " + (reply != null ? reply["Error"] : "no answer"));
-                NotificationManager.DisplayWarningNotification("The hideout could not be opened.");
-                yield return RoomDoor.FadeTo(0f);
-                _busy = false;
-                yield break;
-            }
-            HideoutStations.Read(reply);
-            HideoutStash.Read(id, reply);
-            HideoutShelves.Read(reply);
-            HideoutBoosts.Read(reply);
-            HideoutCrafting.Read(reply);
+                var player = GamePlayerOwner.MyPlayer;
+                RoomDoor.PlayDoorSound(true, player.Transform.position);
+                yield return RoomDoor.FadeTo(1f);
 
-            if (!HideoutBunker.Loaded)
-            {
-                RoomDoor.FadeText = "Opening the hideout...";
-            }
-            yield return Prepare(true);
-            RoomDoor.FadeText = null;
-            if (!HideoutBunker.Loaded)
-            {
-                NotificationManager.DisplayWarningNotification("The hideout could not be opened.");
-                yield return RoomDoor.FadeTo(0f);
-                _busy = false;
-                yield break;
-            }
-            var origin = HideoutBunker.Moved;
-
-            HideoutBunker.Park(false);
-            BotFreeze.Set(true);
-            HideoutStations.ShowAll();
-            HideoutBunker.Sun(false);
-            if (HideoutBunker.BunkerSettings != null)
-            {
-                HideoutBunker.BunkerSettings.ApplySettings();
-            }
-
-            var arrival = origin + Arrival;
-            // Arriving, the player faces the way they always have: out from the nearest wall.
-            Vector3 wallGround;
-            float exitYaw;
-            if (!RoomDoor.FindWall(arrival, out wallGround, out exitYaw))
-            {
-                exitYaw = 0f;
-            }
-            // The way out is the closed door at the end of the small room up the steps (the one
-            // the cultists' room lies behind): something to use, laid over that door and not drawn.
-            _exit = RoomDoor.Spawn("Leave hideout", origin + ExitDoor, ExitDoorYaw);
-            var exitDrawn = _exit.GetComponent<MeshRenderer>();
-            if (exitDrawn != null)
-            {
-                exitDrawn.enabled = false;
-            }
-            _exit.OnUse = Leave;
-            RefreshExits();
-
-            _returnTo = returnTo;
-            _returnYaw = returnYaw;
-            Inside = id;
-            if (atBed)
-            {
-                // Waking up: stand by the Rest Space, on whatever floor is beside it.
-                var controller = HideoutStations.Controller();
-                EFT.Hideout.HideoutArea rest;
-                Bounds bedBounds;
-                if (controller != null && controller.Areas.TryGetValue(EAreaType.RestSpace, out rest) && HideoutStations.LevelBounds(rest, 1, out bedBounds))
+                // Tell the server which hideout this is; it brings that one's stations and stash forward.
+                var call = RequestHandler.PostJsonAsync("/zeromenutime/hideout/enter", JsonConvert.SerializeObject(new { Id = id }));
+                while (!call.IsCompleted)
                 {
-                    var towardsHall = (origin - bedBounds.center);
-                    towardsHall.y = 0f;
-                    var beside = bedBounds.center + towardsHall.normalized * (Mathf.Max(bedBounds.extents.x, bedBounds.extents.z) + 0.9f);
-                    RaycastHit floor;
-                    if (Physics.Raycast(new Vector3(beside.x, bedBounds.max.y + 1.5f, beside.z), Vector3.down, out floor, 6f,
-                            LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain"), QueryTriggerInteraction.Ignore))
+                    yield return null;
+                }
+                JObject reply = null;
+                try
+                {
+                    reply = JObject.Parse(call.Result);
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogError("Hideout enter: " + e.Message);
+                }
+                if (reply == null || !((bool?)reply["Ok"] ?? false))
+                {
+                    Plugin.Log.LogWarning("Hideout '" + id + "' could not be entered: " + (reply != null ? reply["Error"] : "no answer"));
+                    NotificationManager.DisplayWarningNotification("The hideout could not be opened.");
+                    yield return RoomDoor.FadeTo(0f);
+                    _busy = false;
+                    yield break;
+                }
+                HideoutStations.Read(reply);
+                HideoutStash.Read(id, reply);
+                HideoutShelves.Read(reply);
+                HideoutBoosts.Read(reply);
+                HideoutCrafting.Read(reply);
+
+                if (!HideoutBunker.Loaded)
+                {
+                    RoomDoor.FadeText = "Opening the hideout...";
+                }
+                yield return Prepare(true);
+                RoomDoor.FadeText = null;
+                if (!HideoutBunker.Loaded)
+                {
+                    NotificationManager.DisplayWarningNotification("The hideout could not be opened.");
+                    yield return RoomDoor.FadeTo(0f);
+                    _busy = false;
+                    yield break;
+                }
+                var origin = HideoutBunker.Moved;
+
+                HideoutBunker.Park(false);
+                BotFreeze.Set(true);
+                HideoutStations.ShowAll();
+                HideoutBunker.Sun(false);
+                if (HideoutBunker.BunkerSettings != null)
+                {
+                    HideoutBunker.BunkerSettings.ApplySettings();
+                }
+
+                var arrival = origin + Arrival;
+                // Arriving, the player faces the way they always have: out from the nearest wall.
+                Vector3 wallGround;
+                float exitYaw;
+                if (!RoomDoor.FindWall(arrival, out wallGround, out exitYaw))
+                {
+                    exitYaw = 0f;
+                }
+                // The way out is the closed door at the end of the small room up the steps (the one
+                // the cultists' room lies behind): something to use, laid over that door and not drawn.
+                _exit = RoomDoor.Spawn("Leave hideout", origin + ExitDoor, ExitDoorYaw);
+                var exitDrawn = _exit.GetComponent<MeshRenderer>();
+                if (exitDrawn != null)
+                {
+                    exitDrawn.enabled = false;
+                }
+                _exit.OnUse = Leave;
+                RefreshExits();
+
+                _returnTo = returnTo;
+                _returnYaw = returnYaw;
+                Inside = id;
+                if (atBed)
+                {
+                    // Waking up: stand by the Rest Space, on whatever floor is beside it.
+                    var controller = HideoutStations.Controller();
+                    EFT.Hideout.HideoutArea rest;
+                    Bounds bedBounds;
+                    if (controller != null && controller.Areas.TryGetValue(EAreaType.RestSpace, out rest) && HideoutStations.LevelBounds(rest, 1, out bedBounds))
                     {
-                        arrival = floor.point + Vector3.up * 0.05f;
+                        var towardsHall = (origin - bedBounds.center);
+                        towardsHall.y = 0f;
+                        var beside = bedBounds.center + towardsHall.normalized * (Mathf.Max(bedBounds.extents.x, bedBounds.extents.z) + 0.9f);
+                        RaycastHit floor;
+                        if (Physics.Raycast(new Vector3(beside.x, bedBounds.max.y + 1.5f, beside.z), Vector3.down, out floor, 6f,
+                                LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain"), QueryTriggerInteraction.Ignore))
+                        {
+                            arrival = floor.point + Vector3.up * 0.05f;
+                        }
                     }
                 }
+                // Needs to know which hideout this is, so only now.
+                var recipes = HideoutCrafting.Load();
+                player.Teleport(arrival, false);
+                player.Rotation = new Vector2(exitYaw, 0f);
+                yield return new WaitForSecondsRealtime(0.3f);
+                RoomDoor.PlayDoorSound(false, arrival);
+                yield return RoomDoor.FadeTo(0f);
+                Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + (origin + ExitDoor).ToString("F1") + "; boosts: " + HideoutBoosts.Describe());
+                HideoutBoosts.Announce();
+                HideoutCrafting.AnnounceDue();
+                WorldClock.Send("entered a hideout");
+                _busy = false;
             }
-            // Needs to know which hideout this is, so only now.
-            var recipes = HideoutCrafting.Load();
-            player.Teleport(arrival, false);
-            player.Rotation = new Vector2(exitYaw, 0f);
-            yield return new WaitForSecondsRealtime(0.3f);
-            RoomDoor.PlayDoorSound(false, arrival);
-            yield return RoomDoor.FadeTo(0f);
-            Plugin.Log.LogInfo("Entered hideout '" + id + "'; exit door at " + (origin + ExitDoor).ToString("F1") + "; boosts: " + HideoutBoosts.Describe());
-            HideoutBoosts.Announce();
-            HideoutCrafting.AnnounceDue();
-            WorldClock.Send("entered a hideout");
-            _busy = false;
+            finally
+            {
+                // However the way through ended, the doors work again; a way in that broke
+                // off leaves the player where they were, able to see.
+                _busy = false;
+                if (Inside == null)
+                {
+                    RoomDoor.FadeText = null;
+                    RoomDoor.Fade = 0f;
+                }
+            }
         }
 
         private static IEnumerator Leaving()
         {
             _busy = true;
-            var player = GamePlayerOwner.MyPlayer;
-            RoomDoor.PlayDoorSound(true, player.Transform.position);
-            yield return RoomDoor.FadeTo(1f);
-            player.Teleport(_returnTo, false);
-            player.Rotation = new Vector2(_returnYaw, 0f);
-            string was = Inside;
-            StepOut();
-            yield return new WaitForSecondsRealtime(0.2f);
-            HideoutBunker.Park(true);
-            BotFreeze.Set(false);
-            RoomDoor.PlayDoorSound(false, _returnTo);
-            yield return RoomDoor.FadeTo(0f);
-            Plugin.Log.LogInfo("Left hideout '" + was + "'");
-            _busy = false;
+            try
+            {
+                var player = GamePlayerOwner.MyPlayer;
+                RoomDoor.PlayDoorSound(true, player.Transform.position);
+                yield return RoomDoor.FadeTo(1f);
+                player.Teleport(_returnTo, false);
+                player.Rotation = new Vector2(_returnYaw, 0f);
+                string was = Inside;
+                StepOut();
+                yield return new WaitForSecondsRealtime(0.2f);
+                HideoutBunker.Park(true);
+                BotFreeze.Set(false);
+                RoomDoor.PlayDoorSound(false, _returnTo);
+                yield return RoomDoor.FadeTo(0f);
+                Plugin.Log.LogInfo("Left hideout '" + was + "'");
+                _busy = false;
+            }
+            finally
+            {
+                // However the way through ended, the doors work again; a way in that broke
+                // off leaves the player where they were, able to see.
+                _busy = false;
+                if (Inside == null)
+                {
+                    RoomDoor.FadeText = null;
+                    RoomDoor.Fade = 0f;
+                }
+            }
         }
 
         /// <summary>Puts the map's own light back. The interior stays loaded for the next visit.</summary>
@@ -571,6 +602,7 @@ namespace ZeroMenuTime
             HideoutPanel.Close();
             HideoutGunsmith.Close();
             BotFreeze.Set(false);
+            _busy = false;
             if (Inside != null)
             {
                 HideoutStash.Send("raid ending");

@@ -19,8 +19,8 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 
 - Every trader has a **door** at their spot on the map. Through it is the trader's **own room**, furnished in their style (Prapor's armoury, Therapist's clinic, Skier's den, Jaeger's cabin, ...). Bots cannot follow you in.
 - Inside, talk to the trader: **Trade**, **Collect deliveries**, **Save and go to menu**.
-- Trades are paid from what you carry and bought items go into your gear. The stash is not involved.
-- **Quests** are accepted and handed in at the trader. On hand-in the **reward items are laid on the table** in front of you; experience and standing follow when the raid ends.
+- Trades are paid from what you carry, and what you buy is **laid on the trader's table**, to pick up by hand. The stash is not involved.
+- **Quests** are accepted and handed in at the trader. Items a quest gives when you accept it, and the **reward items** when you hand it in, are **laid on the table** in front of you; experience and standing follow when the raid ends.
 - Mail from traders (quest rewards, insurance returns) waits **on the table**. Anything you leave there is still there next time.
 - Every trader stocks a few **field supplies** (basic meds, food, water, a surgical kit) and the **map of the area they stand in**, so you are never stranded.
 
@@ -42,6 +42,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - **One world clock**. The time of day carries on from raid to raid, and **raids have no time limit**.
 - **Sleep** at the Rest Space: the clock jumps, you heal, and you get hungry and thirsty as if the hours had passed.
 - **Save** at the bed (sleeping saves too), or with **Save and go to menu** at a trader. If you die, your **last save** is put back: you wake at your bed, or continue at the trader you saved at, with the gear, health, skills, quests, hideout and clock of that save. If the game stops mid-raid after a bed save, you wake at your bed.
+- Want deaths to hurt? Set **When you die** to lose the gear you carried (like Tarkov: the secure container is kept) or everything, the secure container too. The save still puts back skills, quests, the hideout and the clock; what you keep in the hideout is never lost.
 
 ### A menu of its own
 
@@ -175,6 +176,7 @@ Press **F12** in game and open **r2rka1-ZeroMenuTime**.
 | No menus | Seconds before continuing | 4 | Countdown in the main menu |
 | No menus | Stay in menu key | Backspace | Hold during the countdown to stay in the menu |
 | Death | Ask where to continue | on | Without a save, ask whether to continue at the hideout or where you died |
+| Death | When you die | KeepItems | KeepItems: the save is put back with its gear. LoseGearLikeTarkov: what you carried is lost, the secure container is kept. LoseEverything: the secure container is emptied too |
 | Metabolism | Slow hunger and thirst as they empty | on | Food and water drain more slowly as they run low |
 | Pictures | Take a picture key | F11 | Save the view without the interface to `BepInEx/plugins/ZeroMenuTime/screenshots` |
 | Pictures | Hide the interface key | F9 | Hide the interface until pressed again |
@@ -198,9 +200,8 @@ Hideout doors can be moved the same way in `hideouts.json`.
 - Rooms are bare for about half a minute after a raid starts, while their furniture is fetched. Using a door earlier waits behind a dark screen until it is ready.
 - Only the backpack (or the rig) is offered for selling; payment and purchases use everything you carry.
 - Barter trades paid with items do not count toward trader loyalty.
-- Quests that hand you an item when accepted do not deliver it if accepted in a raid.
 - Air filters and the Equipment Stand's outfits are not built.
-- Gear lost in a death is still reported to insurance, so insured items can come back twice after the save is restored.
+- With **When you die** on KeepItems, gear lost in a death is still reported to insurance, so insured items can come back twice after the save is restored.
 - If the game crashes after a quest hand-in, the reward items you picked up are kept although the quest is not recorded as done.
 - Trader figures are stand-ins dressed in the game's own clothing.
 - Post-raid healing is skipped along with the other result screens.

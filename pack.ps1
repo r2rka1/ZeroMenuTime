@@ -1,8 +1,8 @@
 # Builds both halves of the mod and makes a zip that unpacks straight into the SPT game folder.
-# Usage:  .\pack.ps1 [-TarkovDir F:\SPT\] [-Version 1.1.2]
+# Usage:  .\pack.ps1 [-TarkovDir F:\SPT\] [-Version 1.1.3]
 param(
     [string]$TarkovDir = 'F:\SPT\',
-    [string]$Version = '1.1.2'
+    [string]$Version = '1.1.3'
 )
 
 $ErrorActionPreference = 'Stop'

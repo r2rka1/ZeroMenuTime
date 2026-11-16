@@ -30,6 +30,129 @@ namespace ZeroMenuTime
 
         private static readonly List<GameObject> Spawned = new List<GameObject>();
 
+        /// <summary>Every door of ours that exists right now.</summary>
+        internal static readonly List<RoomDoor> All = new List<RoomDoor>();
+
+        private void Awake()
+        {
+            All.Add(this);
+        }
+
+        private void OnDestroy()
+        {
+            All.Remove(this);
+        }
+
+        /// <summary>How deep the space is, through the door, in which looking at it counts.</summary>
+        private const float ReachDepth = 1.0f;
+
+        /// <summary>
+        /// Where the ray meets the door, measured along the ray. The door counts as a block as wide
+        /// and tall as itself and a metre deep, centred on it, so it is met from either side and
+        /// through the map's own door leaf or frame laid over it.
+        /// </summary>
+        public bool Meets(Ray ray, out float distance, out Matrix4x4 toDoor, out Vector3 size)
+        {
+            distance = 0f;
+            toDoor = Matrix4x4.identity;
+            size = Vector3.zero;
+            if (!isActiveAndEnabled)
+            {
+                return false;
+            }
+            Vector3 centre;
+            var box = GetComponent<BoxCollider>();
+            if (box != null)
+            {
+                centre = transform.TransformPoint(box.center);
+                size = Vector3.Scale(box.size, transform.lossyScale);
+            }
+            else
+            {
+                var collider = GetComponent<Collider>();
+                if (collider == null)
+                {
+                    return false;
+                }
+                centre = collider.bounds.center;
+                size = Quaternion.Inverse(transform.rotation) * collider.bounds.size;
+            }
+            size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
+            // The thinnest side is the way through the door.
+            if (size.x <= size.y && size.x <= size.z)
+            {
+                size.x = Mathf.Max(size.x, ReachDepth);
+            }
+            else if (size.z <= size.y)
+            {
+                size.z = Mathf.Max(size.z, ReachDepth);
+            }
+            else
+            {
+                size.y = Mathf.Max(size.y, ReachDepth);
+            }
+            toDoor = Matrix4x4.TRS(centre, transform.rotation, Vector3.one).inverse;
+            var local = new Ray(toDoor.MultiplyPoint3x4(ray.origin), toDoor.MultiplyVector(ray.direction));
+            var bounds = new Bounds(Vector3.zero, size);
+            if (bounds.Contains(local.origin))
+            {
+                return true;
+            }
+            return bounds.IntersectRay(local, out distance);
+        }
+
+        private static readonly RaycastHit[] Hits = new RaycastHit[16];
+
+        /// <summary>
+        /// The door of ours the ray finds within reach with nothing solid in between, or null. The
+        /// door's own frame and the map's door it is laid over do not count as in between.
+        /// </summary>
+        public static RoomDoor Seen(Ray ray, float reach, out float distance)
+        {
+            distance = 0f;
+            RoomDoor best = null;
+            float nearest = reach;
+            foreach (var door in All)
+            {
+                float at;
+                Matrix4x4 toDoor;
+                Vector3 size;
+                if (door == null || !door.Meets(ray, out at, out toDoor, out size) || at > nearest)
+                {
+                    continue;
+                }
+                bool blocked = false;
+                int count = Physics.RaycastNonAlloc(ray, Hits, at, SolidMask, QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < count && !blocked; i++)
+                {
+                    // Anything within the door's own block, or its frame just around it, is the doorway.
+                    var p = toDoor.MultiplyPoint3x4(Hits[i].point);
+                    blocked = Mathf.Abs(p.x) > size.x / 2f + 0.35f || Mathf.Abs(p.y) > size.y / 2f + 0.35f || Mathf.Abs(p.z) > size.z / 2f + 0.35f;
+                }
+                if (blocked)
+                {
+                    continue;
+                }
+                best = door;
+                nearest = at;
+            }
+            distance = nearest;
+            return best;
+        }
+
+        private static int _solidMask;
+        private static int SolidMask
+        {
+            get
+            {
+                if (_solidMask == 0)
+                {
+                    _solidMask = LayerMask.GetMask("HighPolyCollider", "TransparentCollider", "LowPolyCollider", "Terrain");
+                }
+                return _solidMask;
+            }
+        }
+
         public AvailableInteractionState GetActions()
         {
             var state = new AvailableInteractionState();

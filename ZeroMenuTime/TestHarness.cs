@@ -1134,6 +1134,110 @@ namespace ZeroMenuTime
                     Screenshot(parts.Length > 4 ? parts[4] : "shot");
                     break;
                 }
+                case "doorcheck":
+                {
+                    // doorcheck [WORD]: for every door of ours (or those whose label has WORD), stand
+                    // on each side of it at a few angles, look at it, and report whether the game itself
+                    // offers its menu there. A side with no floor or no clear view is skipped.
+                    string word = parts.Length > 1 ? parts[1].ToLowerInvariant().Replace("_", " ") : null;
+                    var start = player.Transform.position;
+                    var startLook = player.Rotation;
+                    int good = 0, bad = 0;
+                    foreach (var door in RoomDoor.All.ToArray())
+                    {
+                        if (door == null || (word != null && (door.Label ?? "").ToLowerInvariant().IndexOf(word) < 0))
+                        {
+                            continue;
+                        }
+                        string report = "'" + door.Label + "' at " + door.transform.position.ToString("F1") + ":";
+                        foreach (int side in new[] { 1, -1 })
+                        {
+                            string sideText = side > 0 ? " front" : " back";
+                            int sideGood = 0, sideBad = 0, tried = 0;
+                            foreach (float angle in new[] { 0f, 35f, -35f })
+                            {
+                                foreach (float reach in new[] { 1.1f, 0.7f })
+                                {
+                                    var result = new string[1];
+                                    yield return LookAtDoor(player, door, side, angle, reach, result);
+                                    if (result[0] == null)
+                                    {
+                                        continue;
+                                    }
+                                    tried++;
+                                    if (result[0] == "ok")
+                                    {
+                                        sideGood++;
+                                    }
+                                    else
+                                    {
+                                        sideBad++;
+                                        sideText += " [" + angle.ToString("F0") + "deg " + reach.ToString("F1") + "m: " + result[0] + "]";
+                                    }
+                                }
+                            }
+                            report += sideText + (tried == 0 ? " no place to stand" : " " + sideGood + "/" + tried);
+                            good += sideGood;
+                            bad += sideBad;
+                        }
+                        Report(report);
+                    }
+                    player.Teleport(start, false);
+                    player.Rotation = startLook;
+                    Report((bad == 0 ? "PASS" : "FAILED") + " door menus: " + good + " shown, " + bad + " missing");
+                    break;
+                }
+                case "doorlook":
+                {
+                    // doorlook WORD SIDE: stand in front (1) or behind (-1) the door whose label has WORD and look at it.
+                    RoomDoor found = null;
+                    foreach (var door in RoomDoor.All)
+                    {
+                        if (door != null && (door.Label ?? "").ToLowerInvariant().IndexOf(parts[1].ToLowerInvariant().Replace("_", " ")) >= 0)
+                        {
+                            found = door;
+                            break;
+                        }
+                    }
+                    if (found == null)
+                    {
+                        Report("FAILED no such door");
+                        break;
+                    }
+                    var result = new string[1];
+                    yield return LookAtDoor(player, found, parts.Length > 2 ? (int)Number(parts[2]) : 1, 0f, 1.1f, result);
+                    Report("looking at '" + found.Label + "': " + (result[0] ?? "no place to stand"));
+                    break;
+                }
+                case "press":
+                {
+                    // press: what pressing the action key does now, through the game's own menu for
+                    // the thing looked at (its first action).
+                    var seen = player.InteractableObject;
+                    if (seen == null)
+                    {
+                        Report("FAILED nothing offered");
+                        break;
+                    }
+                    var owner = player.GetComponent<GamePlayerOwner>();
+                    var actions = InteractionContextHelper.GetAvailableActions(owner, seen);
+                    if (actions == null || actions.Actions.Count == 0 || actions.Actions[0].Disabled)
+                    {
+                        Report("FAILED no usable action on " + seen.name);
+                        break;
+                    }
+                    var before = player.Transform.position;
+                    Report("pressing '" + actions.Actions[0].Name + "'");
+                    actions.Actions[0].Action();
+                    for (int i = 0; i < 60 && Vector3.Distance(before, player.Transform.position) < 3f; i++)
+                    {
+                        yield return new WaitForSecondsRealtime(0.5f);
+                    }
+                    yield return new WaitForSecondsRealtime(2f);
+                    bool moved = Vector3.Distance(before, player.Transform.position) >= 3f;
+                    Report((moved ? "PASS" : "FAILED") + " went through: now at " + player.Transform.position.ToString("F1") + ", inside hideout: " + (HideoutDoors.Inside ?? "none") + ", screen " + (RoomDoor.Fade > 0.5f ? "dark" : "clear"));
+                    break;
+                }
                 case "target":
                 {
                     // What the game currently offers to interact with, and the actions we would give it.
@@ -1417,6 +1521,58 @@ namespace ZeroMenuTime
                 default:
                     Report("FAILED unknown command");
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Stands REACH metres off a door on one side of it (1 in front, -1 behind), turned ANGLE
+        /// degrees round it, looks at its middle and says what the game offers: "ok" for the door's
+        /// own menu, else what came instead. Null when there is nowhere to stand there.
+        /// </summary>
+        private static IEnumerator LookAtDoor(Player player, RoomDoor door, int side, float angle, float reach, string[] result)
+        {
+            result[0] = null;
+            var collider = door.GetComponent<Collider>();
+            var centre = collider != null ? collider.bounds.center : door.transform.position;
+            // The way through the door: its thinnest side.
+            var box = door.GetComponent<BoxCollider>();
+            var size = box != null ? Vector3.Scale(box.size, door.transform.lossyScale) : Vector3.one;
+            Vector3 through = size.x <= size.y && size.x <= size.z ? door.transform.right : size.z <= size.y ? door.transform.forward : door.transform.up;
+            through.y = 0f;
+            through = through.normalized * side;
+            var direction = Quaternion.Euler(0f, angle, 0f) * through;
+            int solid = LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain");
+            var spot = centre + direction * (reach + 0.3f);
+            RaycastHit floor;
+            if (!Physics.Raycast(spot + Vector3.up * 0.6f, Vector3.down, out floor, 2.6f, solid, QueryTriggerInteraction.Ignore)
+                || Physics.CheckCapsule(floor.point + Vector3.up * 0.4f, floor.point + Vector3.up * 1.6f, 0.25f, solid, QueryTriggerInteraction.Ignore))
+            {
+                yield break;
+            }
+            var eye = floor.point + Vector3.up * 1.55f;
+            var toDoor = centre - eye;
+            // The view to the door must be open up to its own block.
+            if (Physics.Linecast(eye, centre - toDoor.normalized * 0.9f, solid, QueryTriggerInteraction.Ignore))
+            {
+                yield break;
+            }
+            player.Teleport(floor.point + Vector3.up * 0.05f, false);
+            for (int i = 0; i < 4; i++)
+            {
+                var to = centre - (player.Transform.position + Vector3.up * 1.55f);
+                player.Rotation = new Vector2(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, -Mathf.Asin(Mathf.Clamp(to.normalized.y, -1f, 1f)) * Mathf.Rad2Deg);
+                yield return new WaitForSecondsRealtime(0.15f);
+            }
+            var seen = player.InteractableObject;
+            if (seen == door)
+            {
+                var owner = player.GetComponent<GamePlayerOwner>();
+                var actions = InteractionContextHelper.GetAvailableActions(owner, seen);
+                result[0] = actions != null && actions.Actions.Count > 0 && !actions.Actions[0].Disabled ? "ok" : "no action";
+            }
+            else
+            {
+                result[0] = seen == null ? "nothing" : seen.name;
             }
         }
 

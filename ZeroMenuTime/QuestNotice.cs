@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
+using Comfort.Common;
 using Diz.LanguageExtensions;
 using EFT.Communications;
 using EFT.InventoryLogic;
@@ -122,6 +123,63 @@ namespace ZeroMenuTime
                 Plugin.Log.LogWarning("Handing over reward items failed: " + e.Message);
                 return false;
             }
+        }
+    }
+
+    /// <summary>
+    /// Starting a quest in a raid only changes its status in the game; the items some quests give
+    /// at the start never came. They are asked for from the server, which leaves them with the
+    /// quest's trader, and laid on that trader's table.
+    /// </summary>
+    public class QuestStartItemsPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(QuestControllerClientLocalGame), nameof(QuestControllerClientLocalGame.AcceptQuest));
+        }
+
+        [PatchPostfix]
+        public static void Postfix(Quest quest, ref Task<IResult> __result)
+        {
+            __result = After(__result, quest != null ? quest.Id : null);
+        }
+
+        private static async Task<IResult> After(Task<IResult> original, string questId)
+        {
+            var result = await original;
+            try
+            {
+                if (result != null && !result.Failed && !string.IsNullOrEmpty(questId))
+                {
+                    string body = Newtonsoft.Json.JsonConvert.SerializeObject(new { QuestId = questId });
+                    var reply = Newtonsoft.Json.Linq.JObject.Parse(
+                        await SPT.Common.Http.RequestHandler.PostJsonAsync("/zeromenutime/quest/started", body));
+                    int count = (int?)reply["Count"] ?? 0;
+                    string traderId = (string)reply["TraderId"];
+                    if (!((bool?)reply["Ok"] ?? false))
+                    {
+                        Plugin.Log.LogWarning("Starting items for quest " + questId + " not handed over: " + reply["Error"]);
+                    }
+                    else if (count > 0)
+                    {
+                        Plugin.Log.LogInfo("Quest " + questId + " started; " + count + " starting item(s) are with " + TraderConfig.NameOf(traderId));
+                        if (TraderRoom.For(traderId) != null)
+                        {
+                            Mail.Collect(traderId, TraderConfig.NameOf(traderId));
+                        }
+                        else
+                        {
+                            NotificationManager.DisplayMessageNotification("Quest started. Collect its items from " + TraderConfig.NameOf(traderId) + ".",
+                                ENotificationDurationType.Long);
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Quest starting items failed: " + e.Message);
+            }
+            return result;
         }
     }
 }

@@ -19,6 +19,41 @@ namespace ZeroMenuTime
     {
         public static ConfigEntry<bool> Ask;
 
+        public enum Loss
+        {
+            /// <summary>The save is put back as it was, gear and all.</summary>
+            KeepItems,
+            /// <summary>The save is put back, but the gear is what the game leaves after a death.</summary>
+            LoseGearLikeTarkov,
+            /// <summary>As above, and the secure container is emptied too.</summary>
+            LoseEverything,
+        }
+
+        public static ConfigEntry<Loss> OnDeath;
+
+        private static string ModeName(Loss loss)
+        {
+            return loss == Loss.LoseEverything ? "everything" : loss == Loss.LoseGearLikeTarkov ? "tarkov" : "keep";
+        }
+
+        /// <summary>Tells the server what a death takes; it applies that when the raid ends.</summary>
+        public static async void SendMode()
+        {
+            try
+            {
+                string body = JsonConvert.SerializeObject(new { Mode = ModeName(OnDeath.Value) });
+                var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/death/mode", body));
+                if (!((bool?)reply["Ok"] ?? false))
+                {
+                    Plugin.Log.LogWarning("Death setting not taken by the server: " + reply["Error"]);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Death setting not sent: " + e.Message);
+            }
+        }
+
         /// <summary>A death has not been answered yet; ask once the main menu is up.</summary>
         public static bool Pending;
 
@@ -28,6 +63,11 @@ namespace ZeroMenuTime
         {
             Ask = config.Bind("Death", "Ask where to continue", true,
                 "After dying, ask whether to continue at the hideout or where you died, instead of being moved automatically.");
+            OnDeath = config.Bind("Death", "When you die", Loss.KeepItems,
+                "What a death takes. KeepItems: your last save is put back with the gear you had then. "
+                + "LoseGearLikeTarkov: the save is put back, but what you wore and carried is lost (the secure container is kept, insurance works). "
+                + "LoseEverything: the same, and the secure container is emptied too. Gear kept in the hideout is never lost.");
+            OnDeath.SettingChanged += (_, __) => SendMode();
         }
 
         /// <summary>Runs when the main menu appears after a death.</summary>
@@ -56,13 +96,13 @@ namespace ZeroMenuTime
                 if (string.IsNullOrEmpty(bed))
                 {
                     Plugin.Log.LogInfo("Died with a save made at a trader (" + (string)status["Exit"] + ")");
-                    NotificationManager.DisplayMessageNotification("You died. Your last save was put back; you will continue at the trader where you saved.",
+                    NotificationManager.DisplayMessageNotification("You died. Your last save was put back" + LossText() + "; you will continue at the trader where you saved.",
                         ENotificationDurationType.Long);
                     _asking = false;
                     yield break;
                 }
                 Plugin.Log.LogInfo("Died with a save; the next raid begins at the bed of hideout '" + bed + "'");
-                NotificationManager.DisplayMessageNotification("You died. Your last save was put back; you will wake up at your bed in the "
+                NotificationManager.DisplayMessageNotification("You died. Your last save was put back" + LossText() + "; you will wake up at your bed in the "
                     + char.ToUpper(bed[0]) + bed.Substring(1) + " hideout.", ENotificationDurationType.Long);
                 _asking = false;
                 yield break;
@@ -90,6 +130,19 @@ namespace ZeroMenuTime
                 Plugin.Log.LogError("Could not ask where to continue: " + e);
             }
             _asking = false;
+        }
+
+        private static string LossText()
+        {
+            switch (OnDeath.Value)
+            {
+                case Loss.LoseGearLikeTarkov:
+                    return ", but the gear you carried is lost";
+                case Loss.LoseEverything:
+                    return ", but everything you carried is lost, the secure container too";
+                default:
+                    return "";
+            }
         }
 
         private static async void Choose(string choice)

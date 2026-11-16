@@ -6,6 +6,7 @@ using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.Extensions;
 using SPTarkov.Server.Core.Models.Common;
 using SPTarkov.Server.Core.Models.Eft.Common;
+using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 using SPTarkov.Server.Core.Models.Eft.Match;
 using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Models.Utils;
@@ -27,6 +28,8 @@ public sealed class SaveRequest : IRequestData
     public string Exit { get; set; } = "";
     /// <summary>For the testing route "travel": the map (Vagabond's name) to continue on.</summary>
     public string Map { get; set; } = "";
+    /// <summary>For "death/mode": what a death takes. "keep", "tarkov" or "everything".</summary>
+    public string Mode { get; set; } = "";
 }
 
 public sealed class SaveResponse
@@ -93,6 +96,117 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
     private static string HideoutsFile(string sessionId) => System.IO.Path.Combine(Dir(sessionId), "zeromenutime.save.hideouts.json");
     private static string MetaFile(string sessionId) => System.IO.Path.Combine(Dir(sessionId), "zeromenutime.save.meta.json");
     private static string LiveHideoutsFile(string sessionId) => System.IO.Path.Combine(Dir(sessionId), "zeromenutime.hideouts.json");
+    private static string DeathModeFile(string sessionId) => System.IO.Path.Combine(Dir(sessionId), "zeromenutime.deathmode.txt");
+
+    /// <summary>The client's choice of what a death takes; kept on disk so a restarted server still knows it.</summary>
+    public SaveResponse SetDeathMode(MongoId sessionId, SaveRequest request)
+    {
+        string mode = (request.Mode ?? "").ToLowerInvariant();
+        if (mode != "keep" && mode != "tarkov" && mode != "everything")
+        {
+            return new SaveResponse { Error = "Unknown mode: " + request.Mode };
+        }
+        try
+        {
+            Directory.CreateDirectory(Dir(sessionId.ToString()));
+            File.WriteAllText(DeathModeFile(sessionId.ToString()), mode);
+            return new SaveResponse { Ok = true };
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.Message };
+        }
+    }
+
+    private static string DeathMode(string sessionId)
+    {
+        try
+        {
+            string path = DeathModeFile(sessionId);
+            return File.Exists(path) ? File.ReadAllText(path).Trim() : "keep";
+        }
+        catch
+        {
+            return "keep";
+        }
+    }
+
+    private static readonly HashSet<string> KeptSlots = new(StringComparer.OrdinalIgnoreCase) { "Pockets", "SecuredContainer", "Dogtag", "ArmBand" };
+
+    private static List<Item> Below(List<Item> items, string parentId)
+    {
+        var found = new List<Item>();
+        var ids = new HashSet<string> { parentId };
+        bool added = true;
+        while (added)
+        {
+            added = false;
+            foreach (var item in items)
+            {
+                if (item.ParentId != null && ids.Contains(item.ParentId) && ids.Add(item.Id.ToString()))
+                {
+                    found.Add(item);
+                    added = true;
+                }
+            }
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// "Lose everything": of what the character wears, only the pockets and the secure container
+    /// themselves stay (the game needs them), empty.
+    /// </summary>
+    private static int StripAll(PmcData pmc)
+    {
+        var items = pmc.Inventory?.Items;
+        string? equipment = pmc.Inventory?.Equipment?.ToString();
+        if (items == null || equipment == null)
+        {
+            return 0;
+        }
+        var lost = new HashSet<string>();
+        foreach (var worn in items.Where(x => x.ParentId == equipment).ToList())
+        {
+            if (!KeptSlots.Contains(worn.SlotId ?? ""))
+            {
+                lost.Add(worn.Id.ToString());
+            }
+            foreach (var inside in Below(items, worn.Id.ToString()))
+            {
+                lost.Add(inside.Id.ToString());
+            }
+        }
+        items.RemoveAll(x => lost.Contains(x.Id.ToString()));
+        return lost.Count;
+    }
+
+    /// <summary>
+    /// The save is put back after a death, but what the character wore and carried is what the game
+    /// left after that death, not what it had when saving.
+    /// </summary>
+    private static void KeepTheLoss(PmcData dead, PmcData saved)
+    {
+        var savedItems = saved.Inventory?.Items;
+        var deadItems = dead.Inventory?.Items;
+        string? savedEquipment = saved.Inventory?.Equipment?.ToString();
+        string? deadEquipment = dead.Inventory?.Equipment?.ToString();
+        if (savedItems == null || deadItems == null || savedEquipment == null || deadEquipment == null)
+        {
+            return;
+        }
+        var gone = new HashSet<string>(Below(savedItems, savedEquipment).Select(x => x.Id.ToString()));
+        savedItems.RemoveAll(x => gone.Contains(x.Id.ToString()));
+        var have = new HashSet<string>(savedItems.Select(x => x.Id.ToString()));
+        foreach (var item in Below(deadItems, deadEquipment))
+        {
+            if (have.Contains(item.Id.ToString()))
+            {
+                continue;
+            }
+            savedItems.Add(item.ParentId == deadEquipment ? item with { ParentId = savedEquipment } : item);
+        }
+    }
 
     private SaveMeta? ReadMeta(string sessionId)
     {
@@ -371,8 +485,15 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                     return;
                 }
                 var meta = ReadMeta(id);
+                string mode = died ? DeathMode(id) : "keep";
                 if (meta == null)
                 {
+                    if (mode == "everything")
+                    {
+                        var pmc = saveServer.GetProfile(sessionId)?.CharacterData?.PmcData;
+                        int stripped = pmc != null ? StripAll(pmc) : 0;
+                        Console.WriteLine("[ZeroMenuTime] The character died; everything carried is lost (" + stripped + " item(s)).");
+                    }
                     return;
                 }
                 if (!died)
@@ -392,7 +513,16 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                     Console.WriteLine("[ZeroMenuTime] The save could not be read; the death stands as the game has it.");
                     return;
                 }
+                var dead = full.CharacterData.PmcData;
                 full.CharacterData.PmcData = saved;
+                if (mode != "keep" && dead != null)
+                {
+                    // The save is put back, but not the gear it had: what was on the character is lost.
+                    KeepTheLoss(dead, saved);
+                    int stripped = mode == "everything" ? StripAll(saved) : 0;
+                    Console.WriteLine("[ZeroMenuTime] Death mode '" + mode + "': the gear lost in the death stays lost"
+                        + (mode == "everything" ? ", the secure container's contents too (" + stripped + " more item(s))" : "") + ".");
+                }
                 if (File.Exists(HideoutsFile(id)))
                 {
                     File.Copy(HideoutsFile(id), LiveHideoutsFile(id), true);

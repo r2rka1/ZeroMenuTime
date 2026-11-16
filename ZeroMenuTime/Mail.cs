@@ -19,11 +19,15 @@ namespace ZeroMenuTime
     public static class Mail
     {
         private static bool _busy;
+        private static string _againTrader, _againName;
 
         public static async void Collect(string traderId, string traderName)
         {
             if (_busy)
             {
+                // Something more was left with a trader while the last lot was being laid out.
+                _againTrader = traderId;
+                _againName = traderName;
                 return;
             }
             _busy = true;
@@ -120,6 +124,13 @@ namespace ZeroMenuTime
             finally
             {
                 _busy = false;
+                if (_againTrader != null)
+                {
+                    string again = _againTrader, name = _againName;
+                    _againTrader = null;
+                    _againName = null;
+                    Collect(again, name);
+                }
             }
         }
     }

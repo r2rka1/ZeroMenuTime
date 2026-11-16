@@ -17,7 +17,7 @@ public class ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.r2rka1.zeromenutime";
     public string Name { get; init; } = "ZeroMenuTime";
     public string Author { get; init; } = "r2rka1";
-    public SemanticVersioning.Version Version { get; init; } = new("1.1.2");
+    public SemanticVersioning.Version Version { get; init; } = new("1.1.3");
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.6");
     public bool HasPrepatcher { get; init; }
     public string? Url { get; init; } = "https://github.com/r2rka1/ZeroMenuTime";
@@ -135,7 +135,10 @@ public class ZeroMenuTimeRouter(
     SPTarkov.Server.Core.Utils.Cloners.ICloner cloner,
     HideoutsService hideouts,
     SaveGameService saves,
-    NewGameService newGame) : StaticRouter(jsonUtil, [
+    NewGameService newGame,
+    SPTarkov.Server.Core.Services.Commerce.MailSendService mailSend,
+    SPTarkov.Server.Core.Helpers.Quest.QuestRewardHelper questRewards,
+    SPTarkov.Server.Core.Routers.EventOutputHolder outputs) : StaticRouter(jsonUtil, [
     new RouteAction<TradeReport>(
         "/zeromenutime/trade",
         (_, payload, sessionId, _, _) =>
@@ -160,6 +163,20 @@ public class ZeroMenuTimeRouter(
         "/zeromenutime/quest/rewards",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(TableRewards.Deliver(sessionId, payload, profileHelper, questHelper, cloner)) ?? "{}")
+    ),
+    new RouteAction<PurchaseMailRequest>(
+        "/zeromenutime/mail/purchase",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(TableGoods.Purchase(sessionId, payload, profileHelper, mailSend)) ?? "{}")
+    ),
+    new RouteAction<QuestRewardRequest>(
+        "/zeromenutime/quest/started",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(TableGoods.QuestStarted(sessionId, payload, profileHelper, questHelper, questRewards, outputs, mailSend)) ?? "{}")
+    ),
+    new RouteAction<SaveRequest>(
+        "/zeromenutime/death/mode",
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.SetDeathMode(sessionId, payload)) ?? "{}")
     ),
     new RouteAction<NewGameRequest>(
         "/zeromenutime/newgame",
