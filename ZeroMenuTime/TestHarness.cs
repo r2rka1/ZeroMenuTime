@@ -806,6 +806,14 @@ namespace ZeroMenuTime
                         HideoutPanel.Close();
                         Report("window closed");
                     }
+                    else if (what == "filter")
+                    {
+                        // panel filter KIND [WORDS]: KIND is ALL, CAN (for CAN MAKE) or a kind's name with _ for spaces.
+                        string kind = parts.Length > 2 ? parts[2].Replace('_', ' ').ToUpperInvariant() : "ALL";
+                        HideoutPanel.Filter(kind == "CAN" ? "CAN MAKE" : kind, parts.Length > 3 ? string.Join(" ", parts, 3, parts.Length - 3) : "");
+                        yield return null;
+                        what = "lines";
+                    }
                     else if (what == "press")
                     {
                         string words = string.Join(" ", parts, 2, parts.Length - 2);
@@ -824,6 +832,32 @@ namespace ZeroMenuTime
                             Report("  " + entry);
                         }
                     }
+                    break;
+                }
+                case "unpack":
+                {
+                    // unpack WORD_OR_TEMPLATE: unpack a sealed case at hand, as the item's menu would.
+                    string word = parts.Length > 1 ? parts[1] : "";
+                    var held = player.Profile.Inventory.Equipment.GetAllItems().ToList();
+                    if (HideoutStash.Current != null)
+                    {
+                        held.AddRange(HideoutStash.Current.GetAllItems());
+                    }
+                    var box = held.FirstOrDefault(i => i.TemplateId.ToString() == word)
+                              ?? held.FirstOrDefault(i => i.ItemInteractionButtons.Contains(EItemInfoButton.Unpack) && HideoutStations.FullName(i.TemplateId.ToString()).IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (box == null)
+                    {
+                        Report("FAILED nothing to unpack matches '" + word + "'");
+                        break;
+                    }
+                    int before = HideoutStash.Count();
+                    var opening = EFT.UI.ItemUiContext.Instance.UnpackItem(box);
+                    while (!opening.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report((opening.Result.Succeed ? "unpacked " : "FAILED " + opening.Result.Error + " ") + HideoutStations.FullName(box.TemplateId.ToString())
+                           + "; stash " + before + " -> " + HideoutStash.Count() + " item(s)");
                     break;
                 }
                 case "modify":

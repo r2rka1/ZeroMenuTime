@@ -44,7 +44,7 @@ namespace ZeroMenuTime
                 return;
             }
             _patched = true;
-            foreach (var patch in new ModulePatch[] { new RepairKitsAtHandPatch(), new RepairByKitPatch(), new NoTraderRepairInRaidPatch(), new RepairUnlockedPatch() })
+            foreach (var patch in new ModulePatch[] { new RepairKitsAtHandPatch(), new RepairByKitPatch(), new NoTraderRepairInRaidPatch(), new RepairUnlockedPatch(), new UnpackInRaidPatch() })
             {
                 try
                 {
@@ -190,7 +190,19 @@ namespace ZeroMenuTime
         {
             try
             {
-                if (__result || button != EItemInfoButton.Repair || !Repairs.InRaid)
+                if (__result || !Repairs.InRaid)
+                {
+                    return;
+                }
+                if (button == EItemInfoButton.Unpack)
+                {
+                    // A sealed case can be unpacked in the hideout, where there is a stash for what is inside.
+                    var item = Traverse.Create(__instance).Field("_item").GetValue<Item>();
+                    __result = Unpacking.Possible && item != null && item.ItemInteractionButtons.Contains(EItemInfoButton.Unpack)
+                               && !Traverse.Create(__instance).Property("BadContextType").GetValue<bool>();
+                    return;
+                }
+                if (button != EItemInfoButton.Repair)
                 {
                     return;
                 }

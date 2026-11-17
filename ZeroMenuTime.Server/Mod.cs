@@ -141,7 +141,14 @@ public class ZeroMenuTimeRouter(
     SPTarkov.Server.Core.Routers.EventOutputHolder outputs,
     SPTarkov.Server.Core.Services.Commerce.RepairService repairService,
     SPTarkov.Server.Core.Helpers.Ragfair.RepairHelper repairHelper,
+    SPTarkov.Server.Core.Helpers.Profile.InventoryHelper inventoryHelper,
+    SPTarkov.Server.Core.Generators.Loot.LootGenerator lootGenerator,
     SPTarkov.Server.Core.Models.Spt.Tables.TemplateTable templates) : StaticRouter(jsonUtil, [
+    new RouteAction<UnpackRequest>(
+        "/zeromenutime/unpack",
+        (_, payload, _, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(Unpack.Open(payload, templates, inventoryHelper, lootGenerator)) ?? "{}")
+    ),
     new RouteAction<KitRepairRequest>(
         "/zeromenutime/repair/kit",
         (_, payload, sessionId, _, _) =>

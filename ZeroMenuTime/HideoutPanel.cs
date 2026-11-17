@@ -37,6 +37,69 @@ namespace ZeroMenuTime
         private static bool _busy;
         private static TMP_FontAsset _font;
 
+        // The crafting list: which kind is shown, what was typed to search, whether the list is up.
+        private const string All = "ALL", Ready = "CAN MAKE";
+        private static string _kind = All, _search = "";
+        private static bool _listed, _toTop;
+        private static readonly string[,] Kinds =
+        {
+            { "5485a8684bdc2da71d8b4567", "AMMO" }, { "543be5cb4bdc2deb348b4568", "AMMO" },
+            { "5422acb9af1c889c16000029", "WEAPONS" }, { "5448fe124bdc2da5018b4567", "WEAPON PARTS" },
+            { "543be5664bdc2dd4348b4569", "MEDS" }, { "543be6674bdc2df1348b4569", "FOOD" },
+            { "543be5f84bdc2dd4348b456a", "GEAR" }, { "543be6564bdc2df4348b4568", "GRENADES" },
+            { "543be5e94bdc2df1348b4568", "KEYS" }, { "5448eb774bdc2d0a728b4567", "BARTER" },
+            { "62f109593b54472778797866", "CRATES" },
+        };
+
+        /// <summary>What kind of thing an item is, for the buttons over the crafting list.</summary>
+        private static string Kind(string template)
+        {
+            try
+            {
+                EFT.InventoryLogic.ItemTemplate found;
+                if (Singleton<ItemFactory>.Instance.ItemTemplates.TryGetValue(template, out found) && found != null)
+                {
+                    for (int i = 0; i < Kinds.GetLength(0); i++)
+                    {
+                        if (found.IsChildOf(Kinds[i, 0]))
+                        {
+                            return Kinds[i, 1];
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+            return "OTHER";
+        }
+
+        /// <summary>Whether a recipe's product or anything it needs has the typed words in its name.</summary>
+        private static bool Matches(HideoutCrafting.Recipe recipe, string words)
+        {
+            if (string.IsNullOrEmpty(words))
+            {
+                return true;
+            }
+            var names = new List<string> { HideoutStations.FullName(recipe.Product), HideoutStations.ItemName(recipe.Product) };
+            names.AddRange(recipe.Items.Select(cost => HideoutStations.FullName(cost.Tpl)));
+            names.AddRange(recipe.Tools.Select(tool => HideoutStations.FullName(tool)));
+            return words.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .All(word => names.Any(name => name.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0));
+        }
+
+        /// <summary>Sets what the crafting list shows; a kind's name, ALL or CAN MAKE, and words to search for.</summary>
+        public static void Filter(string kind, string search)
+        {
+            _kind = string.IsNullOrEmpty(kind) ? All : kind.ToUpperInvariant();
+            _search = search ?? "";
+            _toTop = true;
+            if (_canvas != null && !_busy)
+            {
+                Build();
+            }
+        }
+
         public static bool IsOpen => _canvas != null;
         public static int Area => _area;
 
@@ -48,6 +111,11 @@ namespace ZeroMenuTime
             }
             // What the stash holds may have changed behind the window's back (a part fitted to a gun).
             HideoutStash.Send("station window opened");
+            if (_area != area)
+            {
+                _kind = All;
+                _search = "";
+            }
             _area = area;
             _name = name;
             _nextRedraw = Time.unscaledTime + 10f;
@@ -120,6 +188,12 @@ namespace ZeroMenuTime
                 CursorSwitcher.SetCursorLockMode(true, Screen.fullScreenMode);
                 Cursor.visible = true;
             }
+            if (_listed && !_busy && Typed())
+            {
+                _toTop = true;
+                Build();
+                return;
+            }
             if (Time.unscaledTime >= _nextRedraw && !_busy && (_area == HideoutPower.Generator || _area == HideoutPower.BitcoinFarm
                                                               || _area == HideoutPower.WaterCollector || (_area == HideoutPower.ScavCase && !string.IsNullOrEmpty(HideoutPower.ScavRecipe))))
             {
@@ -141,6 +215,24 @@ namespace ZeroMenuTime
                     _status.text = StatusText(craft);
                 }
             }
+        }
+
+        /// <summary>Takes what was typed this frame into the search words. True if they changed.</summary>
+        private static bool Typed()
+        {
+            string before = _search;
+            foreach (char key in Input.inputString)
+            {
+                if (key == '\b')
+                {
+                    _search = _search.Length > 0 ? _search.Substring(0, _search.Length - 1) : "";
+                }
+                else if (!char.IsControl(key) && _search.Length < 24 && (key != ' ' || _search.Length > 0))
+                {
+                    _search += key;
+                }
+            }
+            return _search != before;
         }
 
         private static string StatusText(HideoutCrafting.Craft craft)
@@ -175,12 +267,17 @@ namespace ZeroMenuTime
                 return;
             }
             float scroll = 1f;
+            _listed = false;
             if (_canvas != null)
             {
                 var old = _canvas.GetComponentInChildren<ScrollRect>();
                 if (old != null)
                 {
                     scroll = old.verticalNormalizedPosition;
+                }
+                if (_toTop)
+                {
+                    scroll = 1f;
                 }
                 UnityEngine.Object.Destroy(_canvas);
             }
@@ -517,9 +614,40 @@ namespace ZeroMenuTime
                 {
                     Text(right, "<color=" + Bad + ">No power. Start the generator and this station will work.</color>", 16f, Ink, false);
                 }
+                _listed = true;
+                _toTop = false;
+                var ready = recipes.Where(r => HideoutCrafting.Missing(player, r) == null).ToList();
+                var kinds = recipes.GroupBy(r => Kind(r.Product)).OrderByDescending(g => g.Count()).ToList();
+                if (_kind != All && _kind != Ready && kinds.All(g => g.Key != _kind))
+                {
+                    _kind = All;
+                }
+                // A short list needs no sorting out.
+                if (recipes.Count > 4)
+                {
+                    RectTransform chips = null;
+                    float used = 0f;
+                    Chip(right, ref chips, ref used, All, recipes.Count);
+                    Chip(right, ref chips, ref used, Ready, ready.Count);
+                    if (kinds.Count > 1)
+                    {
+                        foreach (var kind in kinds)
+                        {
+                            Chip(right, ref chips, ref used, kind.Key, kind.Count());
+                        }
+                    }
+                    Text(right, _search.Length == 0
+                        ? "<color=" + Faint + ">Type to search by name</color>"
+                        : "Search: <b>" + _search + "</b><color=" + Faint + ">_   Backspace erases</color>", 16f, Ink, false);
+                }
+                var shown = recipes.Where(r => (_kind == All || (_kind == Ready ? ready.Contains(r) : Kind(r.Product) == _kind)) && Matches(r, _search)).ToList();
+                if (shown.Count == 0)
+                {
+                    Text(right, "Nothing here matches.", 18f, Dim, false);
+                }
                 var list = Scroll(right);
                 // What can be made right now comes first.
-                foreach (var recipe in recipes.OrderBy(r => HideoutCrafting.Missing(player, r) == null ? 0 : 1).ThenBy(r => HideoutStations.FullName(r.Product)))
+                foreach (var recipe in shown.OrderBy(r => ready.Contains(r) ? 0 : 1).ThenBy(r => HideoutStations.FullName(r.Product)))
                 {
                     var card = Card(list);
                     var top = Node(card, "top");
@@ -832,7 +960,32 @@ namespace ZeroMenuTime
             return content;
         }
 
-        private static void Button(RectTransform parent, string words, Action onClick, bool enabled, float width)
+        /// <summary>One of the buttons over the crafting list; the one in force is marked.</summary>
+        private static void Chip(RectTransform column, ref RectTransform row, ref float used, string kind, int count)
+        {
+            string words = kind + " " + count;
+            float width = 28f + 9.5f * words.Length;
+            // The buttons run on to a new row rather than push the window wider.
+            if (row == null || used + width > 640f)
+            {
+                row = Node(column, "kinds");
+                Horizontal(row, 8f);
+                used = 0f;
+            }
+            used += width + 8f;
+            var button = Button(row, words, () => Filter(kind, _search), true, width);
+            var size = button.GetComponent<LayoutElement>();
+            size.preferredHeight = size.minHeight = 34f;
+            button.Label.fontSize = 15f;
+            button.Label.characterSpacing = 1f;
+            if (kind == _kind)
+            {
+                button.RestBack = button.Background.color = new Color32(197, 160, 72, 70);
+                button.RestInk = button.Label.color = Gold;
+            }
+        }
+
+        private static PanelButton Button(RectTransform parent, string words, Action onClick, bool enabled, float width)
         {
             var holder = Node(parent, "button " + words);
             var image = holder.gameObject.AddComponent<Image>();
@@ -859,6 +1012,7 @@ namespace ZeroMenuTime
                 Horizontal(wrap, 0f);
                 holder.SetParent(wrap, false);
             }
+            return button;
         }
 
         /// <summary>Presses a button of the open window by its words; for the test harness.</summary>
@@ -920,6 +1074,7 @@ namespace ZeroMenuTime
         public TextMeshProUGUI Label;
         public Action Clicked;
         public bool Usable;
+        public Color RestBack = new Color32(231, 229, 212, 28), RestInk = new Color32(231, 229, 212, 255);
 
         public void OnPointerEnter(PointerEventData data)
         {
@@ -935,8 +1090,8 @@ namespace ZeroMenuTime
         {
             if (Usable)
             {
-                Background.color = new Color32(231, 229, 212, 28);
-                Label.color = new Color32(231, 229, 212, 255);
+                Background.color = RestBack;
+                Label.color = RestInk;
             }
         }
 
