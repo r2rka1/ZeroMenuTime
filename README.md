@@ -36,13 +36,14 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - The game's own hideout, loaded into the raid, behind an existing door on **Streets**, **Customs** and **Shoreline**. All three doors lead to the same hideout.
 - Stations open a **window** showing what the next level needs (and how much you have, with item pictures), what they can make, from what, and how long it takes.
 - **Build anything in any order**: no station, loyalty or skill requirements, and construction is instant. You still pay the materials.
-- **Crafting**, timed on the world clock: crafts keep running while you are away, asleep, or on another map.
+- **Crafting**, timed on the world clock: crafts keep running while you are away, asleep, or on another map. Long recipe lists can be narrowed: buttons for what you can make now and for each kind of product, and the list narrows as you type a name.
 - **Power**: fuel the Generator and switch it on. Without power the lights go out, crafts pause, and the bitcoin farm stops. Lamps (candles, bulbs, fluorescent) are fitted from the Generator's window.
 - **Bitcoin farm**, **Water Collector** with filters, **Solar Power**, **Scav Case**, **Cultist Circle**, **Gym** workouts, **Shooting Range** controls.
 - **Weapon modding** at the Workbench with the game's own modding screen, vital parts included, using parts from your gear and the stash.
 - **Weapon Stand, Place of Fame, Equipment Stand** hold and display what you put on them.
 - **Stash** in the hideout, with a **Sort stash** choice on the Stash station. Things sent between maps by the BTR driver arrive there.
 - **Repair kits** work on what you carry: right-click a weapon or armour piece and choose **Repair** for the game's own repair window. The kits counted are those you carry, and those in the stash while you are in the hideout. As in the menus, weapons need the Workbench built and armour the Lavatory. Traders do not repair yet.
+- **Sealed cases** (the weapon case of an airdrop, locked crates once unlocked) can be unpacked in the hideout: right-click the case and choose **Unpack**. What was inside goes into the stash.
 - While you are inside, the hideout's stations **heal and feed you** at the game's own bonus rates, and every bot on the map is paused. The map's outdoor sounds are hushed down there, and the game's own **Hideout volume** setting applies.
 
 ### Time, sleep and saving

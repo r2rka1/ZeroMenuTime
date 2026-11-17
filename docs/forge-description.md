@@ -43,9 +43,10 @@ Needs **[Vagabond](https://sp-mod.com/mod/2642/vagabond)**. Report bugs in the *
 - Behind an existing door on **Customs**, **Streets** and **Shoreline**. All three lead to the same hideout. While you are inside, the raid above stands still.
 - Look at a station and open its **window**: what the next level needs, what it can make, how long it takes. Build in any order; you pay the materials.
 - **Power**: fuel the Generator and switch it on. Without it the lights are out and crafts wait.
-- **Crafting** runs on the world clock, also while you raid or sleep.
+- **Crafting** runs on the world clock, also while you raid or sleep. Filter the recipe list by kind, by what you can make now, or by typing a name.
 - **Workbench**: the game's own weapon modding screen.
 - **Repair kits**: right-click a weapon or armour piece → Repair. Weapons need the Workbench, armour the Lavatory.
+- **Sealed cases** from airdrops: right-click → Unpack while in the hideout; the contents go to the stash.
 - **Stash** with a Sort choice. **Rest Space**: sleep, heal, save.
 - Bitcoin farm, Water Collector, Solar Power, Scav Case, Cultist Circle, Gym, Shooting Range, Weapon Stand, Place of Fame.
 
