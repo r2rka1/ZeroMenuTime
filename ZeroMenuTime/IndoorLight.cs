@@ -23,6 +23,13 @@ namespace ZeroMenuTime
         private static readonly Color HideoutFill = new Color(0.06f, 0.06f, 0.065f);
         private static readonly Color HideoutDark = new Color(0.012f, 0.012f, 0.014f);
 
+        // What the game's ambient light is held at indoors, whatever the hour.
+        public static Color RoomSky = new Color(0.20f, 0.20f, 0.22f);
+        public static Color HideoutSky = new Color(0.13f, 0.13f, 0.145f);
+        public static Color HideoutSkyDark = new Color(0.05f, 0.05f, 0.06f);
+        // How much of the sky may still be mirrored in shiny things indoors.
+        public static float Mirror = 0.2f, MirrorDark = 0.04f;
+
         /// <summary>Called every frame.</summary>
         public static void Tick()
         {
@@ -66,6 +73,12 @@ namespace ZeroMenuTime
                     _intensity = RenderSettings.ambientIntensity;
                     _reflection = RenderSettings.reflectionIntensity;
                     Camera.onPreCull += Hold;
+                    PushAmbient();
+                }
+                else if (_pushed != Indoors())
+                {
+                    // The power went on or off, or the player went from a room into the hideout.
+                    PushAmbient();
                 }
                 // The sky swaps sun for moon as the hours pass; catch whichever is lit now. Looking
                 // through every light on the map is slow, so only now and then.
@@ -93,6 +106,53 @@ namespace ZeroMenuTime
             RenderSettings.ambientGroundColor = fill;
             RenderSettings.ambientIntensity = 1f;
             RenderSettings.reflectionIntensity = Mathf.Min(_reflection, 0.25f);
+        }
+
+        /// <summary>True while the player is in a room under the ground.</summary>
+        public static bool Dark => _dark;
+
+        /// <summary>The sky's own ambient light as it last gave it, to put back on stepping out.</summary>
+        public static SphericalHarmonicsL2 LastSky;
+        public static bool HasSky;
+        private static Color _pushed;
+
+        /// <summary>What the game's ambient light is held at indoors, whatever the hour outside.</summary>
+        public static Color Indoors()
+        {
+            return HideoutDoors.Inside == null ? RoomSky : HideoutPower.Powered ? HideoutSky : HideoutSkyDark;
+        }
+
+        public static SphericalHarmonicsL2 IndoorsSh()
+        {
+            var sh = new SphericalHarmonicsL2();
+            sh.AddAmbientLight(Indoors().linear);
+            return sh;
+        }
+
+        /// <summary>
+        /// The game lights everything by an ambient light of its own, which the sky feeds with the
+        /// colour of the hour; left alone, a room under the ground is as bright as the day outside.
+        /// This hands it the light again: indoors the patch swaps in the indoor light, outdoors
+        /// the sky's own goes through.
+        /// </summary>
+        private static void PushAmbient()
+        {
+            try
+            {
+                _pushed = Indoors();
+                if (!HasSky)
+                {
+                    return;
+                }
+                foreach (var ambient in UnityEngine.Object.FindObjectsOfType<AmbientLight>())
+                {
+                    ambient.SetSH(LastSky);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Setting the indoor light failed: " + e.Message);
+            }
         }
 
         /// <summary>
@@ -152,11 +212,57 @@ namespace ZeroMenuTime
                 RenderSettings.ambientIntensity = _intensity;
                 RenderSettings.reflectionIntensity = _reflection;
                 HideoutBunker.Sun(true);
+                PushAmbient();
             }
             catch (Exception e)
             {
                 Plugin.Log.LogWarning("Putting the daylight back failed: " + e.Message);
             }
+        }
+    }
+
+    /// <summary>Indoors, the ambient light the sky hands the game is swapped for the indoor one.</summary>
+    public class IndoorAmbientPatch : SPT.Reflection.Patching.ModulePatch
+    {
+        protected override System.Reflection.MethodBase GetTargetMethod()
+        {
+            return HarmonyLib.AccessTools.Method(typeof(AmbientLight), nameof(AmbientLight.SetSH));
+        }
+
+        [SPT.Reflection.Patching.PatchPrefix]
+        public static void Prefix(ref SphericalHarmonicsL2 sh)
+        {
+            IndoorLight.LastSky = sh;
+            IndoorLight.HasSky = true;
+            if (IndoorLight.Dark)
+            {
+                sh = IndoorLight.IndoorsSh();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The game also mirrors the sky in everything that shines. Under the ground there is no sky to
+    /// mirror, so indoors those reflections are turned well down.
+    /// </summary>
+    public class IndoorReflectionPatch : SPT.Reflection.Patching.ModulePatch
+    {
+        private static readonly int Strength = Shader.PropertyToID("_ReflectionIntensity");
+
+        protected override System.Reflection.MethodBase GetTargetMethod()
+        {
+            return HarmonyLib.AccessTools.Method(typeof(AmbientLight), "method_3");
+        }
+
+        [SPT.Reflection.Patching.PatchPostfix]
+        public static void Postfix(MaterialPropertyBlock ____screenAmbientBlock)
+        {
+            if (!IndoorLight.Dark || ____screenAmbientBlock == null)
+            {
+                return;
+            }
+            float most = HideoutDoors.Inside != null && !HideoutPower.Powered ? IndoorLight.MirrorDark : IndoorLight.Mirror;
+            ____screenAmbientBlock.SetFloat(Strength, Mathf.Min(____screenAmbientBlock.GetFloat(Strength), most));
         }
     }
 }

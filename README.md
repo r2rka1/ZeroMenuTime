@@ -23,7 +23,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 ### Traders live on the maps
 
 - Every trader has a **door** at their spot on the map. Through it is the trader's **own room**, furnished in their style (Prapor's armoury, Therapist's clinic, Skier's den, Jaeger's cabin, ...). Bots cannot follow you in.
-- Inside, talk to the trader: **Trade**, **Collect deliveries**, **Save and go to menu**.
+- Inside, talk to the trader: **Trade**, **Collect deliveries**, **Wait until morning** (costs food and water, as sleep does), **Save**, **Save and go to menu**.
 - Trades are paid from what you carry, and what you buy is **laid on the trader's table**, to pick up by hand. The stash is not involved.
 - You can **sell what you wear** as well as what you carry: a slung rifle, a holstered pistol, a helmet, armour. It comes off you when sold. A pack, rig or case is only offered once it is empty, the secure container never, and the weapon in your hands is left out.
 - **Quests** are accepted and handed in at the trader. Items a quest gives when you accept it, and the **reward items** when you hand it in, are **laid on the table** in front of you; experience and standing follow when the raid ends.
@@ -43,14 +43,14 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - **Weapon Stand, Place of Fame, Equipment Stand** hold and display what you put on them.
 - **Stash** in the hideout, with a **Sort stash** choice on the Stash station. Things sent between maps by the BTR driver arrive there.
 - **Repair kits** work on what you carry: right-click a weapon or armour piece and choose **Repair** for the game's own repair window. The kits counted are those you carry, and those in the stash while you are in the hideout. As in the menus, weapons need the Workbench built and armour the Lavatory. Traders do not repair yet.
-- **Sealed cases** (the weapon case of an airdrop, locked crates once unlocked) can be unpacked in the hideout: right-click the case and choose **Unpack**. What was inside goes into the stash.
+- **Sealed cases** (the weapon case of an airdrop, locked crates once unlocked) can be unpacked in the hideout: right-click the case and choose **Unpack**. What was inside goes into the stash. A locked case with its key, a sealed box or a locked supply crate is first opened at the **Workbench** (under CRATES).
 - While you are inside, the hideout's stations **heal and feed you** at the game's own bonus rates, and every bot on the map is paused. The map's outdoor sounds are hushed down there, and the game's own **Hideout volume** setting applies.
 
 ### Time, sleep and saving
 
 - **One world clock**. The time of day carries on from raid to raid, and **raids have no time limit**.
 - **Sleep** at the Rest Space: the clock jumps, you heal, and you get hungry and thirsty as if the hours had passed.
-- **Save** at the bed (sleeping saves too), or with **Save and go to menu** at a trader. If you die, your **last save** is put back: you wake at your bed, or continue at the trader you saved at, with the gear, health, skills, quests, hideout and clock of that save. If the game stops mid-raid after a bed save, you wake at your bed.
+- **Save** at the bed (sleeping saves too), or at a trader with **Save** (the raid goes on) or **Save and go to menu**. If you die, your **last save** is put back: you wake at your bed, or continue at the trader you saved at, with the gear, health, skills, quests, hideout and clock of that save. If the game stops mid-raid after a bed save, you wake at your bed.
 - Want deaths to hurt? Set **When you die** to lose the gear you carried (the secure container is kept) or everything, the secure container too. The save still puts back skills, quests, the hideout and the clock; what you keep in the hideout is never lost.
 
 ### A menu of its own

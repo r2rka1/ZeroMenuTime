@@ -422,6 +422,33 @@ namespace ZeroMenuTime
             Fade = target;
         }
 
+        /// <summary>
+        /// Runs a piece of work, but waits for it no longer than the given time. Work that hangs
+        /// or breaks must not leave the player behind a dark screen for good.
+        /// </summary>
+        public static IEnumerator Within(IEnumerator work, float seconds, string what)
+        {
+            bool done = false;
+            Plugin.Instance.StartCoroutine(Finishing(work, () => done = true));
+            float waited = 0f;
+            while (!done && waited < seconds)
+            {
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (!done)
+            {
+                Plugin.Log.LogWarning("Gave up waiting for " + what + " after " + seconds.ToString("0") + " s; busy " + HideoutDoors.Busy
+                                      + ", interior loading " + HideoutBunker.Loading + ", loaded " + HideoutBunker.Loaded);
+            }
+        }
+
+        private static IEnumerator Finishing(IEnumerator work, System.Action then)
+        {
+            yield return work;
+            then();
+        }
+
         private static IEnumerator Travel(Vector3 destination, float yaw)
         {
             _travelling = true;
@@ -444,7 +471,8 @@ namespace ZeroMenuTime
                 if (RoomProps.AnyBare())
                 {
                     FadeText = "Opening the door...";
-                    yield return HideoutDoors.FurnishNow();
+                    // Never left waiting behind the dark screen: after a while the door opens anyway.
+                    yield return Within(HideoutDoors.FurnishNow(), 40f, "furnishing the rooms");
                     FadeText = null;
                 }
 

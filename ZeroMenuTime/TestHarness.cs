@@ -658,6 +658,96 @@ namespace ZeroMenuTime
                     player.ActiveHealthController.Kill(EDamageType.Bullet);
                     break;
                 }
+                case "sky":
+                {
+                    // sky set ROOM POWERED DARK: try other indoor levels for the sky's ambient colour.
+                    if (parts.Length > 4 && parts[1] == "set")
+                    {
+                        float r = Number(parts[2]), h = Number(parts[3]), d = Number(parts[4]);
+                        IndoorLight.RoomSky = new Color(r, r, r * 1.1f);
+                        IndoorLight.HideoutSky = new Color(h, h, h * 1.1f);
+                        IndoorLight.HideoutSkyDark = new Color(d, d, d * 1.1f);
+                        if (parts.Length > 6)
+                        {
+                            IndoorLight.Mirror = Number(parts[5]);
+                            IndoorLight.MirrorDark = Number(parts[6]);
+                        }
+                        Report("indoor sky levels set");
+                        break;
+                    }
+                    // What lights the scene from outside: sky lights and the fill light.
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<Light>(true))
+                    {
+                        if (light.type == LightType.Directional && light.enabled && light.gameObject.activeInHierarchy)
+                        {
+                            Report("directional '" + light.name + "' scene " + light.gameObject.scene.name + " enabled " + light.enabled + " active " + light.gameObject.activeInHierarchy
+                                   + " intensity " + light.intensity.ToString("F2") + " colour " + light.color);
+                        }
+                    }
+                    Report("ambient mode " + RenderSettings.ambientMode + " light " + RenderSettings.ambientLight + " intensity " + RenderSettings.ambientIntensity.ToString("F2")
+                           + " reflection " + RenderSettings.reflectionIntensity.ToString("F2") + " | inside " + (HideoutDoors.Inside ?? "no") + " powered " + HideoutPower.Powered);
+                    foreach (string name in new[] { "TOD_AmbientColor", "TOD_LightColor", "TOD_SunLightColor", "TOD_MoonLightColor", "TOD_GroundColor", "TOD_FogColor", "TOD_SunSkyColor", "_AmbientColor", "unity_AmbientSky", "_SunColor", "_LightColor0" })
+                    {
+                        Report("global " + name + " " + Shader.GetGlobalColor(name));
+                    }
+                    Report("global floats: TOD_Brightness " + Shader.GetGlobalFloat("TOD_Brightness") + " TOD_Contrast " + Shader.GetGlobalFloat("TOD_Contrast") + " TOD_Fogginess " + Shader.GetGlobalFloat("TOD_Fogginess"));
+                    int on = 0, total = 0;
+                    string kinds = "";
+                    foreach (var light in UnityEngine.Object.FindObjectsOfType<Light>())
+                    {
+                        total++;
+                        if (light.enabled && light.intensity > 0.01f)
+                        {
+                            on++;
+                            if (on <= 12)
+                            {
+                                kinds += " [" + light.type + " '" + light.name + "' " + light.intensity.ToString("F1") + " r" + light.range.ToString("F0") + " " + light.gameObject.scene.name + "]";
+                            }
+                        }
+                    }
+                    Report("lights on " + on + " of " + total + ":" + kinds);
+                    foreach (var probe in UnityEngine.Object.FindObjectsOfType<ReflectionProbe>())
+                    {
+                        if (probe.enabled && Vector3.Distance(probe.transform.position, player.Transform.position) < 60f)
+                        {
+                            Report("reflection probe '" + probe.name + "' " + probe.mode + " intensity " + probe.intensity.ToString("F2") + " size " + probe.size + " scene " + probe.gameObject.scene.name);
+                        }
+                    }
+                    break;
+                }
+                case "waitat":
+                {
+                    // waitat [HOURS]: what "Wait until morning" at a trader does (until morning with no number).
+                    HideoutSleep.Wait(parts.Length > 1 ? Number(parts[1]) : HideoutSleep.HoursUntilMorning());
+                    yield return new WaitForSecondsRealtime(6f);
+                    Report("clock: " + WorldClock.Describe(WorldClock.Now));
+                    goto case "vitals";
+                }
+                case "tradersave":
+                {
+                    // Chooses "Save" at the trader of the room the player is in.
+                    var room = RoomHolding(player.Transform.position);
+                    TraderInteractable owner = null;
+                    foreach (var trader in UnityEngine.Object.FindObjectsOfType<TraderInteractable>())
+                    {
+                        if (room != null && trader.TraderId == room.TraderId)
+                        {
+                            owner = trader;
+                        }
+                    }
+                    if (owner == null || owner.Exfil == null)
+                    {
+                        Report("not in a trader's room with an extract");
+                        break;
+                    }
+                    var saved = SaveGame.SaveNow("harness, at a trader", owner.Exfil.gameObject.name);
+                    while (!saved.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report("trader save: " + saved.Result);
+                    break;
+                }
                 case "sleep":
                 {
                     // sleep HOURS: what choosing a Sleep action at the Rest Space does.
@@ -1905,6 +1995,30 @@ namespace ZeroMenuTime
                     }
                     break;
                 }
+                case "accept":
+                {
+                    // accept QUEST_ID: takes a quest that is on offer, as the trade screen would.
+                    EFT.Quests.Quest offered = null;
+                    foreach (var quest in player.QuestController.Quests)
+                    {
+                        if (parts.Length > 1 && quest.Id == parts[1])
+                        {
+                            offered = quest;
+                        }
+                    }
+                    if (offered == null)
+                    {
+                        Report("FAILED no such quest");
+                        break;
+                    }
+                    var accepting = player.QuestController.AcceptQuest(offered, true);
+                    while (!accepting.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    Report("quest " + offered.Id + " is now " + offered.QuestStatus);
+                    break;
+                }
                 case "handin":
                 {
                     // Hands in a quest the player has in progress, exactly as the trade screen would,
@@ -2125,7 +2239,7 @@ namespace ZeroMenuTime
                          + " " + (hit.distance - 0.5f).ToString("F2") + " m below";
             }
             Report("map " + player.Location + ", at " + at.ToString("F2") + ", facing " + player.Rotation.x.ToString("F0")
-                   + ", alive " + player.HealthController.IsAlive + ", health " + Health(player).ToString("F0")
+                   + ", alive " + player.HealthController.IsAlive + ", solid below " + FallGuard.Below(at).ToString("F1") + " m, health " + Health(player).ToString("F0")
                    + ", in room " + (room != null ? TraderConfig.NameOf(room.TraderId) : "none")
                    + ", game says " + env + ", under feet: " + ground
                    + ", player layer " + LayerMask.LayerToName(player.gameObject.layer));

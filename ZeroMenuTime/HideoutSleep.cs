@@ -47,6 +47,49 @@ namespace ZeroMenuTime
             Plugin.Instance.StartCoroutine(Sleeping(hours));
         }
 
+        /// <summary>
+        /// Waiting at a trader: the clock moves on as in sleep and the wait costs food and water,
+        /// but there is no bed, so nothing heals and the game is not saved.
+        /// </summary>
+        public static void Wait(float hours)
+        {
+            if (_sleeping || Plugin.Instance == null || hours <= 0f || GamePlayerOwner.MyPlayer == null)
+            {
+                return;
+            }
+            Plugin.Instance.StartCoroutine(Waiting(hours));
+        }
+
+        private static IEnumerator Waiting(float hours)
+        {
+            _sleeping = true;
+            var player = GamePlayerOwner.MyPlayer;
+            RoomDoor.FadeText = "Waiting...";
+            yield return RoomDoor.FadeTo(1f);
+            yield return new WaitForSecondsRealtime(1.5f);
+            string outcome;
+            try
+            {
+                var health = player.ActiveHealthController;
+                WorldClock.Add(hours * 3600.0);
+                health.ChangeEnergy(Mathf.Max(-EnergyPerHour * hours, 5f - health.Energy.Current));
+                health.ChangeHydration(Mathf.Max(-WaterPerHour * hours, 5f - health.Hydration.Current));
+                outcome = "You waited " + hours.ToString("0.#") + " hours. It is " + WorldClock.Describe(WorldClock.Now) + ".";
+                Plugin.Log.LogInfo("Waited " + hours.ToString("0.#") + " h at a trader: energy " + health.Energy.Current.ToString("0") + ", water " + health.Hydration.Current.ToString("0"));
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Waiting failed: " + e);
+                outcome = "The wait was cut short.";
+            }
+            _ = WorldClock.SendAsync("waited");
+            yield return new WaitForSecondsRealtime(1.0f);
+            RoomDoor.FadeText = null;
+            yield return RoomDoor.FadeTo(0f);
+            NotificationManager.DisplayMessageNotification(outcome, ENotificationDurationType.Long);
+            _sleeping = false;
+        }
+
         private static IEnumerator Sleeping(float hours)
         {
             _sleeping = true;

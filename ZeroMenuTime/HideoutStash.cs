@@ -59,6 +59,7 @@ namespace ZeroMenuTime
                 _stash = (CompoundItem)root;
                 var player = GamePlayerOwner.MyPlayer;
                 new ItemController(_stash, player.ProfileId, player.Profile.Nickname);
+                MarkSearched(player);
                 Plugin.Log.LogInfo("Stash of hideout '" + hideout + "' holds " + Count() + " item(s)");
             }
             catch (Exception e)
@@ -66,6 +67,45 @@ namespace ZeroMenuTime
                 Plugin.Log.LogError("Building the stash of hideout '" + hideout + "' failed: " + e);
                 _stash = null;
             }
+        }
+
+        /// <summary>
+        /// The stash is built anew on every visit, and new containers count as "not searched yet".
+        /// What lies in your own stash is known to you, so nothing in it needs searching again.
+        /// </summary>
+        private static void MarkSearched(Player player)
+        {
+            int containers = 0, stillShut = 0;
+            try
+            {
+                var search = player.InventoryController.SearchController as IPlayerSearchController;
+                if (search == null || _stash == null)
+                {
+                    return;
+                }
+                foreach (var part in _stash.GetAllItems().ToArray())
+                {
+                    if (part is SearchableItem searchable)
+                    {
+                        search.SetItemAsSearched(searchable);
+                        containers++;
+                    }
+                    search.SetItemAsKnown(part, false);
+                }
+                var asked = search as ISearchController;
+                foreach (var part in _stash.GetAllItems().OfType<SearchableItem>())
+                {
+                    if (asked != null && (!asked.IsSearched(part) || asked.ContainsUnknownItems(part)))
+                    {
+                        stillShut++;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Marking the stash as searched failed: " + e.Message);
+            }
+            Plugin.Log.LogInfo("Stash containers marked as searched: " + containers + (stillShut > 0 ? ", still to be searched: " + stillShut : ""));
         }
 
         /// <summary>Everything in the stash at any depth, not counting the stash itself.</summary>

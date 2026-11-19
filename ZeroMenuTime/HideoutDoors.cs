@@ -450,6 +450,9 @@ namespace ZeroMenuTime
             return _indoor != null ? _indoor.Check(position) : null;
         }
 
+        /// <summary>A way in or out of the hideout is under way.</summary>
+        public static bool Busy => _busy;
+
         public static void Enter(string id, Vector3 returnTo, float returnYaw, bool atBed = false)
         {
             if (_busy || Inside != null || Plugin.Instance == null)
@@ -510,7 +513,7 @@ namespace ZeroMenuTime
                 {
                     RoomDoor.FadeText = "Opening the hideout...";
                 }
-                yield return Prepare(true);
+                yield return RoomDoor.Within(Prepare(true), 120f, "the hideout interior");
                 RoomDoor.FadeText = null;
                 if (!HideoutBunker.Loaded)
                 {

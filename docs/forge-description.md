@@ -24,7 +24,7 @@ Needs **[Vagabond](https://sp-mod.com/mod/2642/vagabond)**. Report bugs in the *
 ### Traders
 
 - Walk up to a trader's door, look at it and choose **Enter**.
-- Inside: **Trade**, **Collect deliveries**, **Save and go to menu**.
+- Inside: **Trade**, **Collect deliveries**, **Wait until morning**, **Save**, **Save and go to menu**.
 - What you buy is **laid on the table**. Quest rewards, the items a quest gives at the start, insurance and other mail arrive there too. Anything you leave waits for your next visit.
 - **Sell what you carry or wear.** A slung rifle or a worn helmet comes off you when sold. A pack, rig or case is only offered once empty; the secure container never.
 - Quests are taken and handed in in the trader's **Tasks** tab.
@@ -46,7 +46,7 @@ Needs **[Vagabond](https://sp-mod.com/mod/2642/vagabond)**. Report bugs in the *
 - **Crafting** runs on the world clock, also while you raid or sleep. Filter the recipe list by kind, by what you can make now, or by typing a name.
 - **Workbench**: the game's own weapon modding screen.
 - **Repair kits**: right-click a weapon or armour piece → Repair. Weapons need the Workbench, armour the Lavatory.
-- **Sealed cases** from airdrops: right-click → Unpack while in the hideout; the contents go to the stash.
+- **Sealed cases** from airdrops: right-click → Unpack while in the hideout; the contents go to the stash. Locked cases, sealed boxes and locked crates are opened at the Workbench first.
 - **Stash** with a Sort choice. **Rest Space**: sleep, heal, save.
 - Bitcoin farm, Water Collector, Solar Power, Scav Case, Cultist Circle, Gym, Shooting Range, Weapon Stand, Place of Fame.
 

@@ -127,6 +127,32 @@ namespace ZeroMenuTime
     }
 
     /// <summary>
+    /// On a hand-in inside a raid the game builds the reward items itself and looks for room for
+    /// them in the player's gear; with no room, or with a reward it cannot build (two of one
+    /// weapon given as a stack), the quest cannot be handed in at all. The items come from the
+    /// server and are laid on the trader's table, so the game's own are not made.
+    /// </summary>
+    public class QuestRewardItemsPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(QuestReward), nameof(QuestReward.TryAppendClaimResults));
+        }
+
+        [PatchPrefix]
+        public static bool Prefix(QuestReward __instance, ref OperationResult __result, ref int clonedCount)
+        {
+            if (!Repairs.InRaid || __instance.type != ERewardType.Item)
+            {
+                return true;
+            }
+            clonedCount = 0;
+            __result = default(OperationResult);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Starting a quest in a raid only changes its status in the game; the items some quests give
     /// at the start never came. They are asked for from the server, which leaves them with the
     /// quest's trader, and laid on that trader's table.

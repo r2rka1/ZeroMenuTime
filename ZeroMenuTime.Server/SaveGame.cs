@@ -342,9 +342,12 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         {
             string id = sessionId.ToString();
             string hideout = (request.Hideout ?? "").ToLowerInvariant();
-            if (!HideoutsService.Known.Contains(hideout) || request.Profile == null)
+            // A save can also be made standing at a trader, without ending the raid.
+            string exit = request.Exit ?? "";
+            bool atTrader = hideout.Length == 0 && exit.StartsWith("VGB_EXT_", StringComparison.OrdinalIgnoreCase);
+            if ((!atTrader && !HideoutsService.Known.Contains(hideout)) || request.Profile == null)
             {
-                return new SaveResponse { Error = "A save needs a hideout and the character" };
+                return new SaveResponse { Error = "A save needs a hideout or a trader, and the character" };
             }
             lock (_gate)
             {
@@ -383,7 +386,25 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                     File.Copy(LiveHideoutsFile(id), HideoutsFile(id), true);
                 }
                 // Until the raid ends in some ordinary way, the bed is where the next raid begins.
-                var meta = new SaveMeta { Hideout = hideout, SavedAtUtc = DateTime.UtcNow.ToString("u"), Resume = true };
+                SaveMeta meta;
+                if (atTrader)
+                {
+                    string map = "";
+                    try
+                    {
+                        map = VagabondMap(id) ?? "";
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("[ZeroMenuTime] Could not ask Vagabond which map the trader save was made on: " + e.Message);
+                    }
+                    meta = new SaveMeta { Hideout = "", Map = map, Exit = exit, SavedAtUtc = DateTime.UtcNow.ToString("u"), Resume = true };
+                    WriteMeta(id, meta);
+                    PlaceAt(id, meta);
+                    Console.WriteLine("[ZeroMenuTime] Game saved at the trader (" + exit + " on " + map + "), the raid goes on.");
+                    return Describe(id, meta);
+                }
+                meta = new SaveMeta { Hideout = hideout, SavedAtUtc = DateTime.UtcNow.ToString("u"), Resume = true };
                 WriteMeta(id, meta);
                 PlaceAt(id, hideout);
                 Console.WriteLine("[ZeroMenuTime] Game saved at the bed of the '" + hideout + "' hideout.");

@@ -253,7 +253,8 @@ public sealed class HideoutsService(
     JsonUtil jsonUtil,
     SPTarkov.Server.Core.Generators.ScavCaseRewardGenerator scavCaseRewardGenerator,
     SPTarkov.Server.Core.Services.Hideout.CircleOfCultistService circleOfCultistService,
-    SPTarkov.Server.Core.Helpers.Profile.InventoryHelper inventoryHelper)
+    SPTarkov.Server.Core.Helpers.Profile.InventoryHelper inventoryHelper,
+    SPTarkov.Server.Core.Models.Spt.Tables.TemplateTable templates)
 {
     /// <summary>The BTR driver's id: what he delivers between maps arrives as mail from him.</summary>
     public const string BtrDriver = "656f0f98d80a697f855d34b1";
@@ -642,7 +643,8 @@ public sealed class HideoutsService(
             {
                 continue;
             }
-            if (recipe.Locked == true && !unlocked.Contains(recipe.Id.ToString()))
+            bool opensCrate = OpensCrate(recipe);
+            if (recipe.Locked == true && !opensCrate && !unlocked.Contains(recipe.Id.ToString()))
             {
                 continue;
             }
@@ -668,7 +670,7 @@ public sealed class HideoutsService(
                         allowed &= levels.GetValueOrDefault(need.AreaType ?? area) >= (need.RequiredLevel ?? 0);
                         break;
                     case "QuestComplete":
-                        allowed &= need.QuestId != null && done.Contains(need.QuestId.Value.ToString());
+                        allowed &= opensCrate || (need.QuestId != null && done.Contains(need.QuestId.Value.ToString()));
                         break;
                     case "Item":
                         if (need.TemplateId != null && (need.Count ?? 0) > 0)
@@ -690,6 +692,26 @@ public sealed class HideoutsService(
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Recipes that open a locked crate (locked case with its key, sealed box, locked supply crate)
+    /// ask for a finished quest in the game's data without naming one, so they could never be
+    /// made. They are offered to everyone: the crate and its key are the real requirement.
+    /// </summary>
+    private static bool RealQuest(string? id)
+    {
+        return !string.IsNullOrEmpty(id) && id.Trim('0').Length > 0;
+    }
+
+    private bool OpensCrate(SPTarkov.Server.Core.Models.Eft.Hideout.HideoutProduction recipe)
+    {
+        if ((recipe.Requirements ?? []).Any(need => need.Type == "QuestComplete" && RealQuest(need.QuestId?.ToString())))
+        {
+            return false;
+        }
+        return templates.Items.TryGetValue(recipe.EndProduct, out var product)
+               && product.Parent.ToString() == "62f109593b54472778797866";
     }
 
     private static void Advance(HideoutStore store, double seconds)

@@ -28,9 +28,22 @@ namespace ZeroMenuTime
                 Action = () => Mail.Collect(TraderId, TraderName),
                 Disabled = false,
             });
+            float untilMorning = HideoutSleep.HoursUntilMorning();
+            state.Actions.Add(new InteractionAction
+            {
+                Name = "Wait until morning (" + untilMorning.ToString("0.#") + " hours)",
+                Action = () => HideoutSleep.Wait(untilMorning),
+                Disabled = false,
+            });
             if (Exfil != null)
             {
                 var exfil = Exfil;
+                state.Actions.Add(new InteractionAction
+                {
+                    Name = "Save",
+                    Action = () => { _ = SaveGame.SaveNow("at a trader", exfil.gameObject.name); },
+                    Disabled = false,
+                });
                 state.Actions.Add(new InteractionAction
                 {
                     Name = "Save and go to menu",

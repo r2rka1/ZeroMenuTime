@@ -82,7 +82,7 @@ namespace ZeroMenuTime
                 new SaveStashPatch(), new SpawnTradersPatch(), new TraderActionsPatch(), new DoorLookPatch(),
                 new TraderExfilEnterPatch(), new TraderExfilExitPatch(),
                 new LocalPurchasePatch(), new LocalSellPatch(), new CarriedPaymentPatch(), new DrawPackItemsPatch(),
-                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
+                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
                 new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
@@ -255,6 +255,7 @@ namespace ZeroMenuTime
             MapMarkers.Tick();
             HideoutPower.Tick();
             BotFreeze.Tick();
+            FallGuard.Tick();
             HideoutSound.Tick();
             Photo.Tick();
             HideoutGunsmith.Tick();
