@@ -33,7 +33,10 @@ namespace ZeroMenuTime
                 _notMe = ~LayerMask.GetMask("Player", "PlayerCollisionTest", "PlayerSpiritAura", "HitCollider", "Triggers", "Ignore Raycast", "Interactive", "Loot", "Shells", "Grass", "Foliage");
             }
             RaycastHit hit;
-            return Physics.Raycast(at + Vector3.up * 1.0f, Vector3.down, out hit, 151f, _notMe, QueryTriggerInteraction.Ignore) ? hit.distance - 1.0f : -1f;
+            // The look starts above the feet, so that a floor the feet have sunk into still counts. Anything met
+            // on the way down to the feet (the surface of water one wades in, a step, a sill) is something
+            // underfoot too: never less than nought, which only "nothing at all" may be.
+            return Physics.Raycast(at + Vector3.up * 1.0f, Vector3.down, out hit, 151f, _notMe, QueryTriggerInteraction.Ignore) ? Mathf.Max(0f, hit.distance - 1.0f) : -1f;
         }
 
         /// <summary>Called every frame.</summary>
@@ -134,11 +137,15 @@ namespace ZeroMenuTime
             }
             Vector3 to = from + Vector3.up * 0.3f;
             RaycastHit ground;
-            if ((again || !_hasSafe)
-                && Physics.Raycast(new Vector3(from.x, 1500f, from.z), Vector3.down, out ground, 3000f, _solid, QueryTriggerInteraction.Ignore))
+            if (again || !_hasSafe)
             {
-                // Nowhere known to be solid: the highest ground straight above or below.
-                to = ground.point + Vector3.up * 0.3f;
+                // Nowhere known to be solid. The nearest floor under where they stood comes first, which
+                // keeps someone inside a building inside it; failing that, the highest ground above or below.
+                if (Physics.Raycast(from + Vector3.up * 1.5f, Vector3.down, out ground, 60f, _solid, QueryTriggerInteraction.Ignore)
+                    || Physics.Raycast(new Vector3(from.x, 1500f, from.z), Vector3.down, out ground, 3000f, _solid, QueryTriggerInteraction.Ignore))
+                {
+                    to = ground.point + Vector3.up * 0.3f;
+                }
             }
             player.Teleport(to, false);
             NotificationManager.DisplayWarningNotification("You fell out of the world and were put back.", ENotificationDurationType.Long);

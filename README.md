@@ -85,7 +85,7 @@ Every door is one of the map's own doors. With [Dynamic Maps](https://sp-mod.com
 | Mechanic | Factory | Basement, by the caged electrical room: the door in the corridor wall |
 | Therapist | Ground Zero | TerraGroup building by the Science Offices, 2nd floor, end of the corridor, next to the big 2 |
 | Peacekeeper | Shoreline | The gate of checkpoint 11, at the west end of the map |
-| Hideout | Shoreline | The red shed next to checkpoint 11, the steel door on its north side |
+| Hideout | Shoreline | The gate of checkpoint 11 again: its right-hand half, under the canopy behind the barriers |
 | Fence | Lighthouse | The drug lab: the shipping container doors behind the plant tables |
 
 <details>

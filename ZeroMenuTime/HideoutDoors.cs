@@ -66,8 +66,9 @@ namespace ZeroMenuTime
                 new HideoutSpot { Id = "streets", Map = "TarkovStreets", Position = new[] { -15.30f, 3.00f, -108.65f }, RotationY = 0f },
                 // The door of one of the metal cabins north of Skier.
                 new HideoutSpot { Id = "customs", Map = "bigmap", Position = new[] { 622.70f, -2.67f, -126.40f }, RotationY = 101f, AtFeet = true },
-                // A grey steel door in a red corrugated shed, west of Peacekeeper.
-                new HideoutSpot { Id = "shoreline", Map = "Shoreline", Position = new[] { -1005.70f, -60.15f, 391.60f }, RotationY = 0f },
+                // The big gate of checkpoint 11: its east half, a few steps from Peacekeeper's door in the west half.
+                // (The shed behind the gate, used before, stands beyond the checkpoint wall and cannot be walked to.)
+                new HideoutSpot { Id = "shoreline", Map = "Shoreline", Position = new[] { -963.37f, -59.60f, 380.60f }, RotationY = 162f },
             };
         }
 

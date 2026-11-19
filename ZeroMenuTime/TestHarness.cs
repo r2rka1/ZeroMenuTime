@@ -1669,6 +1669,147 @@ namespace ZeroMenuTime
                     Report("asked " + parts[1] + " (" + who + ") to speak");
                     break;
                 }
+                case "findobj":
+                {
+                    // findobj WORD [LIMIT]: scene objects whose name contains the word, with where they are and their collider.
+                    string word = parts.Length > 1 ? parts[1].ToLowerInvariant() : "water";
+                    int limit = parts.Length > 2 ? (int)Number(parts[2]) : 25, shown = 0;
+                    foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>())
+                    {
+                        if (t.name.ToLowerInvariant().IndexOf(word, StringComparison.Ordinal) < 0
+                            || (parts.Length > 3 && Vector3.Distance(t.position, player.Transform.position) > Number(parts[3]))
+                            || (parts.Length > 3 && t.GetComponent<Renderer>() == null))
+                        {
+                            continue;
+                        }
+                        var c = t.GetComponent<Collider>();
+                        var r = t.GetComponent<Renderer>();
+                        if (++shown <= limit)
+                        {
+                            Report("  " + Vector3.Distance(t.position, player.Transform.position).ToString("F0") + " m " + t.name + " at " + t.position.ToString("F1") + " turned " + t.eulerAngles.y.ToString("F0") + " layer " + LayerMask.LayerToName(t.gameObject.layer)
+                                   + (c != null ? " collider " + c.GetType().Name + (c.isTrigger ? " (trigger)" : "") + " bounds " + c.bounds.center.ToString("F1") + " size " + c.bounds.size.ToString("F1") : "")
+                                   + (r != null ? " drawn bounds " + r.bounds.center.ToString("F1") + " size " + r.bounds.size.ToString("F1") : ""));
+                        }
+                    }
+                    Report(shown + " object(s) named like " + word);
+                    break;
+                }
+                case "rays":
+                {
+                    // rays [X Y Z]: everything a line straight down meets, from 2 m above to 160 m below, any layer.
+                    var from = parts.Length > 3 ? new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3])) : player.Transform.position;
+                    var hits = Physics.RaycastAll(from + Vector3.up * 2f, Vector3.down, 162f, ~0, QueryTriggerInteraction.Collide);
+                    Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+                    foreach (var h in hits)
+                    {
+                        Report("  " + (h.distance - 2f).ToString("F2") + " m below: " + h.collider.name + " layer " + LayerMask.LayerToName(h.collider.gameObject.layer)
+                               + " " + h.collider.GetType().Name + (h.collider.isTrigger ? " (trigger)" : ""));
+                    }
+                    Report(hits.Length + " thing(s) under " + from.ToString("F1") + "; fall guard sees " + FallGuard.Below(from).ToString("F1"));
+                    break;
+                }
+                case "reach":
+                {
+                    // reach X Y Z [MARGIN] [STEP] [FROMX FROMY FROMZ]: can someone on foot get from here to that point?
+                    // Draws the ground between as a chart: # blocked, . open but not reached, + reached, S start, D goal.
+                    var goal = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+                    float margin = parts.Length > 4 && parts[4] != "open" ? Number(parts[4]) : 15f, step = parts.Length > 5 && parts[5] != "open" ? Number(parts[5]) : 1f;
+                    var start = parts.Length > 8 ? new Vector3(Number(parts[6]), Number(parts[7]), Number(parts[8])) : player.Transform.position;
+                    int body = 0, me = LayerMask.NameToLayer("Player");
+                    for (int layer = 0; layer < 32; layer++)
+                    {
+                        if (!Physics.GetIgnoreLayerCollision(me, layer) && layer != me && LayerMask.LayerToName(layer) != "PlayerCollisionTest"
+                            && LayerMask.LayerToName(layer) != "HitCollider" && LayerMask.LayerToName(layer) != "PlayerSpiritAura")
+                        {
+                            body |= 1 << layer;
+                        }
+                    }
+                    if (parts[parts.Length - 1] == "open")
+                    {
+                        // As if the map's border walls were not there.
+                        body &= ~LayerMask.GetMask("LevelBorder");
+                    }
+                    float x0 = Mathf.Min(start.x, goal.x) - margin, x1 = Mathf.Max(start.x, goal.x) + margin;
+                    float z0 = Mathf.Min(start.z, goal.z) - margin, z1 = Mathf.Max(start.z, goal.z) + margin;
+                    int w = Mathf.CeilToInt((x1 - x0) / step) + 1, h = Mathf.CeilToInt((z1 - z0) / step) + 1;
+                    var height = new float[w, h];
+                    var open = new bool[w, h];
+                    var seen = new bool[w, h];
+                    float top = Mathf.Max(start.y, goal.y) + 2.2f;
+                    for (int i = 0; i < w; i++)
+                    {
+                        for (int j = 0; j < h; j++)
+                        {
+                            var p = new Vector3(x0 + i * step, top, z0 + j * step);
+                            RaycastHit hit;
+                            if (!Physics.Raycast(p, Vector3.down, out hit, 12f, body, QueryTriggerInteraction.Ignore))
+                            {
+                                height[i, j] = float.NaN;
+                                continue;
+                            }
+                            height[i, j] = hit.point.y;
+                            open[i, j] = !Physics.CheckCapsule(hit.point + Vector3.up * 0.75f, hit.point + Vector3.up * 1.5f, 0.3f, body, QueryTriggerInteraction.Ignore);
+                        }
+                    }
+                    int si = Mathf.RoundToInt((start.x - x0) / step), sj = Mathf.RoundToInt((start.z - z0) / step);
+                    int gi = Mathf.RoundToInt((goal.x - x0) / step), gj = Mathf.RoundToInt((goal.z - z0) / step);
+                    var queue = new Queue<int>();
+                    open[si, sj] = true;
+                    seen[si, sj] = true;
+                    queue.Enqueue(si * 100000 + sj);
+                    while (queue.Count > 0)
+                    {
+                        int at = queue.Dequeue(), ai = at / 100000, aj = at % 100000;
+                        for (int d = 0; d < 4; d++)
+                        {
+                            int ni = ai + (d == 0 ? 1 : d == 1 ? -1 : 0), nj = aj + (d == 2 ? 1 : d == 3 ? -1 : 0);
+                            if (ni < 0 || nj < 0 || ni >= w || nj >= h || seen[ni, nj] || !open[ni, nj]
+                                || float.IsNaN(height[ai, aj]) || Mathf.Abs(height[ni, nj] - height[ai, aj]) > 0.55f * step)
+                            {
+                                continue;
+                            }
+                            seen[ni, nj] = true;
+                            queue.Enqueue(ni * 100000 + nj);
+                        }
+                    }
+                    bool got = false;
+                    for (int i = Mathf.Max(0, gi - 2); i <= Mathf.Min(w - 1, gi + 2); i++)
+                    {
+                        for (int j = Mathf.Max(0, gj - 2); j <= Mathf.Min(h - 1, gj + 2); j++)
+                        {
+                            got |= seen[i, j];
+                        }
+                    }
+                    Report("chart: west is left, north is up; x " + x0.ToString("F0") + " to " + x1.ToString("F0") + ", z " + z1.ToString("F0") + " down to " + z0.ToString("F0") + ", " + step + " m a square");
+                    for (int j = h - 1; j >= 0; j--)
+                    {
+                        var row = new System.Text.StringBuilder();
+                        for (int i = 0; i < w; i++)
+                        {
+                            row.Append(i == si && j == sj ? 'S' : i == gi && j == gj ? 'D' : seen[i, j] ? '+' : float.IsNaN(height[i, j]) ? ' ' : open[i, j] ? '.' : '#');
+                        }
+                        Report("  |" + row + "|");
+                    }
+                    Report(got ? "PASS the goal can be reached on foot" : "FAILED no way on foot to the goal");
+                    break;
+                }
+                case "touch":
+                {
+                    // touch X Y Z [R]: every collider reaching into a ball around a point, any layer.
+                    var mid = new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3]));
+                    foreach (var c in Physics.OverlapSphere(mid, parts.Length > 4 ? Number(parts[4]) : 0.5f, ~0, QueryTriggerInteraction.Collide))
+                    {
+                        string path = c.name;
+                        for (var up = c.transform.parent; up != null; up = up.parent)
+                        {
+                            path = up.name + "/" + path;
+                        }
+                        Report("  " + path + " layer " + LayerMask.LayerToName(c.gameObject.layer) + " " + c.GetType().Name + (c.isTrigger ? " (trigger)" : "")
+                               + " bounds " + c.bounds.center.ToString("F1") + " size " + c.bounds.size.ToString("F1") + " turned " + c.transform.eulerAngles.ToString("F0"));
+                    }
+                    Report("touched at " + mid.ToString("F1"));
+                    break;
+                }
                 case "where":
                 {
                     // where X Y Z: where that point is on the screen now, as fractions from the top left.
