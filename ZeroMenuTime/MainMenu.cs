@@ -127,6 +127,7 @@ namespace ZeroMenuTime
                     _askedPlace = true;
                     AskPlace();
                 }
+                ForRaid(screen, GamePlayerOwner.MyPlayer != null);
                 if (_whereLabel != null && _whereLabel.text != Where)
                 {
                     _whereLabel.text = Where;
@@ -137,6 +138,37 @@ namespace ZeroMenuTime
             catch (Exception e)
             {
                 Plugin.Log.LogWarning("Arranging the main menu failed: " + e);
+            }
+        }
+
+        /// <summary>
+        /// The same screen comes up when Esc is pressed in a raid. There nothing may be started or
+        /// reset: Continue becomes the way back to the game, and Reset is not offered.
+        /// </summary>
+        private static void ForRaid(MenuScreen screen, bool inRaid)
+        {
+            if (_panel == null)
+            {
+                return;
+            }
+            foreach (var item in _panel.GetComponentsInChildren<MenuItem>(true))
+            {
+                if (item.name == "item Continue")
+                {
+                    string words = inRaid ? "BACK TO THE GAME" : "CONTINUE";
+                    if (item.Label.text != words)
+                    {
+                        item.Label.text = words;
+                    }
+                }
+                else if (item.name == "item Reset" && item.gameObject.activeSelf == inRaid)
+                {
+                    item.gameObject.SetActive(!inRaid);
+                }
+            }
+            if (_whereLabel != null && _whereLabel.gameObject.activeSelf == inRaid)
+            {
+                _whereLabel.gameObject.SetActive(!inRaid);
             }
         }
 
@@ -346,13 +378,22 @@ namespace ZeroMenuTime
             {
                 return;
             }
+            if (GamePlayerOwner.MyPlayer != null)
+            {
+                // Esc in a raid: back to the game, as the game's own button there does.
+                if (_screen != null && _screen._hideScreenButton != null)
+                {
+                    _screen._hideScreenButton.OnClick.Invoke();
+                }
+                return;
+            }
             Plugin.Log.LogInfo("Continue chosen");
             Plugin.Instance.StartCoroutine(Seamless.ContinueNow());
         }
 
         public static void AskNewGame()
         {
-            if (_working)
+            if (_working || GamePlayerOwner.MyPlayer != null)
             {
                 return;
             }

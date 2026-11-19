@@ -6,10 +6,11 @@ using UnityEngine;
 namespace ZeroMenuTime
 {
     /// <summary>
-    /// A safety net. The hideout and the traders' rooms lie far under the map; should the floor not
-    /// be there when the player arrives (the interior still loading, or let go), the character
-    /// falls without end. Someone who has fallen a long way with nothing under them is put back
-    /// where they last stood. What is known about the fall is written to the log.
+    /// A safety net for the hideout and the traders' rooms only, which lie far under the map; should
+    /// the floor not be there when the player arrives (the interior still loading, or let go), the
+    /// character falls without end. Someone there who has fallen a long way with nothing under them
+    /// is put back where they last stood. On the map itself it never acts. What is known about the
+    /// fall is written to the log.
     /// </summary>
     public static class FallGuard
     {
@@ -24,6 +25,23 @@ namespace ZeroMenuTime
         private static Vector3 _safe;
         private static bool _hasSafe;
         private static int _notMe = 0;
+        private static bool _safeIsOurs;
+
+        private static bool InOurRooms(Vector3 at)
+        {
+            if (HideoutDoors.Inside != null)
+            {
+                return true;
+            }
+            foreach (var room in TraderRoom.Rooms)
+            {
+                if (room.Indoor != null && room.Indoor.Check(at) != null)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         /// <summary>How far below the feet the nearest thing is, whatever it is made of; -1 for nothing within 150 m.</summary>
         public static float Below(Vector3 at)
@@ -90,6 +108,15 @@ namespace ZeroMenuTime
                 _nothingSince = Time.unscaledTime;
                 _safe = at;
                 _hasSafe = true;
+                _safeIsOurs = InOurRooms(at);
+            }
+            // Only the places this mod puts under the map are watched: the hideout and the traders'
+            // rooms. On the map itself the game looks after its own ground, and nothing is done.
+            if (HideoutDoors.Inside == null && !HideoutDoors.Busy && !(_hasSafe && _safeIsOurs))
+            {
+                _nothingSince = Time.unscaledTime;
+                _fallen = 0f;
+                return;
             }
             if (_fallen < Drop && Time.unscaledTime - _nothingSince < (_hasSafe ? 5f : 30f))
             {

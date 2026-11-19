@@ -193,6 +193,12 @@ namespace ZeroMenuTime
 
         public static void StartRaid(string locationId)
         {
+            if (GamePlayerOwner.MyPlayer != null)
+            {
+                // A raid is running. Starting another over it would take the hideout away from under the player.
+                Plugin.Log.LogWarning("A raid is already running; not starting another.");
+                return;
+            }
             try
             {
                 MenuBackdrop.Release();
