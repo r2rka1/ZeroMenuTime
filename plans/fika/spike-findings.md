@@ -89,11 +89,48 @@ Host and client were put into one Fika raid on Customs from the harness, with th
 Customs with two players is the limit of this machine. Use Factory or Ground Zero for the spikes,
 and do not run the headless next to two players.
 
+## Spike S1: dead state and respawn (2026-11-20): works, with gaps to close
+
+What was built: a prefix on the health controller's `Kill` for the local player. When armed, the
+kill is skipped, health is restored, damage is switched off and the player is teleported to a
+"limbo" spot far under the map. Reviving is a teleport back and damage switched on again.
+
+**Seen on host and client in one raid:**
+- A direct kill and a real lethal fall on the client were both stopped ("kill by Bullet stopped",
+  "kill by Fall stopped"). The player stayed alive on their own machine.
+- The host saw the client alive at the limbo position, with no corpse and no error: to Fika the
+  ghost is just a living player who moved. Reviving showed the client back at the spawn spot on
+  the host as well.
+- The same worked for the host player as the one who dies, with the client still alive: the raid
+  went on. This is the case Fika's stock flow does not allow (a dead host cannot leave).
+- No exception on either machine.
+
+**So the design decision D4 stands**: death as "never truly die", with the state carried by
+position alone. Nothing had to be sent over the network for the basic case.
+
+**Gaps found, to design for in stage 5:**
+- **Limbo must be a real, pre-built, solid place.** The quick slab made at the moment of death
+  did not always hold (the host fell through it; so did the client the second time). Build the
+  limbo room at raid start with the trader rooms, on every machine.
+- **A teleport out of a long free fall does not always land** (a revive from the void put the
+  player at the wrong height twice; a second teleport fixed it). Never let a ghost fall, and
+  check the position after a revive teleport, repeating it if needed.
+- **A player teleported into mid-air hangs there until they move**, then falls. Not a problem in
+  itself, but it means a "drop" is not a reliable way to test damage.
+- On a client, bots appear in the same list as humans (they are "observed players" there, and
+  are not marked as AI). Anything that counts living humans must use Fika's own list of human
+  players, not the game's player list.
+
+**Not tried yet:** spectating a teammate from limbo; whether bots forget the ghost at once;
+the body container with the gear; death by bleeding, starvation, grenade and headshot (all go
+through the same `Kill`, but only bullet and fall were run); Fika's own revive option switched
+on at the same time; what the transit check makes of a ghost.
+
 ## Not done yet
 
 - The reference run with Fika and Vagabond only (no harness there; needs Fika's own screens
   driven by hand or by mouse), including the dead-teammate-plus-transit case.
-- Spike S1 (dead state and respawn), S2 (join in progress), S3 in full (host-created items,
+- The rest of S1 (list above), S2 (join in progress), S3 in full (host-created items,
   stash container, trade through operations).
 - A headless-hosted raid (headless + one client), and asking the headless for a raid from this mod.
 - The quick checks in section C of the stage 0 plan.

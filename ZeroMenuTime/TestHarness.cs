@@ -261,6 +261,30 @@ namespace ZeroMenuTime
             if (verb == "fika")
             {
                 // fika: what Fika says this game is. fika host | fika join HOSTPROFILEID: from the menu, start a raid through Fika.
+                if (parts.Length > 1 && parts[1] == "humans")
+                {
+                    foreach (var human in FikaSpike.Humans())
+                    {
+                        Report(human);
+                    }
+                    Report("humans listed");
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "ghost")
+                {
+                    // fika ghost on|off: arm the dead state. fika ghost: how it stands.
+                    if (parts.Length > 2)
+                    {
+                        FikaSpike.GhostOnDeath = parts[2] == "on";
+                    }
+                    Report("ghost on death " + FikaSpike.GhostOnDeath + ", ghost now " + FikaSpike.Ghost + (FikaSpike.Ghost ? ", died of " + FikaSpike.DiedOf + " at " + FikaSpike.DiedAt.ToString("F1") : ""));
+                    yield break;
+                }
+                if (parts.Length > 4 && parts[1] == "revive")
+                {
+                    Report(FikaSpike.Revive(new Vector3(Number(parts[2]), Number(parts[3]), Number(parts[4]))));
+                    yield break;
+                }
                 if (parts.Length > 1 && parts[1] == "start")
                 {
                     Report(FikaSpike.StartNow());
