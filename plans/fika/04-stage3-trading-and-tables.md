@@ -5,6 +5,13 @@ inventory operations, and what lies on a table is the same for everyone.
 
 Depends on: stage 2, and the pattern found in spike S3.
 
+## Stage 0 result
+
+The pattern is proven and simpler than first written: any machine may create an item, as long
+as it announces it with this mod's packet so every machine creates the same one (same ids). The
+host does not have to be asked first. The numbered flow below stands with step 2 and 3 merged:
+the creating machine lays the item and announces it. See `spike-findings.md`.
+
 ## The rule for every item this mod makes
 
 An item exists in the raid only after the host created it. A client never creates an item

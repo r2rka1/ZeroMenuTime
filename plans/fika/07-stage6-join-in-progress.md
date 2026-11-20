@@ -15,7 +15,14 @@ Depends on: stages 1 and 5, and spike S2. This is the highest-risk stage of the 
   sync, and refetches the world loot from the host.
 - There is no setting for late join. Fika's server knows a match is in progress.
 
-## The approach (to be confirmed or replaced by S2)
+## Stage 0 result
+
+The approach below was tried and works: opening the host's two checks is enough, the newcomer
+joins by the ordinary path and receives the world as it is (players, bots, loot, items this mod
+made). See `spike-findings.md`. Step 2 needs no work of its own. What remains is step 3 to 6,
+the untested cases listed in the findings, and the leftovers in the logs.
+
+## The approach (confirmed by S2)
 
 1. **Let the connection in.** A patch on the host's connection check accepts a new player when
    this mod's "join in progress" setting is on (host's choice, default on in headless raids).

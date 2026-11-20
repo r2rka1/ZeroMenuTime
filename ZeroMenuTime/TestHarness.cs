@@ -261,6 +261,67 @@ namespace ZeroMenuTime
             if (verb == "fika")
             {
                 // fika: what Fika says this game is. fika host | fika join HOSTPROFILEID: from the menu, start a raid through Fika.
+                if (parts.Length > 2 && parts[1] == "spawn")
+                {
+                    // fika spawn TEMPLATE: a new item laid in front of the player on every machine.
+                    Report(FikaSpike.SpawnForAll(parts[2]));
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "loot")
+                {
+                    // fika loot [R]: loose items within R metres of the player, with their ids.
+                    float r = parts.Length > 2 ? Number(parts[2]) : 4f;
+                    int n = 0;
+                    foreach (var loot in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.LootItem>())
+                    {
+                        if (loot.Item != null && Vector3.Distance(loot.transform.position, player.Transform.position) <= r)
+                        {
+                            n++;
+                            Report("  " + loot.Item.ShortName + " id " + loot.Item.Id + " at " + loot.transform.position.ToString("F1") + " " + loot.GetType().Name);
+                        }
+                    }
+                    Report(n + " loose item(s) within " + r + " m");
+                    yield break;
+                }
+                if (parts.Length > 2 && parts[1] == "take")
+                {
+                    // fika take ITEMID: the first thing the game's own menu offers for that loose item (Take), without aiming.
+                    EFT.Interactive.LootItem wanted = null;
+                    foreach (var loot in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.LootItem>())
+                    {
+                        if (loot.Item != null && loot.Item.Id == parts[2])
+                        {
+                            wanted = loot;
+                        }
+                    }
+                    if (wanted == null)
+                    {
+                        Report("FAILED no loose item with that id here");
+                        yield break;
+                    }
+                    var offered = InteractionContextHelper.GetAvailableActions(player.GetComponent<GamePlayerOwner>(), wanted);
+                    if (offered == null || offered.Actions.Count == 0)
+                    {
+                        Report("FAILED the game offers nothing for it");
+                        yield break;
+                    }
+                    var names = new List<string>();
+                    foreach (var act in offered.Actions)
+                    {
+                        names.Add(act.Name + (act.Disabled ? " (off)" : ""));
+                    }
+                    Report("offered: " + string.Join(", ", names.ToArray()) + "; doing the first");
+                    offered.Actions[0].Action();
+                    yield return new WaitForSecondsRealtime(3f);
+                    Report("after: carrying it " + (wanted == null || wanted.Item == null ? "?" : (wanted.Item.Parent != null && wanted.Item.Parent.GetOwnerOrNull() == player.InventoryController).ToString()));
+                    yield break;
+                }
+                if (parts.Length > 2 && parts[1] == "latejoin")
+                {
+                    FikaSpike.LateJoin = parts[2] == "on";
+                    Report("late join " + FikaSpike.LateJoin);
+                    yield break;
+                }
                 if (parts.Length > 1 && parts[1] == "humans")
                 {
                     foreach (var human in FikaSpike.Humans())

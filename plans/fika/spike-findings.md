@@ -126,11 +126,80 @@ the body container with the gear; death by bleeding, starvation, grenade and hea
 through the same `Kill`, but only bullet and fall were run); Fika's own revive option switched
 on at the same time; what the transit check makes of a ghost.
 
+## The Fika add-on exists (2026-11-20)
+
+`ZeroMenuTime.Fika` is a second client project, referencing `Fika.Core.dll`, loaded only where
+Fika is (`BepInDependency` on Fika and on the main plugin). It subscribes to Fika's
+"network manager created" event and registers this mod's packets on host and client. It builds
+with `dotnet build ZeroMenuTime.Fika/ZeroMenuTime.Fika.csproj -c Release` and its DLL goes next to
+the main one. Not yet in `pack.ps1` or in `zmt install`.
+
+## Spike S3: items the mod creates (2026-11-20): the pattern works
+
+- **Fika's own "spawn item" message cannot be used**: it only exists in Fika's debug builds.
+- **This mod's own packet does the job.** `WorldItemPacket { Item, Position }`: the sender lays
+  the item locally and sends it; the host relays a client's packet to the other clients; every
+  machine loads the item's models and calls the game's `SetupItem` with the same item. Fika's
+  item serializer (`PutItem` / `GetItem`) carries the whole item with its ids.
+- **Seen in a two-player raid:** an item created by the client appeared on the host with the
+  same id (as Fika's own loot type on both). The host took one: it left the world on the client
+  too. The client took the other: it left the world on the host, with no refusal and no resync
+  in either log. So an item created this way is ordinary loot to Fika from then on.
+- **Either side can be the creator.** The host need not be the one who makes the item, as long
+  as every machine makes the same one. That is simpler than the "ask the host" flow written in
+  stage 3: the buyer's machine can create and announce.
+- The item hangs where it was placed until something moves it (no drop). Table placement needs
+  an exact resting position sent in the packet, not physics.
+
+**Stash decision (overview decision 1):** one shared stash, the raid owner's, is also the
+technically simpler one: a single container item created once for everyone when the hideout is
+first entered, by the same pattern. A stash per player would be the same pattern repeated per
+player. Go with the shared stash as the author prefers. Still to prove in stage 4: a container
+with content (not a loose item), and saving it back to the owner's profile.
+
+**Not tried yet:** a container with content; paying and selling as inventory operations;
+crafting products; what the host does with an operation on an item only the client has
+(the baseline showed such items simply do not exist for the host).
+
+## Spike S2: joining a raid in progress (2026-11-20): works
+
+What blocks a late joiner in Fika is two checks on the host, both reading the game controller's
+"raid started" flag: the answer to the join ping ("in progress") and the connection request
+("Raid already started"). A waiting client is told the flag's value on request, so one that gets
+in after the start goes straight on.
+
+The spike (`LateJoin` in the add-on) makes the flag read false while either of those two host
+methods runs, when late join is switched on. Nothing on the client is changed: it joins the
+ordinary way.
+
+**Seen:** the host started a raid alone on Customs and played on. With late join on, a second
+game joined through the normal join call and loaded into the running raid.
+- Each saw the other, and the late joiner saw the bots already in the raid.
+- An item the host had laid down before the join was there for the late joiner, who took it;
+  the host accepted the operation and the item left its world.
+- An item the late joiner created reached the host.
+- The late joiner went through Skier's door; the host saw them in the room.
+- Left over in the logs: 29 host errors "IncreaseLoadedPlayers: could not find netId N" (the
+  host counting loaded players for a start that already happened), and client warnings about
+  packets for characters it had not created yet during loading. No exceptions. Neither stopped
+  anything; both need a look for side effects.
+
+**So the highest risk of the plan is much smaller than assumed.** No change to Fika's join or
+sync code was needed, only the two gates on the host. Fika's first-join path already brings a
+newcomer the world as it is.
+
+**Not tried yet:** where the late joiner spawns when the group has moved on (they appeared at
+their own Vagabond spawn, which was the same spot here); a late joiner whose own state says a
+different map; joining twice; a player who was in the raid, left, and comes back (the host
+already has their character, which Fika's reconnect path is for); two joiners at once; doors,
+dead bots and their bodies, containers already looted; the headless as host.
+
 ## Not done yet
 
-- The reference run with Fika and Vagabond only (no harness there; needs Fika's own screens
-  driven by hand or by mouse), including the dead-teammate-plus-transit case.
-- The rest of S1 (list above), S2 (join in progress), S3 in full (host-created items,
-  stash container, trade through operations).
-- A headless-hosted raid (headless + one client), and asking the headless for a raid from this mod.
+- A headless-hosted raid (headless + one client), and asking the headless for a raid from this
+  mod. Put off to stage 1 on purpose: the mod's raid-start code returns early with no local
+  player, so the headless builds no rooms yet, and the result would only list what stage 1 fixes.
+- The reference run with Fika and Vagabond only, including the dead-teammate-plus-transit case.
+- The rest of S1 (spectating, bots and the ghost, body container, other causes of death) and of
+  S3 (containers, payment, crafting).
 - The quick checks in section C of the stage 0 plan.

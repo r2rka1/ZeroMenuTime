@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>ZeroMenuTime.Fika</AssemblyName>
+    <Version>1.2.4</Version>
+    <RootNamespace>ZeroMenuTime.Fika</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>CS0436;CS0618;CS0649</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- The SPT copy of the game. Override with: dotnet build -p:GameDir=X:\path\ -->
+    <GameDir Condition=" '$(GameDir)' == '' ">F:\SPT\</GameDir>
+    <Managed>$(GameDir)EscapeFromTarkov_Data\Managed\</Managed>
+    <BepCore>$(GameDir)BepInEx\core\</BepCore>
+    <SptPlugins>$(GameDir)BepInEx\plugins\spt\</SptPlugins>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuildTime</_Parameter1>
+      <_Parameter2>$([System.DateTime]::Now.ToString("HH:mm:ss"))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemDefinitionGroup>
+    <Reference>
+      <Private>false</Private>
+    </Reference>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <!-- Fika is taken from the Fika test set; the add-on is only loaded where Fika is installed. -->
+    <Reference Include="Fika.Core"><HintPath>F:\SPT-Fika\host\BepInEx\plugins\Fika\Fika.Core.dll</HintPath></Reference>
+    <Reference Include="ZeroMenuTime"><HintPath>..\ZeroMenuTime\bin\Release\ZeroMenuTime.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>$(BepCore)0Harmony.dll</HintPath></Reference>
+    <Reference Include="BepInEx"><HintPath>$(BepCore)BepInEx.dll</HintPath></Reference>
+    <Reference Include="spt-common"><HintPath>$(SptPlugins)spt-common.dll</HintPath></Reference>
+    <Reference Include="spt-custom"><HintPath>$(SptPlugins)spt-custom.dll</HintPath></Reference>
+    <Reference Include="spt-reflection"><HintPath>$(SptPlugins)spt-reflection.dll</HintPath></Reference>
+    <Reference Include="ItemComponent.Types"><HintPath>$(Managed)ItemComponent.Types.dll</HintPath></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(Managed)Assembly-CSharp.dll</HintPath></Reference>
+    <Reference Include="DissonanceVoip"><HintPath>$(Managed)DissonanceVoip.dll</HintPath></Reference>
+    <Reference Include="Comfort"><HintPath>$(Managed)Comfort.dll</HintPath></Reference>
+    <Reference Include="Comfort.Unity"><HintPath>$(Managed)Comfort.Unity.dll</HintPath></Reference>
+    <Reference Include="CommonExtensions"><HintPath>$(Managed)CommonExtensions.dll</HintPath></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(Managed)Newtonsoft.Json.dll</HintPath></Reference>
+    <Reference Include="Sirenix.Serialization"><HintPath>$(Managed)Sirenix.Serialization.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(Managed)UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(Managed)UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Managed)UnityEngine.PhysicsModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AssetBundleModule"><HintPath>$(Managed)UnityEngine.AssetBundleModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Managed)UnityEngine.InputLegacyModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule"><HintPath>$(Managed)UnityEngine.ScreenCaptureModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(Managed)UnityEngine.ImageConversionModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(Managed)UnityEngine.AnimationModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AudioModule"><HintPath>$(Managed)UnityEngine.AudioModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(Managed)UnityEngine.IMGUIModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(Managed)UnityEngine.TextRenderingModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(Managed)UnityEngine.UI.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(Managed)UnityEngine.UIModule.dll</HintPath></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(Managed)Unity.TextMeshPro.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

@@ -142,9 +142,18 @@ changes to what the player carries, because the raid has not ended.
 Stages 2 to 4 make the mod playable in co-op with Fika's stock death (die, spectate, leave).
 That is a releasable first version ("co-op beta"). Stages 5 to 7 add the rules in section 5.
 
+## 7a. What stage 0 has shown so far (see `spike-findings.md`)
+
+- **Starting and joining from this mod's menu works** with one Fika call before the game's start.
+- **The dead state works** on host and client; it needs a solid pre-built holding room.
+- **Items made by this mod's own packet are ordinary loot to Fika**; either side can create them.
+- **Join in progress works** by opening two checks on the host; no change to Fika's sync code.
+- Memory: two players on Customs fill this 32 GB machine; test on small maps.
+
 ## 8. The biggest risks
 
-1. **Join in progress (stage 6).** Fika refuses it by design; the reconnect path only restores a
+1. **Join in progress (stage 6).** *Stage 0 result: it works with two small host-side patches;
+   the risk is now the untested cases, not the approach.* As first assessed: Fika refuses it by design; the reconnect path only restores a
    player the host already knows. It needs a patch inside Fika's connection handling and a full
    world sync for a new player. If the spike fails, the fallback is: join at the next transit or
    when the group next leaves a trader save, never mid-raid.

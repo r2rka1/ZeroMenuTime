@@ -47,6 +47,28 @@ namespace ZeroMenuTime
             return ok;
         }
 
+        /// <summary>SPIKE S2: the host lets new players in after the raid has started.</summary>
+        public static bool LateJoin;
+
+        // ---- Spike S3: items every machine knows ----
+
+        /// <summary>Set by the Fika add-on: lay an item in the world here and on every other machine.</summary>
+        public static Action<EFT.InventoryLogic.Item, UnityEngine.Vector3> PlaceForAll;
+
+        /// <summary>Makes a new item and lays it a step in front of the local player, for everyone.</summary>
+        public static string SpawnForAll(string template)
+        {
+            var me = GamePlayerOwner.MyPlayer;
+            if (PlaceForAll == null)
+            {
+                return "the Fika add-on is not loaded";
+            }
+            var item = Comfort.Common.Singleton<ItemFactory>.Instance.GetPresetItem(template);
+            var at = me.Transform.position + me.Transform.forward * 1.2f + UnityEngine.Vector3.up * 0.8f;
+            PlaceForAll(item, at);
+            return "item " + item.Id + " (" + item.ShortName + ") sent to all, at " + at.ToString("F1");
+        }
+
         // ---- Spike S1: never truly die ----
 
         /// <summary>When on, a kill of the local player is stopped and they become a ghost.</summary>

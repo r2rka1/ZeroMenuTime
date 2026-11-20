@@ -30,14 +30,16 @@ Depends on: stages 2 and 3. Needs decisions 1, 2 and 3 from the overview.
 
 ## Stash
 
-- Proposed (decision 1): **each player has their own stash.** At the stash a player sees their own
-  items. This avoids dupes, griefing and two profiles' items mixing.
+- **Decided: one shared stash, the raid owner's** (the author's preference, and stage 0 showed it
+  is also the simpler one technically). Everyone in the group sees and uses the same stash; what
+  is in it belongs to the owner's profile when the raid ends. The docs must say this plainly:
+  what a guest puts in the owner's stash stays with the owner.
 - Under a host that owns inventory, the stash is a container the host must know. Pattern from
   spike S3; expected shape: when a player opens their stash the client sends its content to the
   host, the host creates it as that player's container, transfers are ordinary operations, and on
   close the owner's client saves the result to the server as today.
-- Only the stash's owner can open it. It is created when opened and removed when closed, so the
-  host does not carry every stash all raid.
+- It is created once, for everyone, when the hideout is first entered in the raid, and saved to
+  the owner's profile whenever anyone closes it and at raid end.
 - Shelves (weapon stand, place of fame) are the owner's and visible to all; only the owner
   changes them (proposed).
 
