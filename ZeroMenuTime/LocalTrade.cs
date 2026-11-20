@@ -228,6 +228,13 @@ namespace ZeroMenuTime
 
         public static async Task<bool> Give(Player player, Item item)
         {
+            if (Net.Coop)
+            {
+                // Nothing may appear in a player's gear on one machine only. In co-op whatever is given
+                // is laid down for everyone to see, on the trader's table or in front of the player,
+                // and picked up in the ordinary way.
+                return await RewardTable.LayNear(player, item);
+            }
             var controller = player.InventoryController;
 
             // The raid only has models loaded for items that were in it at the start. A new item needs
@@ -324,6 +331,7 @@ namespace ZeroMenuTime
                 }
                 split.Value.RaiseEvents(controller, CommandStatus.Begin);
                 split.Value.RaiseEvents(controller, CommandStatus.Succeed);
+                InventorySync.Count(item);
                 await Task.Yield();
                 return true;
             }
@@ -335,6 +343,7 @@ namespace ZeroMenuTime
             }
             discard.Value.RaiseEvents(controller, CommandStatus.Begin);
             discard.Value.RaiseEvents(controller, CommandStatus.Succeed);
+            InventorySync.Gone(item);
             await Task.Yield();
             return true;
         }

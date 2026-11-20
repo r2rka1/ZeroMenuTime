@@ -182,6 +182,16 @@ namespace ZeroMenuTime.Fika
             }
         }
 
+        public void TellItem(Item item, Vector3 at, Quaternion turned)
+        {
+            var packet = new WorldItemPacket { Item = item, Position = at, Rotation = turned };
+            var manager = Singleton<IFikaNetworkManager>.Instance;
+            if (manager != null)
+            {
+                manager.SendData(ref packet, DeliveryMethod.ReliableOrdered, true);
+            }
+        }
+
         /// <summary>Lays a received (or own) item in this machine's world.</summary>
         public static async void Lay(WorldItemPacket packet)
         {

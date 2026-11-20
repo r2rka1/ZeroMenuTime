@@ -93,3 +93,44 @@ On: trade, collect deliveries, quest hand-in, repair. Still off in a group: hide
   then the rest.
 - Operations refused by the host leave the client out of step; every flow needs a failure path
   that puts money and goods back.
+
+---
+
+## Result (2026-11-20, branch `fika/stage3`)
+
+**Built**
+
+- `InventorySync` (`zmt.inv`): when a trade, a build or a craft takes something out of what the
+  local player carries (a whole item, or part of a stack), the machine says so by item id and
+  every other machine does the same to its copy of that player. `LocalTrade.Take` calls it.
+- Items for tables in co-op are set down by hand on the creating machine and announced
+  (`TellItem`): every machine lays the same item at exactly that place. `RewardTable.Place` has
+  the co-op path; alone it throws the item as before.
+- `LocalTrade.Give` in co-op never puts an item straight into gear: it is laid on the table of
+  the room the player stands in, or in front of them (`RewardTable.LayNear`). That covers money
+  from selling, craft products and mail collected where there are no rooms.
+- Gate: trade, deliveries, quest rewards at the counter and repairs are on in co-op.
+
+**Seen (host + client, Customs)**
+
+- Client collected deliveries and bought two items: all 11 things lay on the table on the host
+  too, with the same ids. The host's copy of the client's money stack dropped to the same count.
+- Client took a bought item; the host took one of the client's delivered items. Both were
+  accepted, and each left the other machine's world.
+- Client accepted and handed in a quest: the reward (two stacks of roubles and a weapon) lay on
+  the table on both machines. No errors in either log.
+
+**Not tested**
+
+- Selling (the harness has no sell command; it uses the same two primitives as buying).
+- Repairs in co-op: switched on, not run. Durability is changed on the owner's machine only and
+  is not sent to the others; damage is worked out on the owner's machine, so this should only
+  affect what others see when inspecting.
+- Two players trading with the same trader at the same time; Fika's shared quest progression.
+- The headless as host for these flows (it relays the same packets as a player host).
+
+**Known gaps**
+
+- When a teammate takes an item from another player's table, the owner's list of "what is on my
+  table" can go on showing it for a while; the mail bookkeeping still marks it taken.
+- Items with nothing solid on them get a look-at box only on the machine that laid them.

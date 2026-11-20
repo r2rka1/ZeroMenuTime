@@ -83,6 +83,39 @@ namespace ZeroMenuTime
                 room.TableTop.z + (floorRow - (rows - 1) / 2f) * step);
         }
 
+        /// <summary>
+        /// Co-op: lays an item down for the player to pick up, on the table of the room they stand in,
+        /// or just in front of them. The same item is laid on every machine.
+        /// </summary>
+        public static async Task<bool> LayNear(Player player, Item item)
+        {
+            try
+            {
+                foreach (var room in TraderRoom.Rooms)
+                {
+                    if (room.Indoor != null && room.Indoor.Check(player.Transform.position) != null)
+                    {
+                        return await Place(room, item, null) != null;
+                    }
+                }
+                var world = Singleton<GameWorld>.Instance;
+                var models = item.GetAllItems().SelectMany(part => part.Template.AllResources).ToArray();
+                await Singleton<ObjectsFactory>.Instance.LoadBundlesAndCreatePools(
+                    ObjectsFactory.PoolsCategory.Raid, ObjectsFactory.AssemblyType.Local, models, JobYieldPriority.Immediate);
+                var at = player.Transform.position + player.Transform.forward * 0.8f + Vector3.up * 0.15f;
+                var loot = world.SetupItem(item, player, at + Vector3.up * 0.3f, Quaternion.identity);
+                Rest(loot, at);
+                Net.Current.TellItem(item, loot.transform.position, loot.transform.rotation);
+                Plugin.Log.LogInfo("Laid " + item.ShortName.Localized() + " in front of the player for everyone at " + at.ToString("F2"));
+                return true;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Laying an item down failed: " + e);
+                return false;
+            }
+        }
+
         /// <summary>Puts one item on the room's table. The root id ties it to the trader's mail; null for a test item.</summary>
         public static async Task<LootItem> Place(TraderRoom room, Item item, string rootId)
         {
@@ -125,6 +158,17 @@ namespace ZeroMenuTime
             // the way they would if someone had put them down.
             var above = at + Vector3.up * DropHeight;
             var turned = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
+            if (Net.Coop)
+            {
+                // In co-op an item is the same item on every machine or it is nothing. It is set down
+                // by hand here, and every other machine is told to lay the same one at that very place.
+                var shared = world.SetupItem(item, player, above, turned);
+                Rest(shared, at);
+                Net.Current.TellItem(item, shared.transform.position, shared.transform.rotation);
+                OnTables.Add(new Laid { RootId = rootId, Item = item, Loot = shared, Room = room, At = at });
+                Plugin.Log.LogInfo("Laid " + item.ShortName.Localized() + " on the table for everyone at " + at.ToString("F2"));
+                return shared;
+            }
             var loot = world.ThrowItem(item, player, above, turned, Vector3.zero, Vector3.zero, false);
             // Models have their pivots in all sorts of places (a vest's is far off to one side), so
             // shift the object until what is actually visible hangs over the slot.

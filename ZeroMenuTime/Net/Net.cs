@@ -58,6 +58,12 @@ namespace ZeroMenuTime
         void LayItem(Item item, Vector3 at, Quaternion turned);
 
         /// <summary>
+        /// The same, for an item this machine has already laid itself (and set down just so): every
+        /// other machine lays the same item at exactly that place.
+        /// </summary>
+        void TellItem(Item item, Vector3 at, Quaternion turned);
+
+        /// <summary>
         /// What must happen before the game's own raid start: nothing alone; with Fika, the match is
         /// created (or the one of <paramref name="joinHost"/> joined). False when it could not be.
         /// </summary>
@@ -234,6 +240,10 @@ namespace ZeroMenuTime
             }
         }
 
+        public void TellItem(Item item, Vector3 at, Quaternion turned)
+        {
+        }
+
         public Task<bool> PrepareRaid(RaidSettings settings, string joinHost)
         {
             return Task.FromResult(true);
@@ -260,7 +270,10 @@ namespace ZeroMenuTime
     {
         public enum Feature { Rooms, Trade, Deliveries, QuestHandIn, Repair, Hideout, Sleep, Wait, Save, SaveAndLeave }
 
-        private static readonly HashSet<Feature> Ready = new HashSet<Feature> { Feature.Rooms };
+        private static readonly HashSet<Feature> Ready = new HashSet<Feature>
+        {
+            Feature.Rooms, Feature.Trade, Feature.Deliveries, Feature.QuestHandIn, Feature.Repair,
+        };
 
         /// <summary>True alone, always. In co-op: only what is ready; otherwise says so on screen.</summary>
         public static bool Allowed(Feature feature, bool tell = true)

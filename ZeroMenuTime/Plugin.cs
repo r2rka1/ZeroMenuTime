@@ -111,6 +111,7 @@ namespace ZeroMenuTime
             Net.On("zmt.layout", Layout.OnTold);
             Net.RaidEnded += (status, exit) => Layout.Reset();
             Net.RaidStarted += Layout.TellBuilt;
+            Net.On("zmt.inv", InventorySync.OnTold);
             Net.On("zmt.where", Presence.OnWhere);
             Net.RaidStarted += Presence.Reset;
             Net.On("zmt.clock?", WorldClock.OnAsked);
