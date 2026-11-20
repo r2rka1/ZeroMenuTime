@@ -160,6 +160,11 @@ public class ZeroMenuTimeRouter(
             ValueTask.FromResult(jsonUtil.Serialize(Record(sessionId, payload, profileHelper, traderHelper, handbookHelper)) ?? "{}")
     ),
     new RouteAction<MailRequest>(
+        "/zeromenutime/coop/who",
+        (_, _, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(FikaLink.Describe(sessionId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
         "/zeromenutime/mail/list",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(ListMail(sessionId, payload, profileHelper)) ?? "{}")

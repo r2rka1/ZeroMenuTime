@@ -9,15 +9,12 @@ using SPT.Reflection.Utils;
 namespace ZeroMenuTime
 {
     /// <summary>
-    /// SPIKE, not for release. Stage 0 of plans/fika: lets this mod's own raid start go through Fika,
-    /// by reflection, so two test games can get into one raid. The real thing is the add-on of stage 1.
+    /// SPIKE, not for release: what stage 0 of plans/fika tried and later stages will build properly
+    /// (the dead state of stage 5, the late-join switch of stage 6), kept behind the test harness.
     /// </summary>
     public static class FikaSpike
     {
         public static bool Present => Chainloader.PluginInfos.ContainsKey("com.fika.core");
-
-        /// <summary>"host", or the profile id of the host to join.</summary>
-        public static string Mode = "host";
 
         private static Type Utils => AccessTools.TypeByName("Fika.Core.Main.Utils.FikaBackendUtils");
 
@@ -27,47 +24,8 @@ namespace ZeroMenuTime
             return p != null ? p.GetValue(null) : null;
         }
 
-        /// <summary>What Fika's host or join button does before the game's own start is pressed.</summary>
-        public static async Task<bool> Prepare(RaidSettings settings)
-        {
-            var app = ClientAppUtils.GetMainApp();
-            var profile = app.Session.Profile;
-            Utils.GetProperty("Profile", BindingFlags.Public | BindingFlags.Static).SetValue(null, profile);
-            if (Mode == "host")
-            {
-                var create = Utils.GetMethod("CreateMatch", BindingFlags.Public | BindingFlags.Static);
-                await (Task)create.Invoke(null, new object[] { profile.ProfileId, profile.Nickname, settings });
-                Plugin.Log.LogInfo("Fika spike: match created as host " + profile.ProfileId);
-                return true;
-            }
-            var ui = AccessTools.TypeByName("Fika.Core.UI.Custom.MatchMakerUIScript");
-            var join = ui.GetMethod("JoinMatch", BindingFlags.Public | BindingFlags.Static);
-            bool ok = await (Task<bool>)join.Invoke(null, new object[] { profile.Id, Mode, null, false });
-            Plugin.Log.LogInfo("Fika spike: joining " + Mode + ": " + ok);
-            return ok;
-        }
-
         /// <summary>SPIKE S2: the host lets new players in after the raid has started.</summary>
         public static bool LateJoin;
-
-        // ---- Spike S3: items every machine knows ----
-
-        /// <summary>Set by the Fika add-on: lay an item in the world here and on every other machine.</summary>
-        public static Action<EFT.InventoryLogic.Item, UnityEngine.Vector3> PlaceForAll;
-
-        /// <summary>Makes a new item and lays it a step in front of the local player, for everyone.</summary>
-        public static string SpawnForAll(string template)
-        {
-            var me = GamePlayerOwner.MyPlayer;
-            if (PlaceForAll == null)
-            {
-                return "the Fika add-on is not loaded";
-            }
-            var item = Comfort.Common.Singleton<ItemFactory>.Instance.GetPresetItem(template);
-            var at = me.Transform.position + me.Transform.forward * 1.2f + UnityEngine.Vector3.up * 0.8f;
-            PlaceForAll(item, at);
-            return "item " + item.Id + " (" + item.ShortName + ") sent to all, at " + at.ToString("F1");
-        }
 
         // ---- Spike S1: never truly die ----
 
@@ -136,39 +94,6 @@ namespace ZeroMenuTime
                           + " at " + p.Transform.position.ToString("F1") + " shown " + (p.gameObject.activeInHierarchy));
             }
             return lines;
-        }
-
-        /// <summary>The host's START RAID button in Fika's waiting room.</summary>
-        public static string StartNow()
-        {
-            var gameType = AccessTools.TypeByName("Fika.Core.Main.GameMode.IFikaGame");
-            var game = typeof(Comfort.Common.Singleton<>).MakeGenericType(gameType).GetProperty("Instance").GetValue(null);
-            if (game == null)
-            {
-                return "no Fika game yet";
-            }
-            var controller = gameType.GetProperty("GameController").GetValue(game);
-            var started = controller.GetType().GetProperty("RaidStarted", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            bool was = (bool)started.GetValue(controller);
-            started.SetValue(controller, true);
-            return "raid started flag: " + was + " -> true on " + controller.GetType().Name;
-        }
-
-        public static async void Launch(RaidSettings settings, Func<Task> start)
-        {
-            try
-            {
-                if (Present && !await Prepare(settings))
-                {
-                    Plugin.Log.LogWarning("Fika spike: not started");
-                    return;
-                }
-                await start();
-            }
-            catch (Exception e)
-            {
-                Plugin.Log.LogError("Auto-start failed: " + e);
-            }
         }
     }
 

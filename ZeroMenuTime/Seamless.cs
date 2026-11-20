@@ -191,6 +191,30 @@ namespace ZeroMenuTime
             }
         }
 
+        /// <summary>In co-op: the profile id of the host whose raid the next start joins. Null: host one's own.</summary>
+        public static string JoinHost;
+
+        /// <summary>The co-op layer's part first (create or join the match), then the game's own start.</summary>
+        private static async void Launch(RaidSettings settings, Func<Task> start)
+        {
+            try
+            {
+                string join = JoinHost;
+                JoinHost = null;
+                if (!await Net.Current.PrepareRaid(settings, join))
+                {
+                    Plugin.Log.LogWarning("The raid was not started: the co-op match could not be " + (join == null ? "created" : "joined"));
+                    NotificationManager.DisplayWarningNotification("Could not " + (join == null ? "start" : "join") + " the co-op raid.", ENotificationDurationType.Long);
+                    return;
+                }
+                await start();
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Auto-start failed: " + e);
+            }
+        }
+
         public static void StartRaid(string locationId)
         {
             if (GamePlayerOwner.MyPlayer != null)
@@ -273,7 +297,7 @@ namespace ZeroMenuTime
                 }
 
                 Plugin.Log.LogInfo("Auto-starting raid on " + location.Id + " (asked for " + locationId + ")");
-                FikaSpike.Launch(offline, () => menu.method_27());
+                Launch(offline, () => menu.method_27());
             }
             catch (Exception e)
             {
@@ -292,6 +316,14 @@ namespace ZeroMenuTime
 
         [PatchPrefix]
         public static void Prefix(ExitStatus exitStatus, string exitName)
+        {
+            // Alone, this is the signal. With Fika its own game class may never come here; then the
+            // co-op layer gives the signal, and whichever comes first counts.
+            Net.RaiseRaidEnded(exitStatus, exitName);
+        }
+
+        /// <summary>The raid has ended for this machine. Subscribed to <see cref="Net.RaidEnded"/>.</summary>
+        public static void OnRaidEnded(ExitStatus exitStatus, string exitName)
         {
             // The hideout interior must not outlive the raid it was loaded into.
             // A record the server cannot read would make it refuse the whole raid result.
@@ -319,7 +351,8 @@ namespace ZeroMenuTime
                 // Dying (or going missing, or abandoning the raid) ends the run: stay in the menu.
                 bool died = exitStatus == ExitStatus.Killed || exitStatus == ExitStatus.MissingInAction || exitStatus == ExitStatus.Left;
                 Seamless.Died = died;
-                Seamless.Armed = Seamless.SkipResults && !toMenu && !died;
+                // In co-op the next raid is the player's own choice: who hosts, who joins.
+                Seamless.Armed = Seamless.SkipResults && !toMenu && !died && !Net.FikaInstalled;
                 Death.Pending = died && Death.Ask.Value;
                 Seamless.LeftHideout = false;
                 Plugin.Log.LogInfo("Raid ended: " + exitStatus + " via '" + exitName + "' on " + Seamless.LastLocationId

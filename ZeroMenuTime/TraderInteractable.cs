@@ -19,20 +19,20 @@ namespace ZeroMenuTime
             state.Actions.Add(new InteractionAction
             {
                 Name = "Trade with " + TraderName,
-                Action = () => TradeOpener.Open(TraderId, TraderName),
+                Action = () => { if (Coop.Allowed(Coop.Feature.Trade)) { TradeOpener.Open(TraderId, TraderName); } },
                 Disabled = false,
             });
             state.Actions.Add(new InteractionAction
             {
                 Name = "Collect deliveries",
-                Action = () => Mail.Collect(TraderId, TraderName),
+                Action = () => { if (Coop.Allowed(Coop.Feature.Deliveries)) { Mail.Collect(TraderId, TraderName); } },
                 Disabled = false,
             });
             float untilMorning = HideoutSleep.HoursUntilMorning();
             state.Actions.Add(new InteractionAction
             {
                 Name = "Wait until morning (" + untilMorning.ToString("0.#") + " hours)",
-                Action = () => HideoutSleep.Wait(untilMorning),
+                Action = () => { if (Coop.Allowed(Coop.Feature.Wait)) { HideoutSleep.Wait(untilMorning); } },
                 Disabled = false,
             });
             if (Exfil != null)
@@ -41,13 +41,13 @@ namespace ZeroMenuTime
                 state.Actions.Add(new InteractionAction
                 {
                     Name = "Save",
-                    Action = () => { _ = SaveGame.SaveNow("at a trader", exfil.gameObject.name); },
+                    Action = () => { if (Coop.Allowed(Coop.Feature.Save)) { _ = SaveGame.SaveNow("at a trader", exfil.gameObject.name); } },
                     Disabled = false,
                 });
                 state.Actions.Add(new InteractionAction
                 {
                     Name = "Save and go to menu",
-                    Action = () => VagabondLink.Leave(exfil),
+                    Action = () => { if (Coop.Allowed(Coop.Feature.SaveAndLeave)) { VagabondLink.Leave(exfil); } },
                     Disabled = false,
                 });
             }

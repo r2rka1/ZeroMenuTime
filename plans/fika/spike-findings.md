@@ -196,9 +196,8 @@ dead bots and their bodies, containers already looted; the headless as host.
 
 ## Not done yet
 
-- A headless-hosted raid (headless + one client), and asking the headless for a raid from this
-  mod. Put off to stage 1 on purpose: the mod's raid-start code returns early with no local
-  player, so the headless builds no rooms yet, and the result would only list what stage 1 fixes.
+- (Done in stage 1: a headless-hosted raid asked for from this mod's Continue; see the result
+  section of `02-stage1-foundations.md`.)
 - The reference run with Fika and Vagabond only, including the dead-teammate-plus-transit case.
 - The rest of S1 (spectating, bots and the ghost, body container, other causes of death) and of
   S3 (containers, payment, crafting).

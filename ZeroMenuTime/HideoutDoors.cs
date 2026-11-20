@@ -191,7 +191,7 @@ namespace ZeroMenuTime
             var first = waking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? waking.Result : null;
             string wakeAt = first != null && ((bool?)first["Resume"] ?? false) ? (string)first["Hideout"] : null;
             KeyValuePair<Vector3, float> wakeFront;
-            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy)
+            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy && Coop.Allowed(Coop.Feature.Hideout, false))
             {
                 RoomDoor.Fade = 1f;
                 RoomDoor.FadeText = "Waking up...";
@@ -248,7 +248,7 @@ namespace ZeroMenuTime
             var status = asking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? asking.Result : null;
             string bed = status != null && ((bool?)status["Resume"] ?? false) ? (string)status["Hideout"] : null;
             KeyValuePair<Vector3, float> front;
-            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null)
+            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null && Coop.Allowed(Coop.Feature.Hideout, false))
             {
                 Plugin.Log.LogInfo("Waking up at the bed of hideout '" + bed + "'");
                 var consumed = SaveGame.Status(true);
@@ -457,6 +457,11 @@ namespace ZeroMenuTime
         public static void Enter(string id, Vector3 returnTo, float returnYaw, bool atBed = false)
         {
             if (_busy || Inside != null || Plugin.Instance == null)
+            {
+                return;
+            }
+            // Waking at the bed is not told on screen: the player did not ask for anything.
+            if (!Coop.Allowed(Coop.Feature.Hideout, !atBed))
             {
                 return;
             }
@@ -726,7 +731,15 @@ namespace ZeroMenuTime
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError("Closing the hideout failed: " + e);
+                if (e is ArgumentException && e.Message.Contains("Scene to unload is invalid"))
+                {
+                    // The raid's scenes have gone already (a co-op raid ends before this is told): nothing left to close.
+                    Plugin.Log.LogInfo("Hideout interior already gone with the raid");
+                }
+                else
+                {
+                    Plugin.Log.LogError("Closing the hideout failed: " + e);
+                }
             }
         }
     }

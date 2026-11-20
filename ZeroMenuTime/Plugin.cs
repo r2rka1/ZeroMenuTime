@@ -87,6 +87,11 @@ namespace ZeroMenuTime
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
                 new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
             };
+            if (Net.Headless)
+            {
+                // No player, no screens: only the start and the end of a raid are of interest here.
+                _patches.RemoveAll(patch => !(patch is SpawnTradersPatch || patch is RaidStopPatch));
+            }
             foreach (var patch in _patches.ToArray())
             {
                 // One patch that cannot be applied (another mod missing or changed) must not stop the rest.
@@ -100,7 +105,17 @@ namespace ZeroMenuTime
                     Log.LogWarning(patch.GetType().Name + " not applied: " + e.Message);
                 }
             }
-            Log.LogInfo("Zero Menu Time loaded (" + BuildStamp + ")");
+            Net.RaidEnded += RaidStopPatch.OnRaidEnded;
+            Net.RaidStarted += Handshake.OnRaidStarted;
+            Net.On("zmt.hello", Handshake.OnHello);
+            Net.On("zmt.version", Handshake.OnVersion);
+            Net.On("zmt.test", (body, from) => Log.LogInfo("[test] message from " + from + ": " + System.Text.Encoding.UTF8.GetString(body)));
+            Log.LogInfo("Zero Menu Time loaded (" + BuildStamp + ")" + (Net.Headless ? " on a headless host" : ""));
+            if (Net.Headless)
+            {
+                // No screen and no player: nothing below is for this machine.
+                return;
+            }
 
             // Reloaded while the main menu is up: arrange it again.
             try
@@ -217,7 +232,7 @@ namespace ZeroMenuTime
         /// <summary>The black screen while the player steps through a room door.</summary>
         private void OnGUI()
         {
-            if (RoomDoor.Fade <= 0f)
+            if (Net.Headless || RoomDoor.Fade <= 0f)
             {
                 return;
             }
@@ -236,6 +251,12 @@ namespace ZeroMenuTime
 
         private void Update()
         {
+            if (Net.Headless)
+            {
+                // Only what a host with no player has to keep going. Nothing yet needs a tick of its own.
+                TestHarness.Tick();
+                return;
+            }
             if (SelfTestKey != null && SelfTestKey.Value.IsDown() && GamePlayerOwner.MyPlayer != null)
             {
                 SelfTest.Run();
@@ -423,6 +444,12 @@ namespace ZeroMenuTime
                 var player = __instance.MainPlayer;
                 if (player == null)
                 {
+                    if (Net.Headless)
+                    {
+                        // A host with no player: only what the host owes the others is done here.
+                        Plugin.Log.LogInfo("Raid started on a headless host; no player here");
+                        Net.RaiseRaidStarted();
+                    }
                     return;
                 }
 
@@ -555,6 +582,7 @@ namespace ZeroMenuTime
                 Plugin.Log.LogInfo("Raid started on '" + map + "', traders placed: " + count);
                 QuestSync.Send("raid start");
                 Death.SendMode();
+                Net.RaiseRaidStarted();
                 if (count > 0 && Plugin.Instance != null)
                 {
                     Plugin.Instance.StartCoroutine(Plugin.NotifyLater("Traders in this area: " + count, 12f));

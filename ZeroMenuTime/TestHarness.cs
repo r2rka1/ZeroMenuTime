@@ -264,7 +264,10 @@ namespace ZeroMenuTime
                 if (parts.Length > 2 && parts[1] == "spawn")
                 {
                     // fika spawn TEMPLATE: a new item laid in front of the player on every machine.
-                    Report(FikaSpike.SpawnForAll(parts[2]));
+                    var made = Comfort.Common.Singleton<ItemFactory>.Instance.GetPresetItem(parts[2]);
+                    var where = player.Transform.position + player.Transform.forward * 1.2f + Vector3.up * 0.8f;
+                    Net.Current.LayItem(made, where, Quaternion.identity);
+                    Report("item " + made.Id + " laid for all at " + where.ToString("F1"));
                     yield break;
                 }
                 if (parts.Length > 1 && parts[1] == "loot")
@@ -316,6 +319,19 @@ namespace ZeroMenuTime
                     Report("after: carrying it " + (wanted == null || wanted.Item == null ? "?" : (wanted.Item.Parent != null && wanted.Item.Parent.GetOwnerOrNull() == player.InventoryController).ToString()));
                     yield break;
                 }
+                if (parts.Length > 2 && parts[1] == "say")
+                {
+                    // fika say WORDS: a test message to every other machine; each logs it.
+                    Net.Current.Send("zmt.test", System.Text.Encoding.UTF8.GetBytes(string.Join(" ", parts, 2, parts.Length - 2)), true);
+                    Report("said");
+                    yield break;
+                }
+                if (parts.Length > 2 && parts[1] == "tellhost")
+                {
+                    Net.Current.Send("zmt.test", System.Text.Encoding.UTF8.GetBytes(string.Join(" ", parts, 2, parts.Length - 2)), false);
+                    Report("told the host");
+                    yield break;
+                }
                 if (parts.Length > 2 && parts[1] == "latejoin")
                 {
                     FikaSpike.LateJoin = parts[2] == "on";
@@ -324,9 +340,9 @@ namespace ZeroMenuTime
                 }
                 if (parts.Length > 1 && parts[1] == "humans")
                 {
-                    foreach (var human in FikaSpike.Humans())
+                    foreach (var human in Net.Current.Humans())
                     {
-                        Report(human);
+                        Report("  " + human.Name + (human.IsLocal ? " (me)" : "") + " alive " + human.Alive + " at " + human.Position.ToString("F1"));
                     }
                     Report("humans listed");
                     yield break;
@@ -348,18 +364,18 @@ namespace ZeroMenuTime
                 }
                 if (parts.Length > 1 && parts[1] == "start")
                 {
-                    Report(FikaSpike.StartNow());
+                    Report(Net.Current.StartWaitingRaid());
                     yield break;
                 }
                 if (parts.Length > 1 && player == null)
                 {
-                    FikaSpike.Mode = parts[1] == "join" ? parts[2] : "host";
+                    Seamless.JoinHost = parts[1] == "join" ? parts[2] : null;
                     MainMenu.Continue();
                     Report("Continue pressed through Fika as " + parts[1]);
                     yield break;
                 }
-                Report("Fika present " + FikaSpike.Present + ", server " + FikaSpike.Flag("IsServer") + ", client " + FikaSpike.Flag("IsClient") + ", headless " + FikaSpike.Flag("IsHeadless")
-                       + ", single " + FikaSpike.Flag("IsSinglePlayer") + ", group " + FikaSpike.Flag("GroupId") + ", local player " + (player != null));
+                Report("role " + Net.Role + ", host " + Net.IsHost + ", co-op " + Net.Coop + ", headless " + Net.Headless + ", Fika installed " + Net.FikaInstalled
+                       + ", humans " + Net.Current.Humans().Count + ", local player " + (player != null));
                 yield break;
             }
             if (player == null && verb == "continue")

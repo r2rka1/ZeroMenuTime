@@ -601,6 +601,10 @@ public sealed class RaidEndSavePatch : AbstractPatch
     private static async Task After(Task original, MongoId sessionId, bool died)
     {
         await original;
+        if (FikaLink.IsHeadlessProfile(sessionId))
+        {
+            return;
+        }
         SaveGameService.Instance?.RaidEnded(sessionId, died);
     }
 }
