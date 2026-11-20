@@ -109,12 +109,8 @@ namespace ZeroMenuTime
             else
             {
                 int living = 0, inside = 0;
-                foreach (var human in Net.Current.Humans())
+                foreach (var human in Afterlife.Living())
                 {
-                    if (!human.Alive)
-                    {
-                        continue;
-                    }
                     living++;
                     string where;
                     if (Where.TryGetValue(human.ProfileId, out where) && where != Out)

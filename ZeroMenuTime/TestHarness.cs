@@ -363,19 +363,39 @@ namespace ZeroMenuTime
                     Report("humans listed");
                     yield break;
                 }
-                if (parts.Length > 1 && parts[1] == "ghost")
+                if (parts.Length > 1 && parts[1] == "dead")
                 {
-                    // fika ghost on|off: arm the dead state. fika ghost: how it stands.
-                    if (parts.Length > 2)
+                    // fika dead: who is a ghost, who can be brought back, what the local player has to pay with.
+                    Report("ghost now " + Afterlife.Dead + "; ghosts: " + Afterlife.Ghosts.Count + "; living: " + Afterlife.Living().Count
+                           + "; roubles carried: " + (player != null ? Afterlife.CarriedRoubles(player) : 0));
+                    foreach (var ghost in Afterlife.Revivable())
                     {
-                        FikaSpike.GhostOnDeath = parts[2] == "on";
+                        Report("  can bring back " + ghost.Value + " (" + ghost.Key + ")");
                     }
-                    Report("ghost on death " + FikaSpike.GhostOnDeath + ", ghost now " + FikaSpike.Ghost + (FikaSpike.Ghost ? ", died of " + FikaSpike.DiedOf + " at " + FikaSpike.DiedAt.ToString("F1") : ""));
                     yield break;
                 }
-                if (parts.Length > 4 && parts[1] == "revive")
+                if (parts.Length > 2 && parts[1] == "revive")
                 {
-                    Report(FikaSpike.Revive(new Vector3(Number(parts[2]), Number(parts[3]), Number(parts[4]))));
+                    // fika revive paid|free: bring back the first dead teammate, as the trader's or the medical station's entry does.
+                    var ghosts = Afterlife.Revivable();
+                    if (ghosts.Count == 0)
+                    {
+                        Report("FAILED nobody to bring back");
+                        yield break;
+                    }
+                    if (parts[2] == "paid")
+                    {
+                        var paying = Afterlife.ReviveForMoney(ghosts[0].Key, ghosts[0].Value);
+                        while (!paying.IsCompleted)
+                        {
+                            yield return null;
+                        }
+                        Report(paying.Result);
+                    }
+                    else
+                    {
+                        Report(Afterlife.ReviveFree(ghosts[0].Key, ghosts[0].Value));
+                    }
                     yield break;
                 }
                 if (parts.Length > 1 && parts[1] == "start")

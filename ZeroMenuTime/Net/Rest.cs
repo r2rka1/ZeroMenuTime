@@ -67,12 +67,8 @@ namespace ZeroMenuTime
             _hours = float.Parse(parts[1], CultureInfo.InvariantCulture);
             _asker = from;
             Waiting.Clear();
-            foreach (var human in Net.Current.Humans())
+            foreach (var human in Afterlife.Living())
             {
-                if (!human.Alive)
-                {
-                    continue;
-                }
                 if (_kind == "sleep" && Presence.WhereIs(human.ProfileId) != Presence.Hideout)
                 {
                     Say("zmt.rest.off", human.Name + " is not in the hideout. Everyone has to be inside to sleep.");

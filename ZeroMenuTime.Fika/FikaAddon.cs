@@ -284,6 +284,33 @@ namespace ZeroMenuTime.Fika
             return true;
         }
 
+        public async void EndRaidDead()
+        {
+            try
+            {
+                // A moment to see what happened; then out. The host waits for the others to go first.
+                await Task.Delay(6000);
+                var server = Singleton<FikaServer>.Instance;
+                for (int waited = 0; waited < 30 && FikaBackendUtils.IsServer && server != null && server.NetServer != null && server.NetServer.ConnectedPeersCount > 0; waited++)
+                {
+                    await Task.Delay(1000);
+                }
+                CoopHandler coop;
+                var game = Singleton<global::Fika.Core.Main.GameMode.IFikaGame>.Instance;
+                if (game == null || !CoopHandler.TryGetCoopHandler(out coop) || coop.MyPlayer == null)
+                {
+                    return;
+                }
+                game.ExitStatus = ExitStatus.Killed;
+                game.Stop(coop.MyPlayer.ProfileId, ExitStatus.Killed, null, 0f);
+                Plugin.Log.LogInfo("Net: the raid ends for this player, dead with the whole group");
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Net: ending the raid after the group's death failed: " + e);
+            }
+        }
+
         public string StartWaitingRaid()
         {
             var game = Singleton<global::Fika.Core.Main.GameMode.IFikaGame>.Instance;

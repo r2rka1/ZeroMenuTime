@@ -82,7 +82,7 @@ namespace ZeroMenuTime
                 new SaveStashPatch(), new SpawnTradersPatch(), new TraderActionsPatch(), new DoorLookPatch(),
                 new TraderExfilEnterPatch(), new TraderExfilExitPatch(),
                 new LocalPurchasePatch(), new LocalSellPatch(), new CarriedPaymentPatch(), new DrawPackItemsPatch(),
-                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new GhostKillPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
+                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new AfterlifeKillPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
                 new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
@@ -111,6 +111,13 @@ namespace ZeroMenuTime
             Net.On("zmt.layout", Layout.OnTold);
             Net.RaidEnded += (status, exit) => Layout.Reset();
             Net.RaidStarted += Layout.TellBuilt;
+            Net.On("zmt.ghost", Afterlife.OnGhost);
+            Net.On("zmt.ghosts?", Afterlife.OnAskedGhosts);
+            Net.On("zmt.revive", Afterlife.OnRevive);
+            Net.On("zmt.wipe", Afterlife.OnWipe);
+            Net.RaidStarted += Afterlife.OnRaidStarted;
+            Net.RaidEnded += Afterlife.OnRaidEnded;
+            Camera.onPreCull += Afterlife.BeforeDraw;
             Net.On("zmt.hideout", HideoutDoors.OnChanged);
             Net.RaidStarted += Coop.AskOwner;
             Net.On("zmt.rest.ask", Rest.OnAsk);
@@ -253,7 +260,12 @@ namespace ZeroMenuTime
         /// <summary>The black screen while the player steps through a room door.</summary>
         private void OnGUI()
         {
-            if (Net.Headless || RoomDoor.Fade <= 0f)
+            if (Net.Headless)
+            {
+                return;
+            }
+            Afterlife.Draw();
+            if (RoomDoor.Fade <= 0f)
             {
                 return;
             }
@@ -279,6 +291,7 @@ namespace ZeroMenuTime
                 WorldClock.Tick();
                 Presence.Tick();
                 Rest.Tick();
+                Afterlife.Tick();
                 BotFreeze.Tick();
                 return;
             }
@@ -302,6 +315,7 @@ namespace ZeroMenuTime
             HideoutPower.Tick();
             Presence.Tick();
             Rest.Tick();
+            Afterlife.Tick();
             BotFreeze.Tick();
             FallGuard.Tick();
             HideoutSound.Tick();
@@ -615,6 +629,7 @@ namespace ZeroMenuTime
                     count++;
                     Plugin.Log.LogInfo("Placed " + spot.Name + " on " + map + " at " + string.Join(", ", spot.Position));
                 }
+                Afterlife.BuildLimbo();
                 int hideoutDoors = HideoutDoors.Spawn(map);
                 WorldClock.Begin();
                 TraderRoom.ExtendPhysics();

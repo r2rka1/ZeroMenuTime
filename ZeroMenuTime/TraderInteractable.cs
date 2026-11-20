@@ -28,6 +28,16 @@ namespace ZeroMenuTime
                 Action = () => { if (Coop.Allowed(Coop.Feature.Deliveries)) { Mail.Collect(TraderId, TraderName); } },
                 Disabled = false,
             });
+            foreach (var ghost in Afterlife.Revivable())
+            {
+                string who = ghost.Key, name = ghost.Value;
+                state.Actions.Add(new InteractionAction
+                {
+                    Name = "Revive " + name + " (" + Afterlife.ReviveCost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " roubles)",
+                    Action = () => { _ = Afterlife.ReviveForMoney(who, name); },
+                    Disabled = false,
+                });
+            }
             float untilMorning = HideoutSleep.HoursUntilMorning();
             state.Actions.Add(new InteractionAction
             {

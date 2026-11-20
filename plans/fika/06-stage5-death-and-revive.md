@@ -102,3 +102,58 @@ existing save and death modes apply.
 - Fika treats the ghost as alive: things that count living players (transit checks, extraction,
   Fika's own UI) will count ghosts. Useful for stage 7, wrong elsewhere; audit each.
 - Depends on a patch in the same place Fika patches for its downed system.
+
+---
+
+## Result (2026-11-20, branch `fika/stage5`)
+
+**Built** (`ZeroMenuTime/Net/Afterlife.cs`)
+
+- A kill of the local player in a co-op raid is looked at first. If another player is alive, the
+  kill is stopped and the player becomes a ghost: healed, damage off, hands emptied, everything
+  they carry dropped where they fell (one thing at a time, as the game's own drop, so every
+  machine has the same pile), then moved to a shut waiting room built under the map at raid start
+  on every machine. The secure container, armband, knife and dog tag are kept.
+- Every machine keeps the list of ghosts (`zmt.ghost`); a machine coming into the raid asks for it.
+  Ghosts are not counted as living for the freeze rule or the rest vote.
+- A ghost's view is put behind a living teammate just before each frame is drawn (left and right
+  arrow change who), with a line across the top of the screen.
+- **Revival**: a trader's menu lists "Revive NAME (100,000 roubles)" for each ghost; the reviver's
+  roubles are taken. The hideout's medical station (built) lists "REVIVE NAME", free. The ghost's
+  own machine moves the player to where they came into the map, at about a third of health, hungry
+  and thirsty, with nothing but what was kept; it checks the move landed and repeats it if not.
+- **Group wipe**: when a kill lands on the last living player it is let through, every ghost is
+  killed for real, and each machine ends its raid as a death (clients first, the hosting player
+  once they have gone). The same happens if the last living player leaves or loses the
+  connection. Each player's own death setting then applies as it does alone.
+- Alone, nothing changes: the patch lets every kill through.
+
+**Seen (host + client, Customs)**
+
+- Client killed: the raid went on; its 6 pieces of gear lay at the spot on the host as well;
+  the host saw the client alive in the waiting room and listed it as revivable.
+- Host paid: its roubles went from 180,000 to 80,000 on both machines; the client stood at its
+  entry point with 154 of 440 health, 30 energy, 30 water, and was a living player again everywhere.
+- Client a ghost, host killed: "the raid is lost for everyone"; both raids ended as Killed and
+  both games went back to the menu.
+
+**Two things found and fixed while testing**
+
+- Dropping the gear and moving the player in the same moment left the gear in the waiting room.
+  The ghost now stays where it fell until every drop has finished.
+- The weapon in the hands could not be dropped on the other machine ("hands controller can't
+  perform this operation"). The hands are emptied first.
+
+**Deviation from the plan:** the gear is not put into one body container; it is dropped as the
+game drops things, a pile at the spot. It needed no new kind of object and every machine agrees
+on it.
+
+**Not tested**
+
+- The medical station entry (it calls the same revival as the trader's, without the payment).
+- What the spectating view looks like (it was not looked at by eye), and sound while a ghost.
+- Whether bots stop shooting at once and forget the ghost (damage is off, so no harm either way).
+- Deaths by bleeding, starvation, grenades and headshots (all end in the same call).
+- A headless host; three or more players; a ghost choosing to leave the raid.
+- Fika's own "revive" option switched on at the same time. It must be off; the mod does not
+  check it yet.

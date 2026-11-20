@@ -81,6 +81,12 @@ namespace ZeroMenuTime
         /// not: a hosting player cannot leave while others are in.
         /// </summary>
         bool LeaveRaid(string exitName, out string why);
+
+        /// <summary>
+        /// The whole group is dead: this player's raid ends as a death. The hosting player goes
+        /// last, once the others have gone (or after a wait).
+        /// </summary>
+        void EndRaidDead();
     }
 
     /// <summary>The seam itself: the layer in use, roles, events and message handlers.</summary>
@@ -252,6 +258,10 @@ namespace ZeroMenuTime
         public string StartWaitingRaid()
         {
             return "alone: nothing waits";
+        }
+
+        public void EndRaidDead()
+        {
         }
 
         public bool LeaveRaid(string exitName, out string why)
