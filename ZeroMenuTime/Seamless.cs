@@ -273,14 +273,7 @@ namespace ZeroMenuTime
                 }
 
                 Plugin.Log.LogInfo("Auto-starting raid on " + location.Id + " (asked for " + locationId + ")");
-                var start = menu.method_27();
-                start.ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                    {
-                        Plugin.Log.LogError("Auto-start failed: " + t.Exception);
-                    }
-                });
+                FikaSpike.Launch(offline, () => menu.method_27());
             }
             catch (Exception e)
             {

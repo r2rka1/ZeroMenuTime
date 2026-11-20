@@ -258,6 +258,25 @@ namespace ZeroMenuTime
                 }
                 yield break;
             }
+            if (verb == "fika")
+            {
+                // fika: what Fika says this game is. fika host | fika join HOSTPROFILEID: from the menu, start a raid through Fika.
+                if (parts.Length > 1 && parts[1] == "start")
+                {
+                    Report(FikaSpike.StartNow());
+                    yield break;
+                }
+                if (parts.Length > 1 && player == null)
+                {
+                    FikaSpike.Mode = parts[1] == "join" ? parts[2] : "host";
+                    MainMenu.Continue();
+                    Report("Continue pressed through Fika as " + parts[1]);
+                    yield break;
+                }
+                Report("Fika present " + FikaSpike.Present + ", server " + FikaSpike.Flag("IsServer") + ", client " + FikaSpike.Flag("IsClient") + ", headless " + FikaSpike.Flag("IsHeadless")
+                       + ", single " + FikaSpike.Flag("IsSinglePlayer") + ", group " + FikaSpike.Flag("GroupId") + ", local player " + (player != null));
+                yield break;
+            }
             if (player == null && verb == "continue")
             {
                 MainMenu.Continue();
