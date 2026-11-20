@@ -117,6 +117,8 @@ namespace ZeroMenuTime
             Net.On("zmt.layout", Layout.OnTold);
             Net.RaidEnded += (status, exit) => Layout.Reset();
             Net.RaidStarted += Layout.TellBuilt;
+            Net.On("zmt.endraid", Regroup.OnEndRaid);
+            Net.On("zmt.ghost.come", Afterlife.OnCome);
             Net.On("zmt.left", Net.OnLeft);
             Net.On("zmt.ghost", Afterlife.OnGhost);
             Net.On("zmt.ghosts?", Afterlife.OnAskedGhosts);
@@ -299,6 +301,7 @@ namespace ZeroMenuTime
                 Presence.Tick();
                 Rest.Tick();
                 Afterlife.Tick();
+                Regroup.Tick();
                 BotFreeze.Tick();
                 return;
             }
@@ -323,6 +326,7 @@ namespace ZeroMenuTime
             Presence.Tick();
             Rest.Tick();
             Afterlife.Tick();
+            Regroup.Tick();
             BotFreeze.Tick();
             FallGuard.Tick();
             HideoutSound.Tick();

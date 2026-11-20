@@ -174,6 +174,12 @@ namespace ZeroMenuTime
                 if (!Net.Current.LeaveRaid(exfil.gameObject.name, out why))
                 {
                     Seamless.SaveAndMenuRequested = false;
+                    if (Net.Role == Role.Host)
+                    {
+                        // The hosting player, with others in the raid: it ends for everyone, if they say so.
+                        Regroup.AskEndForAll(exfil.gameObject.name);
+                        return;
+                    }
                     NotificationManager.DisplayWarningNotification("You cannot leave now: " + why + ".", ENotificationDurationType.Long);
                     Plugin.Log.LogInfo("Leave refused at " + exfil.gameObject.name + ": " + why);
                     return;

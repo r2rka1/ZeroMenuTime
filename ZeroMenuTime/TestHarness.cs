@@ -357,6 +357,20 @@ namespace ZeroMenuTime
                     Report("humans listed");
                     yield break;
                 }
+                if (parts.Length > 2 && parts[1] == "endforall")
+                {
+                    // fika endforall EXIT: what the hosting player's yes to "end the raid for everyone" does.
+                    Regroup.EndForAll(parts[2]);
+                    Report("ending the raid for everyone by " + parts[2]);
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "arrive")
+                {
+                    // fika arrive: what happens to someone who was dead when the group reached a new map.
+                    yield return Regroup.ArriveAfterDeath();
+                    Report("arrived after death; carrying " + LocalTrade.CarriedItems(player).Count + " item(s)");
+                    yield break;
+                }
                 if (parts.Length > 1 && parts[1] == "dead")
                 {
                     // fika dead: who is a ghost, who can be brought back, what the local player has to pay with.

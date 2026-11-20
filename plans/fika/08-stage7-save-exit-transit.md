@@ -105,3 +105,60 @@ The three modes, applied in the raid at the moment of respawn after a transit or
   profile, on Fika's own raid-end and raid-start handlers; order matters (see stage 1's check).
 - Group memory on the server (who was dead, where) must not leak between different groups a
   player belongs to.
+
+---
+
+## Result (2026-11-20, branch `fika/stage7`)
+
+**Built**
+
+- **Saving in co-op is on.** "Save" at a trader and saving at the bed are each player's own, as
+  alone. Sleeping in a group saves each player at the bed once everyone has agreed and rested.
+- **Save and go to menu.** For a client, and for anyone on a headless host, it takes that player
+  out and the raid goes on (stage 1 and 6). For the hosting player with others in the raid it
+  now asks: "Leaving ends it for everyone". On yes, every living player leaves by the same exit
+  and starts next time from there; anyone dead dies for real with their own death setting; the
+  host leaves last.
+- **Dead teammates and a transit** (`Regroup`). While anyone is a ghost the host looks once a
+  second at the map's transits. When every living player stands in the same one, the ghosts are
+  brought to that spot, unseen, so the co-op layer's "everyone alive is here" is true and the
+  whole group goes through.
+- **Arriving after death.** A player who was a ghost when the raid ended by a transit comes to
+  life on the new map, and their own death setting is applied there:
+  - *Keep items*: the server gives the gear of their last save (everything worn and carried
+    except the secure container, armband, knife, dog tag and pockets); it is laid in front of
+    them as new copies, to be put on.
+  - *Lose carried gear*: they have what the death left them (the kept slots).
+  - *Lose everything*: the same, and the secure container is emptied.
+- **Rule 5** (a dead teammate can spawn where the returning player starts again) needs nothing
+  of its own: when nobody alive is left in a raid the ghosts die for real (stage 5), their death
+  setting is applied by the server as for any death, and "Join a friend" then brings them to
+  where the new raid's owner is (stage 6).
+- **Menu**: done in stage 6 (Continue hosts, Join a friend, Continue on headless).
+
+**Seen (host + client, Customs)**
+
+- The client saved at Skier in a co-op raid.
+- "Arriving after death" with Keep items laid 4 things from that save in front of the client;
+  the host saw the same 4.
+- The host ended the raid for everyone: both raids ended as Survived by Skier's exit, the host last.
+
+**Not tested**
+
+- **Any transit at all under Fika with this mod**, with or without a dead teammate. The harness
+  has no way yet to make two players use a transit together. The code that brings ghosts to the
+  transit, and the flag that carries "was dead" over to the next map, have not run in a real
+  transit. This is the largest untested piece of the whole plan.
+- The death settings Lose carried gear and Lose everything on arrival.
+- The question shown to the hosting player (the harness calls what its yes does).
+- A group sleep that saves; a guest dying after saving at the owner's bed, and where they wake.
+- A dead player in a raid whose last living player saves and leaves on a headless host.
+
+**Known weak points**
+
+- *Keep items* in a group can double gear: the things dropped at death can be carried through
+  the transit by a teammate while the dead player also gets copies from their save. Alone the
+  same setting never doubles anything. To decide: accept, or give the copies only when the
+  originals were left behind.
+- A living player who is made to leave by the host's "end for everyone" keeps their last save
+  as it was; only where they start next time changes.

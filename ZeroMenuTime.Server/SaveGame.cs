@@ -262,6 +262,47 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
     }
 
     /// <summary>
+    /// What the character wore and carried at its last save, as a flat list of items: for the
+    /// "keep items" death setting when a dead player comes back on a new map in co-op. The secure
+    /// container, armband, knife, dog tag and pockets are left out; the player still has those.
+    /// </summary>
+    public SavedGear SavedGearOf(MongoId sessionId)
+    {
+        try
+        {
+            string id = sessionId.ToString();
+            lock (_gate)
+            {
+                if (!File.Exists(CharacterFile(id)))
+                {
+                    return new SavedGear { Ok = true };
+                }
+                var saved = jsonUtil.Deserialize<PmcData>(File.ReadAllText(CharacterFile(id)));
+                var items = saved?.Inventory?.Items;
+                string? equipment = saved?.Inventory?.Equipment?.ToString();
+                var gear = new SavedGear { Ok = true };
+                if (items == null || equipment == null)
+                {
+                    return gear;
+                }
+                var notThese = new HashSet<string> { "SecuredContainer", "ArmBand", "Scabbard", "Dogtag", "Pockets" };
+                foreach (var worn in items.Where(x => x.ParentId == equipment && !notThese.Contains(x.SlotId ?? "")).ToList())
+                {
+                    // Each thing worn becomes the top of its own little tree, with what was in or on it.
+                    gear.Items.Add(worn with { ParentId = null, SlotId = null });
+                    gear.Items.AddRange(Below(items, worn.Id.ToString()));
+                    gear.Roots.Add(worn.Id.ToString());
+                }
+                return gear;
+            }
+        }
+        catch (Exception e)
+        {
+            return new SavedGear { Error = e.Message };
+        }
+    }
+
+    /// <summary>
     /// A player joins someone else's world: as far as Vagabond goes they are now where that world's
     /// owner is (same map, same way in), so they come in beside the others and their own next start
     /// is from there.
@@ -650,4 +691,12 @@ public sealed class RaidEndSavePatch : AbstractPatch
         }
         SaveGameService.Instance?.RaidEnded(sessionId, died);
     }
+}
+
+public sealed class SavedGear
+{
+    public bool Ok { get; set; }
+    public string? Error { get; set; }
+    public List<string> Roots { get; set; } = [];
+    public List<SPTarkov.Server.Core.Models.Eft.Common.Tables.Item> Items { get; set; } = [];
 }

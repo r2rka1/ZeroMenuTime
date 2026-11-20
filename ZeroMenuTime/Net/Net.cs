@@ -315,7 +315,7 @@ namespace ZeroMenuTime
 
         private static readonly HashSet<Feature> Ready = new HashSet<Feature>
         {
-            Feature.Rooms, Feature.Trade, Feature.Deliveries, Feature.QuestHandIn, Feature.Repair, Feature.Hideout, Feature.Sleep, Feature.Wait,
+            Feature.Rooms, Feature.Trade, Feature.Deliveries, Feature.QuestHandIn, Feature.Repair, Feature.Hideout, Feature.Sleep, Feature.Wait, Feature.Save, Feature.SaveAndLeave,
         };
 
         /// <summary>Whose world this raid is (profile id); "" until the server has said, and alone.</summary>

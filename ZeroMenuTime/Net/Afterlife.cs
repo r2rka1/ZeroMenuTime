@@ -81,11 +81,36 @@ namespace ZeroMenuTime
             wall.GetComponent<BoxCollider>().size = size;
         }
 
+        /// <summary>Dead when the group went through a transit: comes to life on the map just arrived at.</summary>
+        private static bool _arriveDead;
+
+        /// <summary>On a ghost's machine: the living are all in a transit; come and stand with them, unseen.</summary>
+        public static void OnCome(byte[] body, string from)
+        {
+            var me = GamePlayerOwner.MyPlayer;
+            string[] parts = Encoding.UTF8.GetString(body ?? new byte[0]).Split(' ');
+            if (me == null || !Dead || parts.Length < 3)
+            {
+                return;
+            }
+            var at = new Vector3(float.Parse(parts[0], CultureInfo.InvariantCulture), float.Parse(parts[1], CultureInfo.InvariantCulture), float.Parse(parts[2], CultureInfo.InvariantCulture));
+            _inLimbo = false;
+            me.Teleport(at + Vector3.up * 0.1f, false);
+            Plugin.Log.LogInfo("Afterlife: brought to the transit at " + at.ToString("F1") + " with the living");
+        }
+
         public static void OnRaidStarted()
         {
             Ghosts.Clear();
+            bool arrive = _arriveDead;
+            _arriveDead = false;
             Dead = false;
+            _inLimbo = false;
             _wipe = false;
+            if (arrive && Plugin.Instance != null)
+            {
+                Plugin.Instance.StartCoroutine(Regroup.ArriveAfterDeath());
+            }
             var me = GamePlayerOwner.MyPlayer;
             _hasCameIn = me != null;
             if (me != null)
@@ -100,6 +125,8 @@ namespace ZeroMenuTime
 
         public static void OnRaidEnded(ExitStatus status, string exit)
         {
+            // A ghost carried through a transit is still dead when the next map begins.
+            _arriveDead = Dead && status == ExitStatus.Transit;
             Ghosts.Clear();
             Dead = false;
             _wipe = false;
