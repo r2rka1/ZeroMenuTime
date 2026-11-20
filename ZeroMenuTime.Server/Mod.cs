@@ -160,6 +160,17 @@ public class ZeroMenuTimeRouter(
             ValueTask.FromResult(jsonUtil.Serialize(Record(sessionId, payload, profileHelper, traderHelper, handbookHelper)) ?? "{}")
     ),
     new RouteAction<MailRequest>(
+        "/zeromenutime/coop/raids",
+        (_, _, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(new CoopRaids { Raids = FikaLink.Raids(sessionId) }) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
+        "/zeromenutime/coop/join",
+        // TraderId carries the owner of the raid being joined: the joiner goes where that world is.
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(saves.GoWhereTheOwnerIs(sessionId, payload.TraderId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
         "/zeromenutime/coop/who",
         (_, _, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(FikaLink.Describe(sessionId)) ?? "{}")

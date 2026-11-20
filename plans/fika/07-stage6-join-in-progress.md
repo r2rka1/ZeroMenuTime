@@ -84,3 +84,57 @@ the overview must say so.
 - State that Fika only syncs at raid start and nobody thought to resend (airdrops, mines, map
   events, the armoured vehicle, weather). S2 must list these; some may be accepted as gaps.
 - If Fika adds its own join in progress later, this stage is replaced by using theirs.
+
+---
+
+## Result (2026-11-20, branch `fika/stage6`)
+
+**Built**
+
+- **Setting** "Let players join a raid in progress" (on by default), read on the host. It opens
+  the two checks found in stage 0 while a join is being answered.
+- **Setting** "Start a co-op raid without waiting" (on by default): a raid this game hosts, or asks
+  a headless host for, starts as soon as this player's character is in it. There is no waiting
+  room to sit in; friends come in as it runs.
+- **The server lists the raids** (`/zeromenutime/coop/raids`): who hosts, whose world, which map,
+  how many players, headless or not. **Joining** (`/zeromenutime/coop/join`) first moves the
+  joiner, in Vagabond's terms, to where that world's owner is (same map, same way in), so the
+  joiner comes in beside the others and their own next start is from there. The client then
+  starts the raid on the owner's map with the join in front.
+- **Main menu, with Fika installed:** "Join a friend" (offers each running raid in turn: name,
+  map, players) and "Continue on headless" (your own world on a free headless host). Continue
+  itself hosts your world on your own game.
+- **What a newcomer asks for** when its raid starts: the host's room and door settings, the
+  clock, the stash if one exists, the list of ghosts. (All built in the earlier stages.)
+- **Leaving and coming back.** "Save and go to menu" now also tells the others, the way an
+  extraction does, so each machine lets the character go; a moment later each machine also
+  forgets it in the raid's own record of everyone who was ever there. Coming back is then a fresh
+  arrival. (Fika's "reconnect" was tried for this and does not work for someone who left
+  properly: the join is accepted and the raid never starts. It is kept only for a player Fika
+  itself still lists, whose game died.)
+- On the host, `Humans()` counts a character only while its player's game is connected.
+
+**Seen (host + client, Customs)**
+
+- The host's raid started by itself. The client found it in the list, joined it as it ran, took
+  the host's clock, built its rooms from the host's settings (`PASS Layout: 2 of 2`) and stood
+  beside the host.
+- The client saved and left at Skier; the host noted "the raid no longer remembers their
+  character"; the client joined again and was in the raid, and an item it laid down reached the host.
+
+**Known problems**
+
+- After coming back, the client logged two "could not find item" errors for things another
+  character did while it was loading. No effect seen; to watch.
+- (Fixed after the run, not re-run:) the host left the returning player out of its count of
+  humans, because Fika gives the same network id to a player who comes back and the old id was
+  on its "extracted" list.
+
+**Not tested**
+
+- A joiner whose own Vagabond state was on another map (the server call that moves them was
+  made; both test profiles were on Customs already).
+- Joining a headless-hosted raid as the second player; two joiners at once.
+- The two menu entries by hand (the harness calls what they call).
+- A raid long under way: opened doors, looted containers, dead bots and their bodies.
+- A player whose game died coming back by Fika's reconnect.

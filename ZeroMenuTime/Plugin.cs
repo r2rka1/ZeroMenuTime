@@ -38,6 +38,8 @@ namespace ZeroMenuTime
 
         public static Plugin Instance;
         public static ConfigEntry<bool> UseCustomSpots;
+        public static ConfigEntry<bool> LateJoin;
+        public static ConfigEntry<bool> AutoStartCoop;
 
         /// <summary>Show a message after a delay, and keep it on screen longer than the default.</summary>
         public static System.Collections.IEnumerator NotifyLater(string message, float delaySeconds)
@@ -61,6 +63,10 @@ namespace ZeroMenuTime
                 "In raid: heals you fully and switches off all damage to you. For testing only; turn off for real play.");
             SelfTestKey = Config.Bind("Testing", "Self-test key", new KeyboardShortcut(KeyCode.F8),
                 "In raid: runs the inventory steps a trade is made of and reports which worked. For testing only.");
+            LateJoin = Config.Bind("Co-op", "Let players join a raid in progress", true,
+                "With Fika, when you host: other players can come into your raid after it has started. They appear where you came into the map.");
+            AutoStartCoop = Config.Bind("Co-op", "Start a co-op raid without waiting", true,
+                "With Fika: a raid you host (or ask a headless host for) starts as soon as it has loaded, without the waiting room. Others join it as it runs.");
             UseCustomSpots = Config.Bind("General", "Also use traders.json spots", false,
                 "When Vagabond is installed traders stand at Vagabond's trader extracts. Turn this on to add the spots from traders.json as well.");
 
@@ -111,6 +117,7 @@ namespace ZeroMenuTime
             Net.On("zmt.layout", Layout.OnTold);
             Net.RaidEnded += (status, exit) => Layout.Reset();
             Net.RaidStarted += Layout.TellBuilt;
+            Net.On("zmt.left", Net.OnLeft);
             Net.On("zmt.ghost", Afterlife.OnGhost);
             Net.On("zmt.ghosts?", Afterlife.OnAskedGhosts);
             Net.On("zmt.revive", Afterlife.OnRevive);

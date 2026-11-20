@@ -348,12 +348,6 @@ namespace ZeroMenuTime
                     Report("told the host");
                     yield break;
                 }
-                if (parts.Length > 2 && parts[1] == "latejoin")
-                {
-                    FikaSpike.LateJoin = parts[2] == "on";
-                    Report("late join " + FikaSpike.LateJoin);
-                    yield break;
-                }
                 if (parts.Length > 1 && parts[1] == "humans")
                 {
                     foreach (var human in Net.Current.Humans())
@@ -401,6 +395,38 @@ namespace ZeroMenuTime
                 if (parts.Length > 1 && parts[1] == "start")
                 {
                     Report(Net.Current.StartWaitingRaid());
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "raids")
+                {
+                    var listing = Coop.Raids();
+                    while (!listing.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    foreach (var raid in listing.Result)
+                    {
+                        Report("  " + raid.Match + " host " + raid.Host + " owner " + raid.OwnerName + " on " + raid.Location + " " + raid.Status + " players " + raid.Players
+                               + (raid.Headless ? " headless" : "") + (raid.Mine ? " (I was in it)" : ""));
+                    }
+                    Report(listing.Result.Count + " raid(s)");
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "join" && player == null && (parts.Length == 2 || parts[2] == "any"))
+                {
+                    // fika join: the first raid on the server's list, as the menu's Join does.
+                    var listing = Coop.Raids();
+                    while (!listing.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    if (listing.Result.Count == 0)
+                    {
+                        Report("FAILED no raid to join");
+                        yield break;
+                    }
+                    _ = Coop.Join(listing.Result[0]);
+                    Report("joining " + listing.Result[0].Match + " on " + listing.Result[0].Location);
                     yield break;
                 }
                 if (parts.Length > 1 && player == null)

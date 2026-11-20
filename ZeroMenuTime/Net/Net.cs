@@ -146,6 +146,39 @@ namespace ZeroMenuTime
             }
         }
 
+        /// <summary>
+        /// A player has left the raid for good (extracted, saved and left). After a moment, when the
+        /// co-op layer has let the character go, the raid's own memory of "everyone who was ever
+        /// here" forgets them too: otherwise the same player could not come into this raid again.
+        /// </summary>
+        public static void OnLeft(byte[] body, string from)
+        {
+            string profile = System.Text.Encoding.UTF8.GetString(body ?? new byte[0]);
+            if (Plugin.Instance != null && profile != "")
+            {
+                Plugin.Instance.StartCoroutine(Forget(profile));
+            }
+        }
+
+        private static System.Collections.IEnumerator Forget(string profile)
+        {
+            yield return new WaitForSecondsRealtime(4f);
+            try
+            {
+                var world = Comfort.Common.Singleton<GameWorld>.Instance;
+                var ever = world != null ? HarmonyLib.AccessTools.Field(typeof(GameWorld), "_allPlayersEverExisted").GetValue(world) as System.Collections.IDictionary : null;
+                if (ever != null && ever.Contains(profile))
+                {
+                    ever.Remove(profile);
+                    Plugin.Log.LogInfo("Net: " + profile + " has left; the raid no longer remembers their character");
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Net: could not forget a player who left: " + e.Message);
+            }
+        }
+
         public static void RaiseRaidStarted()
         {
             if (_raidOn)
@@ -296,6 +329,50 @@ namespace ZeroMenuTime
                 var me = GamePlayerOwner.MyPlayer;
                 return !Net.Coop || (me != null && Owner == me.ProfileId);
             }
+        }
+
+        /// <summary>A raid that can be joined, as the server lists it.</summary>
+        public class Raid
+        {
+            public string Match = "", Host = "", Owner = "", OwnerName = "", Location = "", Status = "";
+            public bool Headless, Mine;
+            public int Players;
+        }
+
+        /// <summary>The raids running or waiting now.</summary>
+        public static async Task<List<Raid>> Raids()
+        {
+            try
+            {
+                var reply = Newtonsoft.Json.Linq.JObject.Parse(await SPT.Common.Http.RequestHandler.PostJsonAsync("/zeromenutime/coop/raids", "{}"));
+                return reply["Raids"] != null ? reply["Raids"].ToObject<List<Raid>>() : new List<Raid>();
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Co-op: the list of raids could not be read: " + e.Message);
+                return new List<Raid>();
+            }
+        }
+
+        /// <summary>
+        /// Joins a raid: the server moves this player to where that world's owner is, then the raid is
+        /// started the usual way with the join in front of it. Someone who was in that raid before
+        /// comes back as the character the host still holds.
+        /// </summary>
+        public static async Task Join(Raid raid)
+        {
+            try
+            {
+                await SPT.Common.Http.RequestHandler.PostJsonAsync("/zeromenutime/coop/join",
+                    Newtonsoft.Json.JsonConvert.SerializeObject(new { TraderId = raid.Owner }));
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Co-op: could not tell the server about the join: " + e.Message);
+            }
+            Plugin.Log.LogInfo("Co-op: joining " + (raid.OwnerName != "" ? raid.OwnerName : raid.Host) + " on " + raid.Location + (raid.Mine ? " (coming back)" : ""));
+            Seamless.JoinHost = (raid.Mine ? "back:" : "") + raid.Match;
+            Seamless.StartRaid(raid.Location);
         }
 
         /// <summary>At raid start: asks the server whose raid this is.</summary>

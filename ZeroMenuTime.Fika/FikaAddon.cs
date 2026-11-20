@@ -64,9 +64,49 @@ namespace ZeroMenuTime.Fika
                 harmony.Patch(target, new HarmonyLib.HarmonyMethod(typeof(LateJoin), nameof(LateJoin.Before)), new HarmonyLib.HarmonyMethod(typeof(LateJoin), nameof(LateJoin.After)));
             }
 
+            FikaEventDispatcher.SubscribeEvent<FikaGameCreatedEvent>(created => StartCoroutine(StartWhenLoaded()));
             string fika = typeof(FikaBackendUtils).Assembly.GetName().Version.ToString(3);
             Logger.LogInfo("Zero Menu Time: Fika add-on loaded; Fika " + fika + (fika == TestedFika ? "" : " (tested with " + TestedFika + ")")
                            + (Net.Headless ? "; this is a headless host" : ""));
+        }
+
+        /// <summary>
+        /// A raid this game hosts, or asked a headless host for, does not wait in the lobby: it starts
+        /// once this player's character is in it. Others come in as it runs.
+        /// </summary>
+        private System.Collections.IEnumerator StartWhenLoaded()
+        {
+            if (Net.Headless || Plugin.AutoStartCoop == null || !Plugin.AutoStartCoop.Value)
+            {
+                yield break;
+            }
+            float until = Time.realtimeSinceStartup + 600f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                yield return new WaitForSecondsRealtime(1f);
+                var game = Singleton<global::Fika.Core.Main.GameMode.IFikaGame>.Instance;
+                if (game == null || game.GameController == null)
+                {
+                    continue;
+                }
+                if (game.GameController.RaidStarted)
+                {
+                    yield break;
+                }
+                if (!FikaBackendUtils.IsServer && !FikaBackendUtils.IsHeadlessRequester)
+                {
+                    // Someone else's raid: it starts when they start it.
+                    yield break;
+                }
+                CoopHandler coop;
+                if (!CoopHandler.TryGetCoopHandler(out coop) || coop.MyPlayer == null)
+                {
+                    continue;
+                }
+                yield return new WaitForSecondsRealtime(3f);
+                Plugin.Log.LogInfo("Net: the raid has loaded; starting it: " + Net.Current.StartWaitingRaid());
+                yield return new WaitForSecondsRealtime(5f);
+            }
         }
 
         private void OnManager(FikaNetworkManagerCreatedEvent created)
@@ -127,13 +167,29 @@ namespace ZeroMenuTime.Fika
             {
                 return list;
             }
-            var game = Singleton<global::Fika.Core.Main.GameMode.IFikaGame>.Instance;
-            var gone = game != null ? game.ExtractedPlayers : null;
+            // On the host: whose game is connected right now. A character whose player has gone stays
+            // standing in the world for Fika; for this mod they are not in the raid.
+            HashSet<string> connected = null;
+            var server = FikaBackendUtils.IsServer ? Singleton<FikaServer>.Instance : null;
+            if (server != null && server.NetServer != null)
+            {
+                connected = new HashSet<string>();
+                foreach (var peer in server.NetServer)
+                {
+                    if (peer.Tag is string tag)
+                    {
+                        connected.Add(tag);
+                    }
+                }
+            }
             foreach (var player in coop.HumanPlayers)
             {
                 // Someone who has left the raid stays on Fika's list; they are not in it any more.
-                if (player == null || (gone != null && gone.Contains(player.NetId))
-                    || (!player.IsYourPlayer && (Gone.Contains(player.Profile.Nickname) || Gone.Contains(player.Profile.Info.MainProfileNickname ?? ""))))
+                // (Fika takes a player who extracted off this list itself. Its list of extracted ids is
+                // not looked at: an id is used again when the same player comes back.)
+                if (player == null
+                    || (!player.IsYourPlayer && connected != null
+                        && !connected.Contains(player.Profile.Nickname) && !connected.Contains(player.Profile.Info.MainProfileNickname ?? "")))
                 {
                     continue;
                 }
@@ -278,6 +334,15 @@ namespace ZeroMenuTime.Fika
                 why = "you host this raid, and others are still in it";
                 return false;
             }
+            // Said to the others the way an extraction is, so each lets this character go; and said in
+            // this mod's own words too, so that coming back later is a fresh arrival, not a clash with
+            // a character the others still remember.
+            Net.Current.Send("zmt.left", System.Text.Encoding.UTF8.GetBytes(coop.MyPlayer.ProfileId), true);
+            if (!FikaBackendUtils.IsServer)
+            {
+                var gone = new global::Fika.Core.Networking.Packets.Generic.SubPackets.ClientExtractPacket(coop.MyPlayer.NetId);
+                Singleton<IFikaNetworkManager>.Instance.SendGenericPacket(in gone, DeliveryMethod.ReliableOrdered, true);
+            }
             game.ExitStatus = ExitStatus.Survived;
             game.ExitLocation = exitName;
             game.Stop(coop.MyPlayer.ProfileId, ExitStatus.Survived, exitName, 0f);
@@ -349,7 +414,13 @@ namespace ZeroMenuTime.Fika
             {
                 return await AskHeadless(settings);
             }
-            bool joined = await MatchMakerUIScript.JoinMatch(profile.Id, joinHost, null, false);
+            // "back:" in front: this player was in that raid before, and the host still holds the character.
+            bool back = joinHost.StartsWith("back:", StringComparison.Ordinal);
+            if (back)
+            {
+                joinHost = joinHost.Substring(5);
+            }
+            bool joined = await MatchMakerUIScript.JoinMatch(profile.Id, joinHost, null, back);
             Plugin.Log.LogInfo("Net: joining the match of " + joinHost + ": " + (joined ? "accepted" : "refused"));
             return joined;
         }
@@ -419,7 +490,7 @@ namespace ZeroMenuTime.Fika
         public static void Before(out bool __state)
         {
             __state = false;
-            if (!FikaSpike.LateJoin)
+            if (Plugin.LateJoin == null || !Plugin.LateJoin.Value)
             {
                 return;
             }

@@ -261,6 +261,44 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         }
     }
 
+    /// <summary>
+    /// A player joins someone else's world: as far as Vagabond goes they are now where that world's
+    /// owner is (same map, same way in), so they come in beside the others and their own next start
+    /// is from there.
+    /// </summary>
+    public SaveResponse GoWhereTheOwnerIs(MongoId sessionId, string owner)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(owner) || owner == sessionId.ToString())
+            {
+                return new SaveResponse { Ok = true };
+            }
+            return CopyPlace(sessionId.ToString(), owner);
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.Message };
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static SaveResponse CopyPlace(string guest, string owner)
+    {
+        var theirs = Vagabond.Common.Api.Api.GetState(owner);
+        var mine = Vagabond.Common.Api.Api.GetState(guest);
+        if (theirs == null || mine == null)
+        {
+            return new SaveResponse { Error = "no Vagabond state" };
+        }
+        mine.CurrentMap = theirs.CurrentMap;
+        mine.LastExit = theirs.LastExit;
+        mine.TransitState = null;
+        Vagabond.Common.Api.Api.SaveState(guest, mine);
+        Console.WriteLine("[ZeroMenuTime] " + guest + " joins the world of " + owner + ": now on " + theirs.CurrentMap + " by " + theirs.LastExit);
+        return new SaveResponse { Ok = true, Exit = theirs.LastExit ?? "" };
+    }
+
     private static void TellVagabondExit(string sessionId, string map, string exit)
     {
         var state = Vagabond.Common.Api.Api.GetState(sessionId);

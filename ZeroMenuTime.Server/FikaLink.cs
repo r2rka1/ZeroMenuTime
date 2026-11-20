@@ -20,6 +20,27 @@ public sealed class CoopWho
     public List<string> Members { get; set; } = [];
 }
 
+/// <summary>A raid that is running or waiting, as offered to someone who might join it.</summary>
+public sealed class CoopRaid
+{
+    public string Match { get; set; } = "";
+    public string Host { get; set; } = "";
+    public string Owner { get; set; } = "";
+    public string OwnerName { get; set; } = "";
+    public string Location { get; set; } = "";
+    public string Status { get; set; } = "";
+    public bool Headless { get; set; }
+    public int Players { get; set; }
+    /// <summary>The asking player is already on this raid's list (was in it before).</summary>
+    public bool Mine { get; set; }
+}
+
+public sealed class CoopRaids
+{
+    public bool Ok { get; set; } = true;
+    public List<CoopRaid> Raids { get; set; } = [];
+}
+
 /// <summary>
 /// What this mod asks of Fika's server: which sessions are in a raid together and whose raid it
 /// is. All by reflection, so the mod neither needs Fika to build nor to run. Without Fika every
@@ -175,8 +196,84 @@ public static class FikaLink
         }
     }
 
+    /// <summary>Which raid (by its own id, new for every raid) each session was last in.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> WasIn = new();
+
+    /// <summary>Notes that the session is in its match now. Called when it asks who it is with, at every raid start.</summary>
+    public static void NoteRaid(MongoId sessionId)
+    {
+        try
+        {
+            var match = MatchOf(sessionId, out _);
+            string instance = match?.GetType().GetProperty("ServerGuid")?.GetValue(match)?.ToString() ?? "";
+            if (instance != "")
+            {
+                WasIn[sessionId.ToString()] = instance;
+            }
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    /// <summary>The raids someone could join now.</summary>
+    public static List<CoopRaid> Raids(MongoId asking)
+    {
+        var raids = new List<CoopRaid>();
+        try
+        {
+            if (_matches?.GetType().GetProperty("Matches")?.GetValue(_matches) is not IDictionary all)
+            {
+                return raids;
+            }
+            foreach (DictionaryEntry entry in all)
+            {
+                var match = entry.Value;
+                if (match == null)
+                {
+                    continue;
+                }
+                var type = match.GetType();
+                var raid = new CoopRaid
+                {
+                    Match = entry.Key?.ToString() ?? "",
+                    Host = type.GetProperty("HostUsername")?.GetValue(match) as string ?? "",
+                    Headless = type.GetProperty("IsHeadless")?.GetValue(match) as bool? ?? false,
+                    Status = type.GetProperty("Status")?.GetValue(match)?.ToString() ?? "",
+                };
+                var config = type.GetProperty("RaidConfig")?.GetValue(match);
+                raid.Location = config?.GetType().GetProperty("Location")?.GetValue(config) as string ?? "";
+                string instance = type.GetProperty("ServerGuid")?.GetValue(match)?.ToString() ?? "";
+                if (type.GetProperty("Players")?.GetValue(match) is IDictionary players)
+                {
+                    raid.Players = players.Count;
+                    // Fika forgets a player who leaves; this mod remembers which raid each was last in.
+                    // "Mine" is only for someone still on Fika's own list (their game died and the host
+                    // holds the character). Someone who left properly comes back as a fresh arrival.
+                    raid.Mine = players.Contains(asking);
+                }
+                var owner = raid.Headless ? RequesterOf((MongoId)entry.Key) : (MongoId)entry.Key;
+                raid.Owner = owner?.ToString() ?? "";
+                try
+                {
+                    raid.OwnerName = owner != null ? _saves?.GetProfile(owner.Value)?.CharacterData?.PmcData?.Info?.Nickname ?? "" : "";
+                }
+                catch (Exception)
+                {
+                }
+                raids.Add(raid);
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not list the Fika raids: " + e.Message);
+        }
+        return raids;
+    }
+
     public static CoopWho Describe(MongoId sessionId)
     {
+        NoteRaid(sessionId);
         var who = new CoopWho { Fika = Installed, Owner = OwnerOf(sessionId).ToString(), HeadlessProfile = IsHeadlessProfile(sessionId) };
         try
         {
