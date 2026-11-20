@@ -84,3 +84,36 @@ Each release: profile backup advice in the notes, since saves gain new files.
 - The matrix passes on all four setups, with known gaps listed in the README.
 - A six-hour headless soak run ends with sane memory and correct saves.
 - The docs describe every rule a group will meet, and the listing says Compatible.
+
+---
+
+## Result (2026-11-20, branch `fika/stage8`)
+
+**Done**
+
+- **Headless run on the final build** (headless + one client, Customs): the client asked for the
+  raid from its own menu path, it started by itself, the client built from the headless's
+  settings (`PASS Layout`), traded (the payment and the bought item reached the headless),
+  entered the hideout (the headless made and registered the shared stash and told the client),
+  put an item in the stash, and the raid stood still while the only player was inside. No errors.
+- **Packaging.** `pack.ps1` builds the main zip as before and, where Fika's DLL is at hand, a
+  second zip `ZeroMenuTime-Fika-<version>.zip` with only the add-on DLL and the co-op readme.
+  The add-on is never in the main zip: a player without Fika must not have it.
+- **Version.** The co-op branches are 1.3.0, so nothing built from them can be mistaken for the
+  released 1.2.4. (The released 1.2.4 zip in `dist` was overwritten by a branch build once and
+  was put back from the GitHub release; its hash matches the published one.)
+- **Docs.** `docs/coop.md`: what is needed, how to start, whose world it is, time, dying,
+  saving, known limits. README points to it as experimental. The in-game guide has a page
+  "Playing with friends", shown only when Fika is installed.
+- **Regression, alone without Fika, on 1.3.0:** raid start, deliveries to the table, hideout,
+  sleep with save, leaving the hideout: as before.
+
+**Not done from this stage's plan**
+
+- The test matrix as a whole, the six-hour soak, three or more players, memory measurements on
+  the headless. The machine holds two players on one map at most.
+- Loading the hideout interior on the headless (so far it has the stash but no floor there).
+- A check that Fika's own revive option is off, and a check of the Fika version at start with
+  the co-op features switched off on an unknown one (the add-on only logs the version).
+- The Forge listing and release notes: nothing is released.
+- A `zmt matrix` command.

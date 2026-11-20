@@ -1,8 +1,8 @@
 # Builds both halves of the mod and makes a zip that unpacks straight into the SPT game folder.
-# Usage:  .\pack.ps1 [-GameDir F:\SPT\] [-Version 1.2.4]
+# Usage:  .\pack.ps1 [-GameDir F:\SPT\] [-Version 1.3.0]
 param(
     [string]$GameDir = 'F:\SPT\',
-    [string]$Version = '1.2.4'
+    [string]$Version = '1.3.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,3 +41,30 @@ try {
     }
 } finally { $archive.Dispose() }
 Write-Host "Packed $zip"
+
+# The co-op add-on goes out on its own: it needs Fika, and BepInEx reports a plugin whose
+# requirement is missing as an error. Built only where Fika's DLL is at hand.
+$addonProject = "$root\ZeroMenuTime.Fika\ZeroMenuTime.Fika.csproj"
+$fika = 'F:\SPT-Fika\host\BepInEx\plugins\Fika\Fika.Core.dll'
+if ((Test-Path $addonProject) -and (Test-Path $fika)) {
+    dotnet build $addonProject -c Release -nologo -v q "-p:GameDir=$GameDir"
+    if ($LASTEXITCODE -ne 0) { throw 'Co-op add-on build failed' }
+    $addonStage = "$root\dist\ZeroMenuTime-Fika-$Version"
+    if (Test-Path $addonStage) { Remove-Item $addonStage -Recurse -Force }
+    $addonDir = "$addonStage\BepInEx\plugins\ZeroMenuTime"
+    New-Item -ItemType Directory -Force $addonDir | Out-Null
+    Copy-Item "$root\ZeroMenuTime.Fika\bin\Release\ZeroMenuTime.Fika.dll" $addonDir
+    if (Test-Path "$root\docs\coop.md") { Copy-Item "$root\docs\coop.md" "$addonStage\README-coop.md" }
+    $addonZip = "$root\dist\ZeroMenuTime-Fika-$Version.zip"
+    if (Test-Path $addonZip) { Remove-Item $addonZip -Force }
+    $addonArchive = [IO.Compression.ZipFile]::Open($addonZip, 'Create')
+    try {
+        Get-ChildItem $addonStage -Recurse -File | ForEach-Object {
+            $name = $_.FullName.Substring($addonStage.Length + 1).Replace('\', '/')
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($addonArchive, $_.FullName, $name, 'Optimal') | Out-Null
+        }
+    } finally { $addonArchive.Dispose() }
+    Write-Host "Packed $addonZip"
+} else {
+    Write-Host 'Co-op add-on not packed (no Fika.Core.dll to build against).'
+}

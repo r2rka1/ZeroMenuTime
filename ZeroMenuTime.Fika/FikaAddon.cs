@@ -24,7 +24,7 @@ namespace ZeroMenuTime.Fika
     /// The part of Zero Menu Time that talks to Fika. It is loaded only where Fika is installed, and
     /// it is the only place a Fika type is named: the rest of the mod works through <see cref="Net"/>.
     /// </summary>
-    [BepInPlugin("com.r2rka1.zeromenutime.fika", "r2rka1-ZeroMenuTime-Fika", "1.2.4")]
+    [BepInPlugin("com.r2rka1.zeromenutime.fika", "r2rka1-ZeroMenuTime-Fika", "1.3.0")]
     [BepInDependency("com.fika.core")]
     [BepInDependency("com.r2rka1.zeromenutime")]
     public class FikaAddon : BaseUnityPlugin

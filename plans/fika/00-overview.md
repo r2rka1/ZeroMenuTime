@@ -150,6 +150,13 @@ That is a releasable first version ("co-op beta"). Stages 5 to 7 add the rules i
 - **Join in progress works** by opening two checks on the host; no change to Fika's sync code.
 - Memory: two players on Customs fill this 32 GB machine; test on small maps.
 
+## 7b. Where it stands (2026-11-20)
+
+All eight stages have code, on branches `fika/stage1` to `fika/stage8` (each built on the one
+before; `main` is the released 1.2.4). Each stage file ends with a "Result" section: what was
+built, what was seen working, what was not tested. `TESTING.md` lists what to try by hand.
+The largest untested piece is transits in co-op.
+
 ## 8. The biggest risks
 
 1. **Join in progress (stage 6).** *Stage 0 result: it works with two small host-side patches;

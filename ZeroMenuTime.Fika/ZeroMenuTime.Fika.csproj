@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>ZeroMenuTime.Fika</AssemblyName>
-    <Version>1.2.4</Version>
+    <Version>1.3.0</Version>
     <RootNamespace>ZeroMenuTime.Fika</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
