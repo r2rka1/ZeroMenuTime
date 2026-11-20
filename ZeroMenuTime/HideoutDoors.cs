@@ -263,6 +263,36 @@ namespace ZeroMenuTime
             }
         }
 
+        /// <summary>Co-op: someone changed the hideout; if this player is inside, look at it again.</summary>
+        public static async void OnChanged(byte[] body, string from)
+        {
+            if (Inside == null)
+            {
+                return;
+            }
+            try
+            {
+                var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/hideout/list", "{}"));
+                if (!((bool?)reply["Ok"] ?? false) || Inside == null)
+                {
+                    return;
+                }
+                HideoutStations.Read(reply);
+                HideoutBoosts.Read(reply);
+                HideoutCrafting.Read(reply);
+                HideoutPower.Read(reply);
+                HideoutShelves.Read(reply);
+                HideoutStations.ShowAll();
+                HideoutPower.ApplyLook();
+                RefreshExits();
+                Plugin.Log.LogInfo("Hideout looked at again after a change by another player");
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hideout not refreshed: " + e.Message);
+            }
+        }
+
         /// <summary>Where this map's hideout doors are, for the map.</summary>
         public static IEnumerable<Vector3> DoorPlaces()
         {
@@ -448,7 +478,10 @@ namespace ZeroMenuTime
             // Loaded ahead of time for a quick way in; until someone goes in it is switched off.
             if (!waited && Inside == null && !_busy)
             {
-                HideoutBunker.Park(true);
+if (!Net.Coop)
+                {
+                    HideoutBunker.Park(true);
+                }
             }
         }
 
@@ -647,7 +680,11 @@ namespace ZeroMenuTime
                 string was = Inside;
                 StepOut();
                 yield return new WaitForSecondsRealtime(0.2f);
-                HideoutBunker.Park(true);
+if (!Net.Coop)
+                {
+                    // In co-op others may be inside: the interior stays for the whole raid.
+                    HideoutBunker.Park(true);
+                }
                 Presence.Refresh();
                 RoomDoor.PlayDoorSound(false, _returnTo);
                 yield return RoomDoor.FadeTo(0f);

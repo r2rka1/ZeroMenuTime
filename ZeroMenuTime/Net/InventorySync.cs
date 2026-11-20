@@ -66,6 +66,18 @@ namespace ZeroMenuTime
                     break;
                 }
             }
+            if (item == null && HideoutStash.Current != null)
+            {
+                // Building and crafting also use up what lies in the shared stash.
+                foreach (var stored in HideoutStash.Current.GetAllItems())
+                {
+                    if (stored.Id == parts[1])
+                    {
+                        item = stored;
+                        break;
+                    }
+                }
+            }
             if (item == null)
             {
                 Plugin.Log.LogWarning("Inventory sync: " + owner.Profile.Nickname + " has no item " + parts[1] + " here");

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Comfort.Common;
 using EFT;
+using EFT.Communications;
 using EFT.InventoryLogic;
 using JsonType;
 using Newtonsoft.Json;
@@ -282,6 +283,7 @@ namespace ZeroMenuTime
             {
                 HideoutStations.Read(reply);
                 HideoutCrafting.Read(reply);
+                Coop.HideoutChanged();
             }
             return reply;
         }
@@ -557,6 +559,12 @@ namespace ZeroMenuTime
             if (player == null || HideoutDoors.Inside == null)
             {
                 return "not possible right now";
+            }
+            if (!Coop.IsOwner)
+            {
+                // The training is written to the hideout owner's character on the server.
+                NotificationManager.DisplayWarningNotification("You can only train in your own hideout.");
+                return "only in your own hideout";
             }
             var health = player.ActiveHealthController;
             if (health.Energy.Current < WorkoutCost + 5f || health.Hydration.Current < WorkoutCost + 5f)

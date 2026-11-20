@@ -229,23 +229,23 @@ public class ZeroMenuTimeRouter(
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/recipes",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Recipes(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Recipes(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/craft",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Craft(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Craft(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/collect",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Collect(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Collect(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/shelf",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetShelf(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetShelf(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/power",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Power(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Power(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/list",
@@ -253,15 +253,15 @@ public class ZeroMenuTimeRouter(
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/enter",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Enter(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Enter(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/build",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Build(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Build(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/stash",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetStash(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetStash(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<DeathChoiceRequest>(
         "/zeromenutime/death/goto",

@@ -57,6 +57,10 @@ namespace ZeroMenuTime
         public static void Refresh()
         {
             _askedPlace = false;
+            if (GamePlayerOwner.MyPlayer == null)
+            {
+                MenuBackdrop.MenuShownAgain();
+            }
         }
 
         private static async void AskPlace()

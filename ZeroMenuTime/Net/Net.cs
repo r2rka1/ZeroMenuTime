@@ -272,8 +272,50 @@ namespace ZeroMenuTime
 
         private static readonly HashSet<Feature> Ready = new HashSet<Feature>
         {
-            Feature.Rooms, Feature.Trade, Feature.Deliveries, Feature.QuestHandIn, Feature.Repair,
+            Feature.Rooms, Feature.Trade, Feature.Deliveries, Feature.QuestHandIn, Feature.Repair, Feature.Hideout, Feature.Sleep, Feature.Wait,
         };
+
+        /// <summary>Whose world this raid is (profile id); "" until the server has said, and alone.</summary>
+        public static string Owner = "";
+
+        /// <summary>The local player owns the hideout everyone stands in. Alone: always.</summary>
+        public static bool IsOwner
+        {
+            get
+            {
+                var me = GamePlayerOwner.MyPlayer;
+                return !Net.Coop || (me != null && Owner == me.ProfileId);
+            }
+        }
+
+        /// <summary>At raid start: asks the server whose raid this is.</summary>
+        public static async void AskOwner()
+        {
+            Owner = "";
+            if (!Net.Coop || Net.Headless)
+            {
+                return;
+            }
+            try
+            {
+                var who = Newtonsoft.Json.Linq.JObject.Parse(await SPT.Common.Http.RequestHandler.PostJsonAsync("/zeromenutime/coop/who", "{}"));
+                Owner = (string)who["Owner"] ?? "";
+                Plugin.Log.LogInfo("Co-op: this world belongs to " + Owner + (IsOwner ? " (you)" : ""));
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Co-op: could not ask whose raid this is: " + e.Message);
+            }
+        }
+
+        /// <summary>The hideout's stations, power or crafts changed here: every machine inside looks again.</summary>
+        public static void HideoutChanged()
+        {
+            if (Net.Coop)
+            {
+                Net.Current.Send("zmt.hideout", new byte[0], true);
+            }
+        }
 
         /// <summary>True alone, always. In co-op: only what is ready; otherwise says so on screen.</summary>
         public static bool Allowed(Feature feature, bool tell = true)

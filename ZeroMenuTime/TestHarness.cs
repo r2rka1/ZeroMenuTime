@@ -319,6 +319,12 @@ namespace ZeroMenuTime
                     Report("after: carrying it " + (wanted == null || wanted.Item == null ? "?" : (wanted.Item.Parent != null && wanted.Item.Parent.GetOwnerOrNull() == player.InventoryController).ToString()));
                     yield break;
                 }
+                if (parts.Length > 2 && parts[1] == "answer")
+                {
+                    // fika answer yes|no: answers the sleep or wait question asked by another player.
+                    Report(Rest.AnswerLast(parts[2] == "yes"));
+                    yield break;
+                }
                 if (parts.Length > 1 && parts[1] == "layout")
                 {
                     // fika layout: where this machine's rooms and doors stand; whose settings they were built from.
@@ -595,14 +601,22 @@ namespace ZeroMenuTime
                                 Report("FAILED no room in the stash");
                                 break;
                             }
-                            var move = ItemManipulator.Move(item, place, player.InventoryController, false);
+                            // In co-op: as a move the game sends to the others, which is what dragging does.
+                            var move = ItemManipulator.Move(item, place, player.InventoryController, Net.Coop);
                             if (move.Failed)
                             {
                                 Report("FAILED move: " + move.Error);
                                 break;
                             }
-                            move.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
-                            move.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                            if (Net.Coop)
+                            {
+                                player.InventoryController.TryRunNetworkTransaction(move, null);
+                            }
+                            else
+                            {
+                                move.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                                move.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                            }
                             moved++;
                         }
                         Report("moved " + moved + " into the stash");
@@ -644,15 +658,22 @@ namespace ZeroMenuTime
                         {
                             // Moved, as dragging it out would; not created anew.
                             var room = LocalTrade.RoomFor(player, item);
-                            var move = room == null ? default : ItemManipulator.Move(item, room, player.InventoryController, false);
+                            var move = room == null ? default : ItemManipulator.Move(item, room, player.InventoryController, Net.Coop);
                             if (room == null || move.Failed)
                             {
                                 Report("FAILED could not take it: " + (room == null ? "no room in carried gear" : move.Error.ToString()));
                             }
                             else
                             {
-                                move.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
-                                move.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                                if (Net.Coop)
+                                {
+                                    player.InventoryController.TryRunNetworkTransaction(move, null);
+                                }
+                                else
+                                {
+                                    move.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
+                                    move.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                                }
                                 Report("took " + HideoutStations.ItemName(parts[2]) + " out of the stash");
                             }
                         }

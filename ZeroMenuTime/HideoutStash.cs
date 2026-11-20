@@ -30,8 +30,133 @@ namespace ZeroMenuTime
         /// <summary>Builds the stash from the server's answer on entering a hideout.</summary>
         public static void Read(string hideout, JObject reply)
         {
+            if (Net.Coop)
+            {
+                // In co-op there is one stash, the raid owner's, and it is the same item tree on every
+                // machine. It is not built from this machine's own answer: the host says what is in it.
+                _hideout = hideout;
+                if (_stash == null)
+                {
+                    Net.Current.Send("zmt.stash?", new byte[0], false);
+                }
+                return;
+            }
             _stash = null;
             _hideout = hideout;
+            Build(hideout, reply);
+        }
+
+        // ---- Co-op: one stash for everyone ----
+
+        private static object _registered;
+
+        /// <summary>On the host: someone is entering the hideout and needs the stash. Made here first if need be.</summary>
+        public static async void OnAsked(byte[] body, string from)
+        {
+            if (!Net.IsHost)
+            {
+                return;
+            }
+            try
+            {
+                if (_stash == null)
+                {
+                    // The host asks as itself; the server answers with the raid owner's hideout.
+                    var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/hideout/enter",
+                        "{\"Id\":\"" + (_hideout ?? (HideoutDoors.Fronts.Count > 0 ? HideoutDoors.Fronts.Keys.First() : "customs")) + "\"}"));
+                    if (!((bool?)reply["Ok"] ?? false))
+                    {
+                        Plugin.Log.LogWarning("Shared stash: the server gave none: " + reply["Error"]);
+                        return;
+                    }
+                    if (_stash == null)
+                    {
+                        _hideout = _hideout ?? (string)reply["Active"] ?? "customs";
+                        Build(_hideout, reply);
+                    }
+                }
+                Tell();
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Shared stash: " + e);
+            }
+        }
+
+        /// <summary>On the host: a machine that has just come into the raid asks whether a stash exists yet.</summary>
+        public static void OnAskedIfAny(byte[] body, string from)
+        {
+            if (Net.IsHost && _stash != null)
+            {
+                Tell();
+            }
+        }
+
+        /// <summary>On the host: says to every machine what the stash holds now.</summary>
+        private static void Tell()
+        {
+            if (_stash == null)
+            {
+                return;
+            }
+            var items = JArray.Parse(Singleton<ItemFactory>.Instance.TreeToFlatItems(_stash).ToJson());
+            for (int i = items.Count - 1; i >= 0; i--)
+            {
+                if ((string)items[i]["_id"] == _stash.Id.ToString())
+                {
+                    items.RemoveAt(i);
+                }
+            }
+            var told = new JObject { ["StashId"] = _stash.Id.ToString(), ["StashTemplate"] = _stash.TemplateId.ToString(), ["Stash"] = items, ["Hideout"] = _hideout };
+            Net.Current.Send("zmt.stash", System.Text.Encoding.UTF8.GetBytes(told.ToString(Newtonsoft.Json.Formatting.None)), true);
+            Plugin.Log.LogInfo("Shared stash: told everyone (" + items.Count + " item(s))");
+        }
+
+        /// <summary>On a client: the host says what the stash holds. Built once; after that the game's own moves keep it true.</summary>
+        public static void OnTold(byte[] body, string from)
+        {
+            if (Net.IsHost || _stash != null)
+            {
+                return;
+            }
+            try
+            {
+                var reply = JObject.Parse(System.Text.Encoding.UTF8.GetString(body));
+                _hideout = _hideout ?? (string)reply["Hideout"];
+                Build(_hideout, reply);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Shared stash: the host's answer could not be used: " + e);
+            }
+        }
+
+        /// <summary>
+        /// Makes the stash known to the raid the way a crate on the map is, under its own id, so that
+        /// moves in and out of it are ordinary moves every machine can follow.
+        /// </summary>
+        private static void Register()
+        {
+            var world = Singleton<GameWorld>.Instance;
+            if (world == null || _stash == null)
+            {
+                return;
+            }
+            var owner = new ItemController(_stash, _stash.Id, "Stash");
+            var holder = new GameObject("ZeroMenuTime shared stash");
+            holder.transform.position = HideoutBunker.Moved;
+            world.ItemOwners[owner] = new GameWorld.ItemOwnerWorldData
+            {
+                Transform = holder.transform,
+                DoNotPerformPickUpValidation = true,
+                ItemOwner = owner,
+            };
+            _registered = owner;
+            Plugin.Log.LogInfo("Shared stash " + _stash.Id + " registered with the raid: " + Count() + " item(s)");
+        }
+
+        private static void Build(string hideout, JObject reply)
+        {
             try
             {
                 string id = (string)reply["StashId"];
@@ -58,8 +183,18 @@ namespace ZeroMenuTime
                 }
                 _stash = (CompoundItem)root;
                 var player = GamePlayerOwner.MyPlayer;
-                new ItemController(_stash, player.ProfileId, player.Profile.Nickname);
-                MarkSearched(player);
+                if (Net.Coop)
+                {
+                    Register();
+                }
+                else
+                {
+                    new ItemController(_stash, player.ProfileId, player.Profile.Nickname);
+                }
+                if (player != null)
+                {
+                    MarkSearched(player);
+                }
                 Plugin.Log.LogInfo("Stash of hideout '" + hideout + "' holds " + Count() + " item(s)");
             }
             catch (Exception e)
@@ -123,6 +258,12 @@ namespace ZeroMenuTime
         public static bool Open()
         {
             var player = GamePlayerOwner.MyPlayer;
+            if (_stash == null && Net.Coop)
+            {
+                NotificationManager.DisplayWarningNotification("The stash is not here yet; try again in a moment.");
+                Net.Current.Send("zmt.stash?", new byte[0], false);
+                return false;
+            }
             if (_stash == null || player == null)
             {
                 return false;
@@ -167,6 +308,11 @@ namespace ZeroMenuTime
         /// <summary>Packs the stash tight, the way the Sort button of the old stash screen did.</summary>
         public static bool Sort()
         {
+            if (Net.Coop)
+            {
+                NotificationManager.DisplayWarningNotification("The stash cannot be sorted in co-op yet.");
+                return false;
+            }
             try
             {
                 var player = GamePlayerOwner.MyPlayer;
@@ -236,6 +382,29 @@ namespace ZeroMenuTime
 
         public static void Clear()
         {
+            if (Net.Coop && _stash != null && _hideout != null)
+            {
+                // Leaving the hideout in co-op: the stash stays, it is everyone's for the whole raid.
+                return;
+            }
+            Forget();
+        }
+
+        /// <summary>The raid is over: the stash goes with it.</summary>
+        public static void Forget()
+        {
+            try
+            {
+                var world = Singleton<GameWorld>.Instantiated ? Singleton<GameWorld>.Instance : null;
+                if (world != null && _registered is IItemOwner known)
+                {
+                    world.ItemOwners.Remove(known);
+                }
+            }
+            catch (Exception)
+            {
+            }
+            _registered = null;
             _stash = null;
             _hideout = null;
         }

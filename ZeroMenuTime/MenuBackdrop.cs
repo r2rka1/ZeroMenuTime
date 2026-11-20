@@ -45,6 +45,13 @@ namespace ZeroMenuTime
         private static bool _loading, _ready;
         // A raid was started while the interior was still loading: it is let go as soon as it is in.
         private static bool _released;
+        private static bool _raidStarting;
+
+        /// <summary>The main menu has come up afresh (game start, or back from a raid): the backdrop may load again.</summary>
+        public static void MenuShownAgain()
+        {
+            _raidStarting = false;
+        }
         private static float _started;
 
         /// <summary>For testing: hold the view at one spot.</summary>
@@ -70,6 +77,12 @@ namespace ZeroMenuTime
             }
             if (!_ready)
             {
+                if (_raidStarting)
+                {
+                    // A raid start is under way (in co-op the menu stays up while the match is joined):
+                    // an interior loaded now would be torn down with the menu and leave a dead one behind.
+                    return;
+                }
                 if (!_loading)
                 {
                     _loading = true;
@@ -258,6 +271,7 @@ namespace ZeroMenuTime
         /// <summary>A raid is about to load: the interior must not be carried into it.</summary>
         public static async void Release()
         {
+            _raidStarting = true;
             Hide(true);
             _ready = false;
             if (_camera != null)

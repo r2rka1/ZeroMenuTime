@@ -101,3 +101,61 @@ go to menu, trader save, death handling of this mod (Fika's stock death applies)
   fallback is a stash that is only usable when the player is alone inside... which is poor. A
   second fallback: stash transfers done by this mod's server and applied as host-created items.
 - The interior shown all raid costs memory and frames on every machine.
+
+---
+
+## Result (2026-11-20, branch `fika/stage4`)
+
+**Built**
+
+- **Whose hideout.** Every hideout route on the server (list, enter, build, craft, collect,
+  recipes, power, shelves, stash) resolves the caller to the raid's owner. The client asks the
+  server whose raid it is at raid start (`Coop.Owner`, `Coop.IsOwner`).
+- **One shared stash.** In co-op the stash is not built from a machine's own answer. The first
+  player to go in asks the host (`zmt.stash?`); the host reads the owner's stash from the server,
+  builds the item tree, registers it with the raid under the stash's own id (the way a crate on
+  the map is known), and sends the contents to every machine, which builds and registers the same
+  tree. A client entering the raid asks whether one exists already. From then on, moves in and
+  out are the game's own networked moves; Fika carries them. Any machine saves it to the server
+  on closing it. Sorting is switched off in co-op (it is done locally only).
+- **The interior stays** for the whole raid in co-op (never switched off when someone leaves).
+- **Building** is the owner's alone; a guest is told so. **Training** in the gym likewise (the
+  server writes it to the owner's character).
+- **Changes** to stations, power or crafts are announced (`zmt.hideout`); machines with a player
+  inside read the hideout again.
+- **Sleep and wait by agreement** (`Rest`): the asker's machine asks the host; for sleep the host
+  checks everyone alive is in the hideout; every other living player gets a yes/no question with
+  a 30 second limit; when all agree the host moves the clock, and each player's machine does the
+  resting (fade, energy, water, healing). Any no, or no answer, and nothing happens.
+- **A bug found on the way and fixed**: while a client waited to join, the main menu reloaded its
+  hideout backdrop; the raid then destroyed it and the mod went on believing the interior was
+  loaded, so a client entering the hideout stood on nothing. The backdrop no longer loads once a
+  raid start is under way. (This was the "client thrown out of the hideout" seen in stage 0.)
+- Gate: hideout, sleep and wait are on in co-op. Saving stays off until stage 7, so sleeping in
+  co-op does not save yet.
+
+**Seen (host + client, Customs)**
+
+- Both entered by the hideout door, stood in the same interior and saw each other there; with
+  both inside the raid stood still (29 bots off).
+- Shared stash: the client moved a bandage from its pack into the stash; the host saw it there
+  and took it out into its own pack; the stash was empty again on both. No refusals, no resyncs.
+- A guest's attempt to build was refused ("only the owner builds").
+- Sleep: the client asked for 2 hours, the host answered yes, the clock moved 2 hours on both
+  and both rested.
+
+**Not tested**
+
+- Crafting and collecting in co-op, power on and off seen by the other player, shelves.
+- A guest paying for a craft with items from the shared stash (the sync covers it in code).
+- The stash saved to the owner's profile and read back in a later raid.
+- A refusal and a timeout of the sleep question; "wait until morning" at a trader in a group.
+- The hideout with a headless host: the headless answers the stash request and registers the
+  stash, but it does not load the interior, so anything dropped on the hideout floor has no floor
+  on the headless. To check, and if needed load the interior there (stage 8).
+- A late joiner receiving the stash.
+
+**Decided along the way**
+
+- The stash is registered with the raid directly rather than as an object lying in the world.
+- Whatever a guest puts into the stash is the owner's when the raid ends. The docs must say so.

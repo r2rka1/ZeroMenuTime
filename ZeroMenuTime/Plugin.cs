@@ -111,6 +111,18 @@ namespace ZeroMenuTime
             Net.On("zmt.layout", Layout.OnTold);
             Net.RaidEnded += (status, exit) => Layout.Reset();
             Net.RaidStarted += Layout.TellBuilt;
+            Net.On("zmt.hideout", HideoutDoors.OnChanged);
+            Net.RaidStarted += Coop.AskOwner;
+            Net.On("zmt.rest.ask", Rest.OnAsk);
+            Net.On("zmt.rest.vote", Rest.OnVote);
+            Net.On("zmt.rest.answer", Rest.OnAnswer);
+            Net.On("zmt.rest.do", Rest.OnDo);
+            Net.On("zmt.rest.off", Rest.OnOff);
+            Net.On("zmt.stash?", HideoutStash.OnAsked);
+            Net.On("zmt.stash.any?", HideoutStash.OnAskedIfAny);
+            Net.On("zmt.stash", HideoutStash.OnTold);
+            Net.RaidEnded += (status, exit) => HideoutStash.Forget();
+            Net.RaidStarted += () => { if (Net.Role == Role.Client) { Net.Current.Send("zmt.stash.any?", new byte[0], false); } };
             Net.On("zmt.inv", InventorySync.OnTold);
             Net.On("zmt.where", Presence.OnWhere);
             Net.RaidStarted += Presence.Reset;
@@ -266,6 +278,7 @@ namespace ZeroMenuTime
                 TestHarness.Tick();
                 WorldClock.Tick();
                 Presence.Tick();
+                Rest.Tick();
                 BotFreeze.Tick();
                 return;
             }
@@ -288,6 +301,7 @@ namespace ZeroMenuTime
             MapMarkers.Tick();
             HideoutPower.Tick();
             Presence.Tick();
+            Rest.Tick();
             BotFreeze.Tick();
             FallGuard.Tick();
             HideoutSound.Tick();

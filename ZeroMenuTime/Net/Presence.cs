@@ -80,6 +80,13 @@ namespace ZeroMenuTime
             Decide();
         }
 
+        /// <summary>On the host: where a player last said they were.</summary>
+        public static string WhereIs(string profile)
+        {
+            string where;
+            return Where.TryGetValue(profile ?? "", out where) ? where : Out;
+        }
+
         public static void Reset()
         {
             Where.Clear();

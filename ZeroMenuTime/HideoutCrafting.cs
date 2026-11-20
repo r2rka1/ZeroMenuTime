@@ -330,6 +330,7 @@ namespace ZeroMenuTime
                     return "server refused: " + reply["Error"];
                 }
                 Read(reply);
+                Coop.HideoutChanged();
                 HideoutStash.Send("after starting a craft");
                 MenuArea = -1;
                 Refresh();

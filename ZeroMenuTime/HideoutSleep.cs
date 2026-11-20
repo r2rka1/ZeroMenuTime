@@ -44,6 +44,12 @@ namespace ZeroMenuTime
             {
                 return;
             }
+            if (Net.Coop)
+            {
+                // In co-op the clock is everyone's: the others are asked first.
+                Rest.Ask("sleep", hours);
+                return;
+            }
             Plugin.Instance.StartCoroutine(Sleeping(hours));
         }
 
@@ -57,7 +63,36 @@ namespace ZeroMenuTime
             {
                 return;
             }
+            if (Net.Coop)
+            {
+                Rest.Ask("wait", hours);
+                return;
+            }
             Plugin.Instance.StartCoroutine(Waiting(hours));
+        }
+
+        /// <summary>Co-op: everyone agreed and the host has moved the clock; this player rests.</summary>
+        public static void Agreed(string kind, float hours)
+        {
+            if (_sleeping || Plugin.Instance == null)
+            {
+                return;
+            }
+            _clockMoved = true;
+            Plugin.Instance.StartCoroutine(kind == "sleep" && HideoutDoors.Inside != null ? Sleeping(hours) : Waiting(hours));
+        }
+
+        /// <summary>The clock has been moved already (by the host, in co-op); only the resting is left to do.</summary>
+        private static bool _clockMoved;
+
+        private static void MoveClock(float hours)
+        {
+            if (_clockMoved)
+            {
+                _clockMoved = false;
+                return;
+            }
+            WorldClock.Add(hours * 3600.0);
         }
 
         private static IEnumerator Waiting(float hours)
@@ -71,7 +106,7 @@ namespace ZeroMenuTime
             try
             {
                 var health = player.ActiveHealthController;
-                WorldClock.Add(hours * 3600.0);
+                MoveClock(hours);
                 health.ChangeEnergy(Mathf.Max(-EnergyPerHour * hours, 5f - health.Energy.Current));
                 health.ChangeHydration(Mathf.Max(-WaterPerHour * hours, 5f - health.Hydration.Current));
                 outcome = "You waited " + hours.ToString("0.#") + " hours. It is " + WorldClock.Describe(WorldClock.Now) + ".";
@@ -105,7 +140,7 @@ namespace ZeroMenuTime
             {
                 var health = player.ActiveHealthController;
                 float before = health.GetBodyPartHealth(EBodyPart.Common).Current;
-                WorldClock.Add(hours * 3600.0);
+                MoveClock(hours);
 
                 // Never let sleep itself starve the sleeper: stop short of the last few points.
                 float energyChange = (HideoutBoosts.Energy - EnergyPerHour) * hours;
@@ -131,10 +166,13 @@ namespace ZeroMenuTime
             HideoutCrafting.AnnounceDue();
 
             // Sleeping is also where the game is saved.
-            var saving = SaveGame.SaveNow("slept");
-            while (!saving.IsCompleted)
+            if (Coop.Allowed(Coop.Feature.Save, false))
             {
-                yield return null;
+                var saving = SaveGame.SaveNow("slept");
+                while (!saving.IsCompleted)
+                {
+                    yield return null;
+                }
             }
 
             yield return new WaitForSecondsRealtime(1.0f);

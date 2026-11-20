@@ -205,6 +205,7 @@ namespace ZeroMenuTime
                 {
                     Plugin.Log.LogWarning("The raid was not started: the co-op match could not be " + (join == null ? "created" : "joined"));
                     NotificationManager.DisplayWarningNotification("Could not " + (join == null ? "start" : "join") + " the co-op raid.", ENotificationDurationType.Long);
+                    MenuBackdrop.MenuShownAgain();
                     return;
                 }
                 await start();
