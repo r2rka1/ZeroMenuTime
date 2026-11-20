@@ -138,6 +138,25 @@ public static class FikaLink
     /// </summary>
     public static MongoId OwnerOf(MongoId sessionId)
     {
+        var owner = FindOwner(sessionId);
+        if (owner != sessionId)
+        {
+            Guests[sessionId.ToString()] = owner;
+        }
+        return owner;
+    }
+
+    /// <summary>Whose world each session was last a guest in, kept until its raid end has been dealt with.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, MongoId> Guests = new();
+
+    /// <summary>The owner of the world this session was a guest in, once; null if it was in its own.</summary>
+    public static MongoId? TakeLastHost(MongoId sessionId)
+    {
+        return Guests.TryRemove(sessionId.ToString(), out var owner) ? owner : null;
+    }
+
+    private static MongoId FindOwner(MongoId sessionId)
+    {
         try
         {
             var match = MatchOf(sessionId, out var matchId);
@@ -185,10 +204,11 @@ public static class FikaLink
 
 /// <summary>Finds Fika once every mod has loaded.</summary>
 [Injectable(TypePriority = OnLoadOrder.PostLoad)]
-public sealed class FikaLinkLoader(IServiceProvider services, SaveServer saves) : IOnLoad
+public sealed class FikaLinkLoader(IServiceProvider services, SaveServer saves, HideoutsService hideouts) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
+        HideoutsService.Instance = hideouts;
         try
         {
             FikaLink.Init(services, saves);

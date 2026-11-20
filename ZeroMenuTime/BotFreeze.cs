@@ -30,7 +30,7 @@ namespace ZeroMenuTime
             if (on)
             {
                 Sweep();
-                Plugin.Log.LogInfo("Bots switched off while in the hideout: " + Frozen.Count);
+                Plugin.Log.LogInfo("Bots switched off, the raid stands still: " + Frozen.Count);
             }
             else
             {
@@ -55,7 +55,7 @@ namespace ZeroMenuTime
             {
                 return;
             }
-            if (GamePlayerOwner.MyPlayer == null)
+            if (!Singleton<GameWorld>.Instantiated)
             {
                 _on = false;
                 Frozen.Clear();

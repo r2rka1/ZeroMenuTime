@@ -224,7 +224,8 @@ public class ZeroMenuTimeRouter(
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/clock",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetClock(sessionId, payload)) ?? "{}")
+        // The clock is the world's, and the world is its owner's: whoever hosts reports it for the owner.
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetClock(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/recipes",
@@ -248,7 +249,7 @@ public class ZeroMenuTimeRouter(
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/list",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/enter",

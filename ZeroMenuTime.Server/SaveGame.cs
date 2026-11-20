@@ -605,6 +605,11 @@ public sealed class RaidEndSavePatch : AbstractPatch
         {
             return;
         }
+        var host = FikaLink.TakeLastHost(sessionId);
+        if (host != null)
+        {
+            HideoutsService.Instance?.CatchUp(sessionId, host.Value);
+        }
         SaveGameService.Instance?.RaidEnded(sessionId, died);
     }
 }

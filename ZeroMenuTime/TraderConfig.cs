@@ -76,9 +76,12 @@ namespace ZeroMenuTime
         {
             try
             {
-                var doors = File.Exists(DoorsPath)
-                    ? JsonConvert.DeserializeObject<List<TraderSpot>>(File.ReadAllText(DoorsPath)) ?? new List<TraderSpot>()
-                    : new List<TraderSpot>();
+                // In co-op the host's file is the one that counts; a client never reads its own.
+                var doors = Layout.Active != null
+                    ? new List<TraderSpot>(Layout.Active.Doors ?? new List<TraderSpot>())
+                    : File.Exists(DoorsPath)
+                        ? JsonConvert.DeserializeObject<List<TraderSpot>>(File.ReadAllText(DoorsPath)) ?? new List<TraderSpot>()
+                        : new List<TraderSpot>();
                 // Doors picked by hand; an entry in doors.json for the same trader and map comes first.
                 doors.Add(new TraderSpot
                 {

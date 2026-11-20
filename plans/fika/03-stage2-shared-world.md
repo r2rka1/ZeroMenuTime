@@ -73,3 +73,56 @@ Still off in a group: trading, deliveries, quest hand-in at the counter, hideout
 - Room positions depend on build order today (`Rooms.Count * 40`). The list from the host must
   carry explicit positions so order no longer matters.
 - Teleports across large distances under Fika's interpolation; may need a "snap" hint to observers.
+
+---
+
+## Result (2026-11-20, branch `fika/stage2`)
+
+**Built**
+
+- **Clock.** `WorldClock`: only the host (alone, hosting player or headless) reads the clock from
+  the server, sets the raid's time and reports it back each minute. It tells every other machine
+  (`zmt.clock`) at raid start, each minute and after a jump; a client asks at its own raid start
+  (`zmt.clock?`) and never writes to the server. Only the host can move the clock.
+  Server: the clock and the hideout list routes resolve the caller to the raid's owner, so a
+  headless host reads and writes the asking player's clock. When a guest's raid ends, their own
+  clock is moved on to the host's if that is later (`HideoutsService.CatchUp`), never back.
+- **Rooms and doors.** `Layout`: a client builds nothing at raid start until the host has sent
+  what it builds from (rooms on or off, depth, room style, its own doors file, custom trader
+  spots, hideout doors). The client then runs the same build with those values in place of its
+  own settings and files, and compares where things ended up with the host's list (`PASS Layout`
+  or a warning per difference). If the host never answers, it builds from its own after 30 s.
+- **Headless.** The raid-start build runs with no player: it builds the trader rooms and door
+  objects and widens the physics region, and skips the trade screen scene, figures, repairs,
+  quest sync and the hideout preload. `WorldClock`, `Presence` and `BotFreeze` tick there.
+- **Freeze rule.** `Presence`: each machine reports where its player is (out, room, hideout)
+  when that changes; the host keeps the list and decides. Alone: still while in the hideout, as
+  before. Co-op: still only while every living human is inside a room or the hideout.
+
+**Seen**
+
+- Host + client on Customs: the client took the host's time (same reading on both); built 2
+  places from the host's settings at the same coordinates. Host in Skier's room alone: bots run.
+  Client joins it there: 26 bots off. Client steps out: 26 back on.
+- Headless + client: headless built 1 room and 1 hideout door, read the asking player's clock
+  and told the client; client `PASS Layout: 2 of 2`. Client into the room: 10 bots off on the
+  headless; out: back on. The headless lists one human, the client.
+- Alone without Fika: clock, rooms and hideout freeze as before.
+- No exceptions from the mod in any log.
+
+**Not tested**
+
+- A client whose own door files or settings differ from the host's (all copies had defaults);
+  the path is built, the difference was not provoked.
+- The guest's clock catching up at raid end (needs a look at the stored clocks after a raid).
+- Wait and sleep moving the clock in a group (both are still gated off in co-op).
+- A late joiner (stage 6) asking for layout and clock in a raid long under way; the requests are
+  the same ones, so it should work, but it was not run after these changes.
+- What a frozen raid looks like from a client's screen over minutes (bots stood still in the count;
+  not watched by eye).
+
+**Decided along the way**
+
+- Alone, a trader's room does not freeze the raid (unchanged). In co-op a room counts as inside.
+- The host sends what it builds *from*, not the finished positions: one build path for everyone,
+  with the positions compared afterwards as a check.

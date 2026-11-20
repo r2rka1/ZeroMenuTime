@@ -319,6 +319,16 @@ namespace ZeroMenuTime
                     Report("after: carrying it " + (wanted == null || wanted.Item == null ? "?" : (wanted.Item.Parent != null && wanted.Item.Parent.GetOwnerOrNull() == player.InventoryController).ToString()));
                     yield break;
                 }
+                if (parts.Length > 1 && parts[1] == "layout")
+                {
+                    // fika layout: where this machine's rooms and doors stand; whose settings they were built from.
+                    foreach (var built in Layout.Built())
+                    {
+                        Report("  " + built);
+                    }
+                    Report("built from " + (Layout.Active != null ? "the host's settings" : "this game's own settings") + "; bots switched off now: " + BotFreeze.Count);
+                    yield break;
+                }
                 if (parts.Length > 2 && parts[1] == "say")
                 {
                     // fika say WORDS: a test message to every other machine; each logs it.

@@ -74,6 +74,11 @@ namespace ZeroMenuTime
 
         public static List<HideoutSpot> Load()
         {
+            if (Layout.Active != null)
+            {
+                // In co-op the host's doors are the doors.
+                return Layout.Active.Hideouts ?? new List<HideoutSpot>();
+            }
             try
             {
                 if (File.Exists(FilePath))
@@ -166,8 +171,9 @@ namespace ZeroMenuTime
             }
             // The interior is wanted for its own sake where there is a hideout door, and for its
             // furniture wherever a trader has a room.
-            bool rooms = RoomProps.Use != null && RoomProps.Use.Value && TraderRoom.Rooms.Count > 0;
-            if ((placed > 0 || rooms) && Plugin.Instance != null)
+            bool rooms = Layout.Shell && TraderRoom.Rooms.Count > 0;
+            // A headless host has no use for the interior yet (the hideout in co-op comes later).
+            if ((placed > 0 || rooms) && Plugin.Instance != null && !Net.Headless)
             {
                 Plugin.Instance.StartCoroutine(Preload());
             }
@@ -531,7 +537,7 @@ namespace ZeroMenuTime
                 var origin = HideoutBunker.Moved;
 
                 HideoutBunker.Park(false);
-                BotFreeze.Set(true);
+                Presence.Refresh();
                 HideoutStations.ShowAll();
                 HideoutBunker.Sun(false);
                 if (HideoutBunker.BunkerSettings != null)
@@ -642,7 +648,7 @@ namespace ZeroMenuTime
                 StepOut();
                 yield return new WaitForSecondsRealtime(0.2f);
                 HideoutBunker.Park(true);
-                BotFreeze.Set(false);
+                Presence.Refresh();
                 RoomDoor.PlayDoorSound(false, _returnTo);
                 yield return RoomDoor.FadeTo(0f);
                 Plugin.Log.LogInfo("Left hideout '" + was + "'");
