@@ -132,7 +132,7 @@ Peacekeeper has no model or voice of this kind in the 1.0 game and stays a stand
 | [Dynamic Maps](https://sp-mod.com/mod/1431/dynamic-maps) | optional, supported | 1.2.1 |
 | Your own installed copy of the 1.0 game | optional: only for the real trader models and voices | 1.3.0 |
 
-**Fika** (multiplayer) is **not supported**: the hideout, world clock and save game are single-player.
+**Fika** (multiplayer) is **supported**, on a player's own game or a headless host: join a friend's raid at any time, share the host's hideout and stash, revive fallen teammates. It needs the small add-on zip next to the main one. See [Playing with friends](docs/coop.md).
 
 ## Install
 

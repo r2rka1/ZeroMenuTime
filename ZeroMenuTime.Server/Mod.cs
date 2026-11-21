@@ -17,7 +17,7 @@ public class ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.r2rka1.zeromenutime";
     public string Name { get; init; } = "ZeroMenuTime";
     public string Author { get; init; } = "r2rka1";
-    public SemanticVersioning.Version Version { get; init; } = new("1.2.4");
+    public SemanticVersioning.Version Version { get; init; } = new("2.0.0");
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.6");
     public bool HasPrepatcher { get; init; }
     public string? Url { get; init; } = "https://github.com/r2rka1/ZeroMenuTime";
@@ -160,6 +160,32 @@ public class ZeroMenuTimeRouter(
             ValueTask.FromResult(jsonUtil.Serialize(Record(sessionId, payload, profileHelper, traderHelper, handbookHelper)) ?? "{}")
     ),
     new RouteAction<MailRequest>(
+        "/zeromenutime/coop/raids",
+        (_, _, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(new CoopRaids { Raids = FikaLink.Raids(sessionId) }) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
+        "/zeromenutime/coop/join",
+        // TraderId carries the owner of the raid being joined: the joiner goes where that world is.
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(saves.GoWhereTheOwnerIs(sessionId, payload.TraderId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
+        "/zeromenutime/coop/follow",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(saves.FollowTheOwner(sessionId, payload.TraderId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
+        "/zeromenutime/coop/savedgear",
+        (_, _, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(saves.SavedGearOf(sessionId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
+        "/zeromenutime/coop/who",
+        (_, _, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(FikaLink.Describe(sessionId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
         "/zeromenutime/mail/list",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(ListMail(sessionId, payload, profileHelper)) ?? "{}")
@@ -219,43 +245,44 @@ public class ZeroMenuTimeRouter(
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/clock",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetClock(sessionId, payload)) ?? "{}")
+        // The clock is the world's, and the world is its owner's: whoever hosts reports it for the owner.
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetClock(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/recipes",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Recipes(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Recipes(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/craft",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Craft(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Craft(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/collect",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Collect(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Collect(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/shelf",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetShelf(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetShelf(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/power",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Power(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Power(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/list",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.List(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/enter",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Enter(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Enter(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/build",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Build(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.Build(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<HideoutRequest>(
         "/zeromenutime/hideout/stash",
-        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetStash(sessionId, payload)) ?? "{}")
+        (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(hideouts.SetStash(FikaLink.OwnerOf(sessionId), payload)) ?? "{}")
     ),
     new RouteAction<DeathChoiceRequest>(
         "/zeromenutime/death/goto",

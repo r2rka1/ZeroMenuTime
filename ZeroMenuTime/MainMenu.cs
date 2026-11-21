@@ -57,6 +57,10 @@ namespace ZeroMenuTime
         public static void Refresh()
         {
             _askedPlace = false;
+            if (GamePlayerOwner.MyPlayer == null)
+            {
+                MenuBackdrop.MenuShownAgain();
+            }
         }
 
         private static async void AskPlace()
@@ -161,7 +165,7 @@ namespace ZeroMenuTime
                         item.Label.text = words;
                     }
                 }
-                else if (item.name == "item Reset" && item.gameObject.activeSelf == inRaid)
+                else if ((item.name == "item Reset" || item.name == "item Join a friend" || item.name == "item Continue on headless") && item.gameObject.activeSelf == inRaid)
                 {
                     item.gameObject.SetActive(!inRaid);
                 }
@@ -237,6 +241,14 @@ namespace ZeroMenuTime
             Item(panel, "Continue", font, new Vector2(left0, y), Continue);
             _whereLabel = Text(panel, "where", Where, font, 17f, Dim, new Vector2(left0 + 2f, y - 50f), new Vector2(700f, 26f));
             y -= 96f;
+            if (Net.FikaInstalled)
+            {
+                // Co-op: Continue hosts your own world; these two are the other ways into a raid.
+                Item(panel, "Join a friend", font, new Vector2(left0, y), JoinFriend);
+                y -= 66f;
+                Item(panel, "Continue on headless", font, new Vector2(left0, y), ContinueOnHeadless);
+                y -= 66f;
+            }
             Item(panel, "Reset", font, new Vector2(left0, y), AskNewGame);
             y -= 66f;
             Item(panel, "Settings", font, new Vector2(left0, y), () => Open(EMenuType.Settings));
@@ -389,6 +401,57 @@ namespace ZeroMenuTime
             }
             Plugin.Log.LogInfo("Continue chosen");
             Plugin.Instance.StartCoroutine(Seamless.ContinueNow());
+        }
+
+        /// <summary>Co-op: your own world, hosted by a headless host instead of this game.</summary>
+        public static void ContinueOnHeadless()
+        {
+            if (_working || GamePlayerOwner.MyPlayer != null)
+            {
+                return;
+            }
+            Seamless.JoinHost = "headless";
+            Continue();
+        }
+
+        /// <summary>Co-op: offers the raids that are running, one after another, and joins the one chosen.</summary>
+        public static async void JoinFriend()
+        {
+            if (_working || GamePlayerOwner.MyPlayer != null)
+            {
+                return;
+            }
+            var raids = await Coop.Raids();
+            var ui = ItemUiContext.Instance;
+            if (raids.Count == 0 || ui == null)
+            {
+                NotificationManager.DisplayWarningNotification("Nobody is in a raid you could join.", ENotificationDurationType.Long);
+                return;
+            }
+            Offer(raids, 0);
+        }
+
+        private static void Offer(System.Collections.Generic.List<Coop.Raid> raids, int index)
+        {
+            if (index >= raids.Count)
+            {
+                return;
+            }
+            var raid = raids[index];
+            string who = raid.OwnerName != "" ? raid.OwnerName : raid.Host;
+            string map;
+            if (!Places.TryGetValue(raid.Location, out map))
+            {
+                map = raid.Location;
+            }
+            string text = "Join " + who + " on " + map + "?\n\n" + raid.Players + " player(s) there" + (raid.Headless ? ", on a headless host" : "")
+                          + (raid.Mine ? ". You were in this raid before." : ".")
+                          + "\n\nYou come in where they came into the map." + (index + 1 < raids.Count ? "\n\nNo: see the next raid." : "");
+            Prompt.Ask(text, () =>
+            {
+                Guide.Close();
+                _ = Coop.Join(raid);
+            }, () => Offer(raids, index + 1), "JOIN A FRIEND");
         }
 
         public static void AskNewGame()

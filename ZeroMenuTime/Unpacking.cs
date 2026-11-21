@@ -51,6 +51,7 @@ namespace ZeroMenuTime
                 }
                 gone.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
                 gone.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
+                InventorySync.Gone(box);
 
                 bool found = (bool?)reply["FoundInRaid"] ?? false;
                 int made = 0, total = 0;

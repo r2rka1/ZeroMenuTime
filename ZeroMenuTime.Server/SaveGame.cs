@@ -261,6 +261,110 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         }
     }
 
+    /// <summary>
+    /// What the character wore and carried at its last save, as a flat list of items: for the
+    /// "keep items" death setting when a dead player comes back on a new map in co-op. The secure
+    /// container, armband, knife, dog tag and pockets are left out; the player still has those.
+    /// </summary>
+    public SavedGear SavedGearOf(MongoId sessionId)
+    {
+        try
+        {
+            string id = sessionId.ToString();
+            lock (_gate)
+            {
+                if (!File.Exists(CharacterFile(id)))
+                {
+                    return new SavedGear { Ok = true };
+                }
+                var saved = jsonUtil.Deserialize<PmcData>(File.ReadAllText(CharacterFile(id)));
+                var items = saved?.Inventory?.Items;
+                string? equipment = saved?.Inventory?.Equipment?.ToString();
+                var gear = new SavedGear { Ok = true };
+                if (items == null || equipment == null)
+                {
+                    return gear;
+                }
+                var notThese = new HashSet<string> { "SecuredContainer", "ArmBand", "Scabbard", "Dogtag", "Pockets" };
+                foreach (var worn in items.Where(x => x.ParentId == equipment && !notThese.Contains(x.SlotId ?? "")).ToList())
+                {
+                    // Each thing worn becomes the top of its own little tree, with what was in or on it.
+                    gear.Items.Add(worn with { ParentId = null, SlotId = null });
+                    gear.Items.AddRange(Below(items, worn.Id.ToString()));
+                    gear.Roots.Add(worn.Id.ToString());
+                }
+                return gear;
+            }
+        }
+        catch (Exception e)
+        {
+            return new SavedGear { Error = e.Message };
+        }
+    }
+
+    /// <summary>
+    /// A player joins someone else's world: as far as Vagabond goes they are now where that world's
+    /// owner is (same map, same way in), so they come in beside the others and their own next start
+    /// is from there.
+    /// </summary>
+    public SaveResponse GoWhereTheOwnerIs(MongoId sessionId, string owner)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(owner) || owner == sessionId.ToString())
+            {
+                return new SaveResponse { Ok = true };
+            }
+            return CopyPlace(sessionId.ToString(), owner);
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.Message };
+        }
+    }
+
+    /// <summary>
+    /// A guest who went through a transit with the group: their place is made the owner's again,
+    /// the transit under way included, so that their game loads the map the group is going to.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public SaveResponse FollowTheOwner(MongoId sessionId, string owner)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(owner) || owner == sessionId.ToString())
+            {
+                return new SaveResponse { Ok = true };
+            }
+            return CopyPlace(sessionId.ToString(), owner, true);
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.Message };
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static SaveResponse CopyPlace(string guest, string owner, bool following = false)
+    {
+        var theirs = Vagabond.Common.Api.Api.GetState(owner);
+        var mine = Vagabond.Common.Api.Api.GetState(guest);
+        if (theirs == null || mine == null)
+        {
+            return new SaveResponse { Error = "no Vagabond state" };
+        }
+        if (following && mine.CurrentMap == theirs.CurrentMap && mine.LastExit == theirs.LastExit && Equals(mine.TransitState, theirs.TransitState))
+        {
+            return new SaveResponse { Ok = true, Exit = theirs.LastExit ?? "" };
+        }
+        mine.CurrentMap = theirs.CurrentMap;
+        mine.LastExit = theirs.LastExit;
+        mine.TransitState = following ? theirs.TransitState : null;
+        Vagabond.Common.Api.Api.SaveState(guest, mine);
+        Console.WriteLine("[ZeroMenuTime] " + guest + (following ? " follows " : " joins the world of ") + owner + ": now on " + theirs.CurrentMap + " by " + theirs.LastExit);
+        return new SaveResponse { Ok = true, Exit = theirs.LastExit ?? "" };
+    }
+
     private static void TellVagabondExit(string sessionId, string map, string exit)
     {
         var state = Vagabond.Common.Api.Api.GetState(sessionId);
@@ -601,6 +705,23 @@ public sealed class RaidEndSavePatch : AbstractPatch
     private static async Task After(Task original, MongoId sessionId, bool died)
     {
         await original;
+        if (FikaLink.IsHeadlessProfile(sessionId))
+        {
+            return;
+        }
+        var host = FikaLink.TakeLastHost(sessionId);
+        if (host != null)
+        {
+            HideoutsService.Instance?.CatchUp(sessionId, host.Value);
+        }
         SaveGameService.Instance?.RaidEnded(sessionId, died);
     }
+}
+
+public sealed class SavedGear
+{
+    public bool Ok { get; set; }
+    public string? Error { get; set; }
+    public List<string> Roots { get; set; } = [];
+    public List<SPTarkov.Server.Core.Models.Eft.Common.Tables.Item> Items { get; set; } = [];
 }

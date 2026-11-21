@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using Comfort.Common;
 using EFT;
+using EFT.Communications;
 using EFT.Interactive;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
@@ -164,6 +165,28 @@ namespace ZeroMenuTime
             }
             // Leaving at a trader is the "save and quit to menu" choice: the next raid does not auto-start,
             // and the server keeps the character as it leaves as the save.
+            if (Net.Coop)
+            {
+                // In co-op the game's extraction does not take the player out; the co-op layer does.
+                string why;
+                Seamless.SaveAndMenuRequested = true;
+                _ = SaveGame.TraderSave(exfil.gameObject.name);
+                if (!Net.Current.LeaveRaid(exfil.gameObject.name, out why))
+                {
+                    Seamless.SaveAndMenuRequested = false;
+                    if (Net.Role == Role.Host)
+                    {
+                        // The hosting player, with others in the raid: it ends for everyone, if they say so.
+                        Regroup.AskEndForAll(exfil.gameObject.name);
+                        return;
+                    }
+                    NotificationManager.DisplayWarningNotification("You cannot leave now: " + why + ".", ENotificationDurationType.Long);
+                    Plugin.Log.LogInfo("Leave refused at " + exfil.gameObject.name + ": " + why);
+                    return;
+                }
+                Plugin.Log.LogInfo("Leave requested at " + exfil.gameObject.name + " (co-op)");
+                return;
+            }
             Seamless.SaveAndMenuRequested = true;
             _ = SaveGame.TraderSave(exfil.gameObject.name);
             LeaveRequested.Add(exfil.GetInstanceID());

@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 
 namespace ZeroMenuTime
 {
-    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "1.2.4")]
+    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "2.0.0")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
     // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
     [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]
@@ -38,6 +38,8 @@ namespace ZeroMenuTime
 
         public static Plugin Instance;
         public static ConfigEntry<bool> UseCustomSpots;
+        public static ConfigEntry<bool> LateJoin;
+        public static ConfigEntry<bool> AutoStartCoop;
 
         /// <summary>Show a message after a delay, and keep it on screen longer than the default.</summary>
         public static System.Collections.IEnumerator NotifyLater(string message, float delaySeconds)
@@ -61,6 +63,10 @@ namespace ZeroMenuTime
                 "In raid: heals you fully and switches off all damage to you. For testing only; turn off for real play.");
             SelfTestKey = Config.Bind("Testing", "Self-test key", new KeyboardShortcut(KeyCode.F8),
                 "In raid: runs the inventory steps a trade is made of and reports which worked. For testing only.");
+            LateJoin = Config.Bind("Co-op", "Let players join a raid in progress", true,
+                "With Fika, when you host: other players can come into your raid after it has started. They appear where you came into the map.");
+            AutoStartCoop = Config.Bind("Co-op", "Start a co-op raid without waiting", true,
+                "With Fika: a raid you host (or ask a headless host for) starts as soon as it has loaded, without the waiting room. Others join it as it runs.");
             UseCustomSpots = Config.Bind("General", "Also use traders.json spots", false,
                 "When Vagabond is installed traders stand at Vagabond's trader extracts. Turn this on to add the spots from traders.json as well.");
 
@@ -82,11 +88,16 @@ namespace ZeroMenuTime
                 new SaveStashPatch(), new SpawnTradersPatch(), new TraderActionsPatch(), new DoorLookPatch(),
                 new TraderExfilEnterPatch(), new TraderExfilExitPatch(),
                 new LocalPurchasePatch(), new LocalSellPatch(), new CarriedPaymentPatch(), new DrawPackItemsPatch(),
-                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
+                new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new AfterlifeKillPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
                 new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
             };
+            if (Net.Headless)
+            {
+                // No player, no screens: only the start and the end of a raid are of interest here.
+                _patches.RemoveAll(patch => !(patch is SpawnTradersPatch || patch is RaidStopPatch));
+            }
             foreach (var patch in _patches.ToArray())
             {
                 // One patch that cannot be applied (another mod missing or changed) must not stop the rest.
@@ -100,7 +111,53 @@ namespace ZeroMenuTime
                     Log.LogWarning(patch.GetType().Name + " not applied: " + e.Message);
                 }
             }
-            Log.LogInfo("Zero Menu Time loaded (" + BuildStamp + ")");
+            Net.RaidEnded += RaidStopPatch.OnRaidEnded;
+            Net.RaidStarted += Handshake.OnRaidStarted;
+            Net.On("zmt.layout?", Layout.OnAsked);
+            Net.On("zmt.layout", Layout.OnTold);
+            Net.RaidEnded += (status, exit) => Layout.Reset();
+            Net.RaidEnded += Regroup.OnRaidEnded;
+            Net.RaidStarted += Regroup.OnRaidStarted;
+            Net.RaidStarted += Layout.TellBuilt;
+            Net.On("zmt.endraid", Regroup.OnEndRaid);
+            Net.On("zmt.ghost.come", Afterlife.OnCome);
+            Net.On("zmt.ghost.there", Afterlife.OnGhostThere);
+            Net.On("zmt.left", Net.OnLeft);
+            Net.On("zmt.ghost", Afterlife.OnGhost);
+            Net.On("zmt.ghosts?", Afterlife.OnAskedGhosts);
+            Net.On("zmt.revive", Afterlife.OnRevive);
+            Net.On("zmt.wipe", Afterlife.OnWipe);
+            Net.RaidStarted += Afterlife.OnRaidStarted;
+            Net.RaidEnded += Afterlife.OnRaidEnded;
+            Camera.onPreCull += Afterlife.BeforeDraw;
+            gameObject.AddComponent<Afterlife.LateCamera>();
+            Net.On("zmt.hideout", HideoutDoors.OnChanged);
+            Net.RaidStarted += Coop.AskOwner;
+            Net.On("zmt.rest.ask", Rest.OnAsk);
+            Net.On("zmt.rest.vote", Rest.OnVote);
+            Net.On("zmt.rest.answer", Rest.OnAnswer);
+            Net.On("zmt.rest.do", Rest.OnDo);
+            Net.On("zmt.rest.off", Rest.OnOff);
+            Net.On("zmt.stash?", HideoutStash.OnAsked);
+            Net.On("zmt.stash.any?", HideoutStash.OnAskedIfAny);
+            Net.On("zmt.stash", HideoutStash.OnTold);
+            Net.RaidEnded += (status, exit) => HideoutStash.Forget();
+            Net.RaidStarted += () => { if (Net.Role == Role.Client) { Net.Current.Send("zmt.stash.any?", new byte[0], false); Net.Current.Send("zmt.world?", new byte[0], false); } };
+            Net.On("zmt.world?", (body, from) => { });
+            Net.On("zmt.inv", InventorySync.OnTold);
+            Net.On("zmt.where", Presence.OnWhere);
+            Net.RaidStarted += Presence.Reset;
+            Net.On("zmt.clock?", WorldClock.OnAsked);
+            Net.On("zmt.clock", WorldClock.OnTold);
+            Net.On("zmt.hello", Handshake.OnHello);
+            Net.On("zmt.version", Handshake.OnVersion);
+            Net.On("zmt.test", (body, from) => Log.LogInfo("[test] message from " + from + ": " + System.Text.Encoding.UTF8.GetString(body)));
+            Log.LogInfo("Zero Menu Time loaded (" + BuildStamp + ")" + (Net.Headless ? " on a headless host" : ""));
+            if (Net.Headless)
+            {
+                // No screen and no player: nothing below is for this machine.
+                return;
+            }
 
             // Reloaded while the main menu is up: arrange it again.
             try
@@ -217,6 +274,12 @@ namespace ZeroMenuTime
         /// <summary>The black screen while the player steps through a room door.</summary>
         private void OnGUI()
         {
+            if (Net.Headless)
+            {
+                return;
+            }
+            Afterlife.Draw();
+            Prompt.Draw();
             if (RoomDoor.Fade <= 0f)
             {
                 return;
@@ -236,6 +299,18 @@ namespace ZeroMenuTime
 
         private void Update()
         {
+            if (Net.Headless)
+            {
+                // Only what a host with no player has to keep going.
+                TestHarness.Tick();
+                WorldClock.Tick();
+                Presence.Tick();
+                Rest.Tick();
+                Afterlife.Tick();
+                Regroup.Tick();
+                BotFreeze.Tick();
+                return;
+            }
             if (SelfTestKey != null && SelfTestKey.Value.IsDown() && GamePlayerOwner.MyPlayer != null)
             {
                 SelfTest.Run();
@@ -254,6 +329,11 @@ namespace ZeroMenuTime
             IndoorLight.Tick();
             MapMarkers.Tick();
             HideoutPower.Tick();
+            Presence.Tick();
+            Rest.Tick();
+            Prompt.Tick();
+            Afterlife.Tick();
+            Regroup.Tick();
             BotFreeze.Tick();
             FallGuard.Tick();
             HideoutSound.Tick();
@@ -418,29 +498,55 @@ namespace ZeroMenuTime
         [PatchPostfix]
         public static void Postfix(GameWorld __instance)
         {
+            Build(__instance, false);
+        }
+
+        /// <summary>
+        /// Puts this map's traders, rooms and doors in place. In co-op a client first asks the host
+        /// how (see <see cref="Layout"/>) and comes back here with <paramref name="told"/> set.
+        /// A headless host has no player: it builds the rooms the others stand in, and nothing for itself.
+        /// </summary>
+        public static void Build(GameWorld __instance, bool told)
+        {
             try
             {
                 var player = __instance.MainPlayer;
-                if (player == null)
+                bool headless = Net.Headless;
+                if (player == null && !headless)
+                {
+                    return;
+                }
+                if (!told && Layout.WaitForHost(__instance))
                 {
                     return;
                 }
 
                 // The trade screen lives in the menu UI scene, which the game unloads during raids.
-                if (!MonoBehaviourSingleton<MenuUI>.Instantiated)
+                if (!headless && !MonoBehaviourSingleton<MenuUI>.Instantiated)
                 {
                     var key = Scenes.MenuUIScene;
                     EFT.Assets.Manager.LoadScene(key.path, key.rcid, LoadSceneMode.Additive);
                     Plugin.Log.LogInfo("Menu UI scene requested for in-raid trading");
                 }
 
-                string map = player.Location ?? "";
+                string map = (player != null ? player.Location : __instance.LocationId) ?? "";
+                // A co-op client's own idea of the map can be an older one (after a transit, or when its
+                // own travel state differs from the host's); the host says which map this is.
+                if (Layout.Active != null && !string.IsNullOrEmpty(Layout.Active.Map) && !string.Equals(map, Layout.Active.Map, StringComparison.OrdinalIgnoreCase))
+                {
+                    Plugin.Log.LogWarning("Raid start: this game says '" + map + "', the host says '" + Layout.Active.Map + "'; going by the host");
+                    map = Layout.Active.Map;
+                }
+                Layout.Map = map;
                 int count = 0;
 
                 // Traders stand at Vagabond's trader extracts when Vagabond is installed.
                 TraderInteractable.DestroyAll();
                 VagabondLink.Reset();
-                Repairs.EnablePatches();
+                if (!headless)
+                {
+                    Repairs.EnablePatches();
+                }
                 var extracts = VagabondLink.LoadTraderExtracts();
                 VagabondLink.SwitchOffHideoutExits(__instance);
                 foreach (var extract in extracts)
@@ -456,7 +562,7 @@ namespace ZeroMenuTime
                     // In the open the trader stands on the extract; with rooms, a door stands there
                     // and the trader waits inside.
                     var ground = exfil.transform.position;
-                    if (TraderRoom.Enabled.Value)
+                    if (Layout.RoomsOn)
                     {
                         var room = TraderRoom.Build(extract.TraderId, name, exfil.transform.position);
                         // The door goes where doors.json says, else against the nearest wall, else on the spot.
@@ -524,7 +630,7 @@ namespace ZeroMenuTime
                     var at = ground + new Vector3(0f, 0.9f, 0f);
                     var trader = TraderInteractable.Spawn(name, extract.TraderId, at, facing, Plugin.ShowMarkers.Value);
                     trader.Exfil = exfil;
-                    if (Plugin.ShowFigures.Value)
+                    if (Plugin.ShowFigures.Value && !headless)
                     {
                         TraderFigure.Spawn(extract.TraderId, name, ground, facing, trader.gameObject);
                     }
@@ -533,8 +639,8 @@ namespace ZeroMenuTime
                     Plugin.Log.LogInfo("Placed " + name + " at Vagabond extract " + extract.ExfilIdentifier + " " + at.ToString("F1"));
                 }
 
-                bool useFile = extracts.Count == 0 || Plugin.UseCustomSpots.Value;
-                foreach (var spot in useFile ? TraderConfig.Load() : new List<TraderSpot>())
+                bool useFile = extracts.Count == 0 || Layout.CustomSpots;
+                foreach (var spot in useFile ? (Layout.Active != null ? Layout.Active.Traders : TraderConfig.Load()) : new List<TraderSpot>())
                 {
                     if (!spot.Enabled || spot.Position == null || spot.Position.Length < 3)
                     {
@@ -549,12 +655,20 @@ namespace ZeroMenuTime
                     count++;
                     Plugin.Log.LogInfo("Placed " + spot.Name + " on " + map + " at " + string.Join(", ", spot.Position));
                 }
+                Afterlife.BuildLimbo();
                 int hideoutDoors = HideoutDoors.Spawn(map);
                 WorldClock.Begin();
                 TraderRoom.ExtendPhysics();
                 Plugin.Log.LogInfo("Raid started on '" + map + "', traders placed: " + count);
+                if (headless)
+                {
+                    Plugin.Log.LogInfo("Headless host: " + TraderRoom.Rooms.Count + " room(s) and " + hideoutDoors + " hideout door(s) built for the players");
+                    Net.RaiseRaidStarted();
+                    return;
+                }
                 QuestSync.Send("raid start");
                 Death.SendMode();
+                Net.RaiseRaidStarted();
                 if (count > 0 && Plugin.Instance != null)
                 {
                     Plugin.Instance.StartCoroutine(Plugin.NotifyLater("Traders in this area: " + count, 12f));

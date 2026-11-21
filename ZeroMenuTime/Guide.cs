@@ -24,9 +24,34 @@ namespace ZeroMenuTime
         {
             public string Title, Text, Pictures;
             public bool DeathChoice, ModelsStatus;
+            /// <summary>Shown only when the co-op mod is installed.</summary>
+            public bool CoopOnly;
         }
 
-        private static readonly Page[] Pages =
+        private static Page[] _pages;
+
+        /// <summary>The pages for this install: the co-op page only where co-op is possible.</summary>
+        private static Page[] Pages
+        {
+            get
+            {
+                if (_pages == null)
+                {
+                    var shown = new System.Collections.Generic.List<Page>();
+                    foreach (var page in AllPages)
+                    {
+                        if (!page.CoopOnly || Net.FikaInstalled)
+                        {
+                            shown.Add(page);
+                        }
+                    }
+                    _pages = shown.ToArray();
+                }
+                return _pages;
+            }
+        }
+
+        private static readonly Page[] AllPages =
         {
             new Page
             {
@@ -96,6 +121,15 @@ namespace ZeroMenuTime
                 Text = "You save by <b>sleeping in your hideout's bed</b>, or by choosing <b>Save and go to menu</b> at a trader. A death puts you back at your last save.\n\n"
                        + "Choose what a death takes from you. You can change this at any time in the settings (F12, Death).",
                 DeathChoice = true,
+            },
+            new Page
+            {
+                Title = "Playing with friends",
+                CoopOnly = true,
+                Text = "<b>Continue</b> hosts your own world; friends come into it with <b>Join a friend</b>, at any time. <b>Continue on headless</b> hosts it on a headless host instead, so you can leave and come back while others play on.\n\n"
+                       + "It is the host's world: their clock, their hideout, one stash for everyone. <b>What you put in the stash is the host's.</b> Only the host builds.\n\n"
+                       + "The raid stands still only while <b>everyone</b> is in a trader's room or the hideout. Sleeping and waiting need everyone's yes.\n\n"
+                       + "If you die, your gear drops where you fell and you watch the others. A teammate can <b>revive</b> you at a trader for 100,000 roubles, or free at the hideout's medical station. You come back where you came into the map, with nothing. If everyone dies, the raid is over.",
             },
             new Page
             {

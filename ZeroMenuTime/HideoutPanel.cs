@@ -549,6 +549,17 @@ namespace ZeroMenuTime
                 Text(left, HideoutStash.Count() + " item(s) kept in this hideout.", 18f, Dim, false);
                 Button(left, "OPEN STASH", () => { Close(); HideoutStash.Open(); }, true, 220f);
             }
+            if (_area == (int)EAreaType.MedStation && level >= 1 && Afterlife.Revivable().Count > 0)
+            {
+                Space(left, 14f);
+                Heading(left, "REVIVE");
+                Text(left, "A fallen teammate is brought back at the place they came into this map, with nothing. Their gear lies where they fell.", 16f, Dim, false);
+                foreach (var ghost in Afterlife.Revivable())
+                {
+                    string who = ghost.Key, name = ghost.Value;
+                    Button(left, "REVIVE " + name.ToUpperInvariant(), () => { Close(); Afterlife.ReviveFree(who, name); }, true, 312f);
+                }
+            }
             if (_area == HideoutSleep.RestSpace && level >= 1)
             {
                 Space(left, 14f);

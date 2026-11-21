@@ -448,6 +448,11 @@ namespace ZeroMenuTime
             {
                 return "not possible right now";
             }
+            if (!Coop.IsOwner)
+            {
+                NotificationManager.DisplayWarningNotification("Only the owner of this hideout can build here.");
+                return "only the owner builds";
+            }
             _building = true;
             try
             {
@@ -494,6 +499,7 @@ namespace ZeroMenuTime
                 }
                 Read(reply);
                 HideoutBoosts.Read(reply);
+                Coop.HideoutChanged();
                 HideoutStash.Send("after building");
                 await HideoutCrafting.Load();
                 int level;

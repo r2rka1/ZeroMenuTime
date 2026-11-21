@@ -68,18 +68,47 @@ namespace ZeroMenuTime
             game.StatedRealDateTime = DateTime.UtcNow;
             game.StatedGameDateTime = Epoch.AddSeconds(seconds);
             _lastKnown = seconds;
+            // On a co-op client the sky keeps a clock object of its own (alone, and on the host, it
+            // is this same one): without this the client's sky stays at the hour it joined with.
+            try
+            {
+                var sky = TODSkyProvider.Instance;
+                var skyClock = sky != null && sky.CurrentTime != null ? sky.CurrentTime.GameDateTime : null;
+                if (skyClock != null && !ReferenceEquals(skyClock, game))
+                {
+                    skyClock._realtimeSinceStartup = game._realtimeSinceStartup;
+                    skyClock.StatedRealDateTime = game.StatedRealDateTime;
+                    skyClock.StatedGameDateTime = game.StatedGameDateTime;
+                    skyClock.TimeFactor = game.TimeFactor;
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("World clock: the sky's own clock was not set: " + e.Message);
+            }
         }
 
         /// <summary>At raid start: carry on from where the clock stood when the last raid ended.</summary>
         public static async void Begin()
         {
             _running = false;
+            if (!Net.IsHost)
+            {
+                // In someone else's raid the clock is theirs: ask the host what it reads.
+                Net.Current.Send("zmt.clock?", new byte[0], false);
+                return;
+            }
             try
             {
                 var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/hideout/list", "{}"));
                 if (!((bool?)reply["Ok"] ?? false))
                 {
                     Plugin.Log.LogWarning("World clock not read: " + reply["Error"]);
+                    return;
+                }
+                if (Net.Role == Role.Client)
+                {
+                    // The role was not yet known when this began; the host's word counts.
                     return;
                 }
                 double seconds = (double?)reply["Clock"] ?? 0;
@@ -91,6 +120,7 @@ namespace ZeroMenuTime
                 _running = true;
                 _nextSend = Time.unscaledTime + 5f;
                 Plugin.Log.LogInfo("World clock: " + Describe(seconds) + " (" + seconds.ToString("F0") + " game seconds)");
+                Tell();
             }
             catch (Exception e)
             {
@@ -98,15 +128,55 @@ namespace ZeroMenuTime
             }
         }
 
-        /// <summary>Moves the clock forward, as sleeping does.</summary>
+        /// <summary>Moves the clock forward, as sleeping does. Only where the world is decided.</summary>
         public static void Add(double gameSeconds)
         {
             if (!_running || gameSeconds <= 0)
             {
                 return;
             }
+            if (!Net.IsHost)
+            {
+                Plugin.Log.LogWarning("World clock: only the host moves the clock; not moved");
+                return;
+            }
             Set(Now + gameSeconds);
             Send("moved on");
+            Tell();
+        }
+
+        /// <summary>On the host: says the time to every other machine in the raid.</summary>
+        public static void Tell()
+        {
+            if (_running && Net.Coop && Net.IsHost)
+            {
+                Net.Current.Send("zmt.clock", BitConverter.GetBytes(Now), true);
+            }
+        }
+
+        /// <summary>On the host: a machine asks the time (it has just come into the raid).</summary>
+        public static void OnAsked(byte[] body, string from)
+        {
+            Tell();
+        }
+
+        /// <summary>On a client: the host says the time.</summary>
+        public static void OnTold(byte[] body, string from)
+        {
+            if (Net.IsHost || body == null || body.Length < 8 || Game() == null)
+            {
+                return;
+            }
+            double seconds = BitConverter.ToDouble(body, 0);
+            bool first = !_running;
+            double off = _running ? seconds - Now : 0;
+            Set(seconds);
+            _running = true;
+            if (first || Math.Abs(off) > 120)
+            {
+                Plugin.Log.LogInfo("World clock from the host: " + Describe(seconds) + (first ? "" : " (was " + off.ToString("F0") + " s off)"));
+                HideTimer();
+            }
         }
 
         /// <summary>Called every frame; tells the server the time about once a minute.</summary>
@@ -117,13 +187,22 @@ namespace ZeroMenuTime
                 return;
             }
             _nextSend = Time.unscaledTime + 60f;
-            HideTimer();
+            if (!Net.Headless)
+            {
+                HideTimer();
+            }
             if (Game() == null)
             {
                 _running = false;
                 return;
             }
+            if (!Net.IsHost)
+            {
+                // The host keeps the time and tells the server.
+                return;
+            }
             Send(null);
+            Tell();
         }
 
         public static async void Send(string reason)
@@ -133,7 +212,7 @@ namespace ZeroMenuTime
 
         public static async System.Threading.Tasks.Task SendAsync(string reason)
         {
-            if (!_running)
+            if (!_running || !Net.IsHost)
             {
                 return;
             }

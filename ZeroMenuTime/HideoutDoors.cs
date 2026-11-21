@@ -74,6 +74,11 @@ namespace ZeroMenuTime
 
         public static List<HideoutSpot> Load()
         {
+            if (Layout.Active != null)
+            {
+                // In co-op the host's doors are the doors.
+                return Layout.Active.Hideouts ?? new List<HideoutSpot>();
+            }
             try
             {
                 if (File.Exists(FilePath))
@@ -166,8 +171,9 @@ namespace ZeroMenuTime
             }
             // The interior is wanted for its own sake where there is a hideout door, and for its
             // furniture wherever a trader has a room.
-            bool rooms = RoomProps.Use != null && RoomProps.Use.Value && TraderRoom.Rooms.Count > 0;
-            if ((placed > 0 || rooms) && Plugin.Instance != null)
+            bool rooms = Layout.Shell && TraderRoom.Rooms.Count > 0;
+            // A headless host has no use for the interior yet (the hideout in co-op comes later).
+            if ((placed > 0 || rooms) && Plugin.Instance != null && !Net.Headless)
             {
                 Plugin.Instance.StartCoroutine(Preload());
             }
@@ -191,7 +197,7 @@ namespace ZeroMenuTime
             var first = waking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? waking.Result : null;
             string wakeAt = first != null && ((bool?)first["Resume"] ?? false) ? (string)first["Hideout"] : null;
             KeyValuePair<Vector3, float> wakeFront;
-            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy)
+            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy && !(Net.Coop && Seamless.Joined) && Coop.Allowed(Coop.Feature.Hideout, false))
             {
                 RoomDoor.Fade = 1f;
                 RoomDoor.FadeText = "Waking up...";
@@ -248,12 +254,42 @@ namespace ZeroMenuTime
             var status = asking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? asking.Result : null;
             string bed = status != null && ((bool?)status["Resume"] ?? false) ? (string)status["Hideout"] : null;
             KeyValuePair<Vector3, float> front;
-            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null)
+            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null && !(Net.Coop && Seamless.Joined) && Coop.Allowed(Coop.Feature.Hideout, false))
             {
                 Plugin.Log.LogInfo("Waking up at the bed of hideout '" + bed + "'");
                 var consumed = SaveGame.Status(true);
                 Enter(bed, front.Key, front.Value, true);
                 NotificationManager.DisplayMessageNotification("You wake up at your bed.", ENotificationDurationType.Long);
+            }
+        }
+
+        /// <summary>Co-op: someone changed the hideout; if this player is inside, look at it again.</summary>
+        public static async void OnChanged(byte[] body, string from)
+        {
+            if (Inside == null)
+            {
+                return;
+            }
+            try
+            {
+                var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/hideout/list", "{}"));
+                if (!((bool?)reply["Ok"] ?? false) || Inside == null)
+                {
+                    return;
+                }
+                HideoutStations.Read(reply);
+                HideoutBoosts.Read(reply);
+                HideoutCrafting.Read(reply);
+                HideoutPower.Read(reply);
+                HideoutShelves.Read(reply);
+                HideoutStations.ShowAll();
+                HideoutPower.ApplyLook();
+                RefreshExits();
+                Plugin.Log.LogInfo("Hideout looked at again after a change by another player");
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Hideout not refreshed: " + e.Message);
             }
         }
 
@@ -442,7 +478,10 @@ namespace ZeroMenuTime
             // Loaded ahead of time for a quick way in; until someone goes in it is switched off.
             if (!waited && Inside == null && !_busy)
             {
-                HideoutBunker.Park(true);
+if (!Net.Coop)
+                {
+                    HideoutBunker.Park(true);
+                }
             }
         }
 
@@ -457,6 +496,11 @@ namespace ZeroMenuTime
         public static void Enter(string id, Vector3 returnTo, float returnYaw, bool atBed = false)
         {
             if (_busy || Inside != null || Plugin.Instance == null)
+            {
+                return;
+            }
+            // Waking at the bed is not told on screen: the player did not ask for anything.
+            if (!Coop.Allowed(Coop.Feature.Hideout, !atBed))
             {
                 return;
             }
@@ -526,7 +570,7 @@ namespace ZeroMenuTime
                 var origin = HideoutBunker.Moved;
 
                 HideoutBunker.Park(false);
-                BotFreeze.Set(true);
+                Presence.Refresh();
                 HideoutStations.ShowAll();
                 HideoutBunker.Sun(false);
                 if (HideoutBunker.BunkerSettings != null)
@@ -636,8 +680,12 @@ namespace ZeroMenuTime
                 string was = Inside;
                 StepOut();
                 yield return new WaitForSecondsRealtime(0.2f);
-                HideoutBunker.Park(true);
-                BotFreeze.Set(false);
+if (!Net.Coop)
+                {
+                    // In co-op others may be inside: the interior stays for the whole raid.
+                    HideoutBunker.Park(true);
+                }
+                Presence.Refresh();
                 RoomDoor.PlayDoorSound(false, _returnTo);
                 yield return RoomDoor.FadeTo(0f);
                 Plugin.Log.LogInfo("Left hideout '" + was + "'");
@@ -726,7 +774,15 @@ namespace ZeroMenuTime
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError("Closing the hideout failed: " + e);
+                if (e is ArgumentException && e.Message.Contains("Scene to unload is invalid"))
+                {
+                    // The raid's scenes have gone already (a co-op raid ends before this is told): nothing left to close.
+                    Plugin.Log.LogInfo("Hideout interior already gone with the raid");
+                }
+                else
+                {
+                    Plugin.Log.LogError("Closing the hideout failed: " + e);
+                }
             }
         }
     }

@@ -330,6 +330,7 @@ namespace ZeroMenuTime
                     return "server refused: " + reply["Error"];
                 }
                 Read(reply);
+                Coop.HideoutChanged();
                 HideoutStash.Send("after starting a craft");
                 MenuArea = -1;
                 Refresh();
@@ -381,7 +382,7 @@ namespace ZeroMenuTime
                 }
                 HideoutStash.Send("after collecting a craft");
                 Refresh();
-                string text = "Collected into the stash: " + string.Join(", ", names.ToArray()) + ".";
+                string text = (Net.Coop ? "Collected, laid in front of you: " : "Collected into the stash: ") + string.Join(", ", names.ToArray()) + ".";
                 Plugin.Log.LogInfo(text);
                 NotificationManager.DisplayMessageNotification(text, ENotificationDurationType.Long);
                 return text;
@@ -412,6 +413,12 @@ namespace ZeroMenuTime
             catch (Exception e)
             {
                 Plugin.Log.LogWarning("Could not load the model of " + item.TemplateId + ": " + e.Message);
+            }
+            if (Net.Coop)
+            {
+                // The shared stash is the same on every machine only through moves everyone is told
+                // of. A thing made here is laid in front of the player for all to see; they stow it.
+                return await LocalTrade.Give(player, item);
             }
             var stash = HideoutStash.Current;
             var address = stash != null ? stash.Grids[0].FindLocationForItem(item) : null;

@@ -102,11 +102,11 @@ namespace ZeroMenuTime
         public static TraderRoom Build(string traderId, string traderName, Vector3 doorGround)
         {
             // Rooms on the same map are kept well apart so one cannot be seen or heard from another.
-            var origin = doorGround + new Vector3(Rooms.Count * 40f, -Mathf.Abs(Depth.Value), 0f);
+            var origin = doorGround + new Vector3(Rooms.Count * 40f, -Mathf.Abs(Layout.Depth), 0f);
             // Each trader has a room of their own in the bundle; anyone without one gets the plain shop.
             // With furniture from the game, the room is a plain shell made here and filled in once the
             // hideout interior is at hand; otherwise it is one of the rooms built in Unity.
-            bool shell = RoomProps.Use != null && RoomProps.Use.Value;
+            bool shell = Layout.Shell;
             var prefab = shell ? null : RoomBundle.Prefab("TraderRoom_" + (LookOverride ?? traderName)) ?? RoomBundle.Prefab("TraderRoom_Base");
             if (prefab != null)
             {

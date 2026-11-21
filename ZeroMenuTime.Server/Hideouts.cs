@@ -256,6 +256,9 @@ public sealed class HideoutsService(
     SPTarkov.Server.Core.Helpers.Profile.InventoryHelper inventoryHelper,
     SPTarkov.Server.Core.Models.Spt.Tables.TemplateTable templates)
 {
+    /// <summary>For the patches, which are not made by the container.</summary>
+    public static HideoutsService? Instance;
+
     /// <summary>The BTR driver's id: what he delivers between maps arrives as mail from him.</summary>
     public const string BtrDriver = "656f0f98d80a697f855d34b1";
 
@@ -1166,6 +1169,37 @@ public sealed class HideoutsService(
     }
 
     /// <summary>Moves the world clock on to what the game reports. It never goes back.</summary>
+    /// <summary>
+    /// A guest comes home from someone else's world: their own clock moves on to that world's, if
+    /// that is later. A clock never goes back.
+    /// </summary>
+    public void CatchUp(MongoId guest, MongoId owner)
+    {
+        try
+        {
+            double theirs = 0;
+            Guarded(owner, new HideoutRequest(), false, (pmc, store) =>
+            {
+                theirs = store.ClockSeconds;
+                return Describe(pmc, store);
+            });
+            Guarded(guest, new HideoutRequest(), false, (pmc, store) =>
+            {
+                if (theirs > store.ClockSeconds)
+                {
+                    Advance(store, theirs);
+                    Save(guest.ToString(), store);
+                    Console.WriteLine("[ZeroMenuTime] Guest " + guest + " comes home; clock moved on to the host's (" + theirs.ToString("F0") + " s).");
+                }
+                return Describe(pmc, store);
+            });
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not move a guest's clock on: " + e.Message);
+        }
+    }
+
     public HideoutResponse SetClock(MongoId sessionId, HideoutRequest request)
     {
         return Guarded(sessionId, request, false, (pmc, store) =>

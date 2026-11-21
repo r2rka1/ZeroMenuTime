@@ -25,7 +25,10 @@ namespace ZeroMenuTime
         [PatchPostfix]
         public static void Postfix(Quest quest, ref Task<OperationResult<ConditionalFinishResult<Quest>>> __result)
         {
-            __result = Notify(__result, quest != null ? quest.Id : null);
+            if (Coop.Allowed(Coop.Feature.QuestHandIn, false))
+            {
+                __result = Notify(__result, quest != null ? quest.Id : null);
+            }
         }
 
         private static async Task<OperationResult<ConditionalFinishResult<Quest>>> Notify(
@@ -142,7 +145,7 @@ namespace ZeroMenuTime
         [PatchPrefix]
         public static bool Prefix(QuestReward __instance, ref OperationResult __result, ref int clonedCount)
         {
-            if (!Repairs.InRaid || __instance.type != ERewardType.Item)
+            if (!Repairs.InRaid || __instance.type != ERewardType.Item || !Coop.Allowed(Coop.Feature.QuestHandIn, false))
             {
                 return true;
             }

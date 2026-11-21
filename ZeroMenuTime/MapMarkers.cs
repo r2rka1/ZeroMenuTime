@@ -94,7 +94,7 @@ namespace ZeroMenuTime
                 foreach (var found in Views)
                 {
                     var def = _mapDef.GetValue(found, null);
-                    if (def == null || !IsThisMap(def, player.Location))
+                    if (def == null || !IsThisMap(def, Layout.Map != "" ? Layout.Map : player.Location))
                     {
                         continue;
                     }

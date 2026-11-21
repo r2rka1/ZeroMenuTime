@@ -300,7 +300,7 @@ public sealed class NewCharacterPatch : AbstractPatch
     [HarmonyPriority(Priority.Last)]
     public static void Postfix(MongoId sessionId, ref ValueTask<string> __result)
     {
-        if (NewGameService.Resetting || NewGameService.Instance == null)
+        if (NewGameService.Resetting || NewGameService.Instance == null || FikaLink.IsHeadlessProfile(sessionId))
         {
             return;
         }

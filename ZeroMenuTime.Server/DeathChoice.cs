@@ -67,6 +67,16 @@ public sealed class RaidStartLocationPatch : AbstractPatch
     {
         try
         {
+            if (FikaLink.IsHeadlessProfile(sessionId))
+            {
+                // A host with no player: nothing of a player's to remember.
+                Console.WriteLine("[ZeroMenuTime] Raid start by a headless host; its world belongs to " + FikaLink.OwnerOf(sessionId));
+                return;
+            }
+            if (FikaLink.Installed)
+            {
+                Console.WriteLine("[ZeroMenuTime] Raid start by " + sessionId + "; the world belongs to " + FikaLink.OwnerOf(sessionId));
+            }
             TableRewards.Clear(sessionId.ToString());
             DeathChoiceBridge.RememberRaidStart(sessionId.ToString());
         }

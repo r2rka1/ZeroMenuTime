@@ -127,6 +127,12 @@ namespace ZeroMenuTime
             {
                 return false;
             }
+            if (!Coop.IsOwner)
+            {
+                // The racks are kept on the owner's machine only; a guest's changes would be lost.
+                EFT.Communications.NotificationManager.DisplayWarningNotification("Only the owner of this hideout can use its racks.");
+                return false;
+            }
             var owner = player.GetComponent<GamePlayerOwner>();
             if (owner == null)
             {
