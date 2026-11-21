@@ -119,3 +119,5 @@ Each release: profile backup advice in the notes, since saves gain new files.
 - A `zmt matrix` command.
 
 **Test campaign, 2026-11-21.** Done since: a scripted suite in the dev kit (`devkit/coop-suite.sh`, ten groups) in place of the planned `zmt matrix`; three processes at once (headless and two players); version mismatch (told on both sides, the odd client kept out of the rooms). Still not done: the six-hour soak, more than two players, the hideout floor on the headless, the Fika version and revive-option checks at start, the Forge listing. See `TESTING.md`.
+
+**Version, 2026-11-21.** The co-op release is numbered 2.0.0 (the branch carried 1.3.0 while it was being built).

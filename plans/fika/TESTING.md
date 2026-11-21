@@ -1,6 +1,6 @@
 # Co-op build: how it is tested, what passed, what is left for people
 
-Branch `fika/stage8`, version 1.3.0. Everything below was run by scripts on one machine with
+Branch `fika/stage8`, version 2.0.0. Everything below was run by scripts on one machine with
 two game copies and a headless. None of it has been played by people. Back up the profiles
 before playing it.
 
@@ -9,8 +9,8 @@ before playing it.
 - Test set: `F:\SPT-Fika\host`, `client`, `headless`; its server is in `host\SPT_Runtime` on
   port 6970. Lowest video settings, 1280x720 windows. Profiles: Test (host), Archee (client),
   one headless profile.
-- The single-player test game `F:\SPT` has the 1.3.0 build too (no Fika there, so no add-on).
-- Zips: `dist\ZeroMenuTime-1.3.0.zip` (main) and `dist\ZeroMenuTime-Fika-1.3.0.zip` (add-on,
+- The single-player test game `F:\SPT` has the 2.0.0 build too (no Fika there, so no add-on).
+- Zips: `dist\ZeroMenuTime-2.0.0.zip` (main) and `dist\ZeroMenuTime-Fika-2.0.0.zip` (add-on,
   goes into the same plugin folder, only where Fika is).
 
 ## The dev kit for co-op

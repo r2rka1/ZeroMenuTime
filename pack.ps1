@@ -1,8 +1,8 @@
 # Builds both halves of the mod and makes a zip that unpacks straight into the SPT game folder.
-# Usage:  .\pack.ps1 [-GameDir F:\SPT\] [-Version 1.3.0]
+# Usage:  .\pack.ps1 [-GameDir F:\SPT\] [-Version 2.0.0]
 param(
     [string]$GameDir = 'F:\SPT\',
-    [string]$Version = '1.3.0'
+    [string]$Version = '2.0.0'
 )
 
 $ErrorActionPreference = 'Stop'
