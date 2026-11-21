@@ -130,6 +130,7 @@ namespace ZeroMenuTime
             Net.RaidStarted += Afterlife.OnRaidStarted;
             Net.RaidEnded += Afterlife.OnRaidEnded;
             Camera.onPreCull += Afterlife.BeforeDraw;
+            gameObject.AddComponent<Afterlife.LateCamera>();
             Net.On("zmt.hideout", HideoutDoors.OnChanged);
             Net.RaidStarted += Coop.AskOwner;
             Net.On("zmt.rest.ask", Rest.OnAsk);

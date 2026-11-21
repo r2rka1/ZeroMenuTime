@@ -663,6 +663,25 @@ namespace ZeroMenuTime
             _line = "You are dead. Watching " + seen.Name + "  (left / right arrow: someone else)";
         }
 
+        /// <summary>
+        /// The same move as just before the picture is drawn, but as late as a frame's own work goes.
+        /// The game puts the camera back on the dead player's head every frame; things that light the
+        /// scene around the camera (its shadows above all) look where the camera is before drawing
+        /// starts, and without this they prepare the waiting room under the map: the teammate's
+        /// surroundings then come out flat and washed white.
+        /// </summary>
+        [DefaultExecutionOrder(30000)]
+        public class LateCamera : MonoBehaviour
+        {
+            private void LateUpdate()
+            {
+                if (Dead)
+                {
+                    BeforeDraw(Camera.main);
+                }
+            }
+        }
+
         /// <summary>The line across the top of a ghost's screen.</summary>
         public static void Draw()
         {

@@ -586,6 +586,44 @@ namespace ZeroMenuTime
                     Report("FAILED no such door");
                     yield break;
                 }
+                if (parts.Length > 1 && parts[1] == "camfx")
+                {
+                    // fika camfx: every switched-on component on the main camera, with its numbers, to compare two states.
+                    var main = Camera.main;
+                    if (main == null) { Report("FAILED no main camera"); yield break; }
+                    if (parts.Length > 3 && (parts[2] == "off" || parts[2] == "on"))
+                    {
+                        // fika camfx off|on NAME: switch one of the camera's components, to find which one spoils a picture.
+                        foreach (var part in main.GetComponents<Behaviour>())
+                        {
+                            if (part != null && part.GetType().Name == parts[3])
+                            {
+                                part.enabled = parts[2] == "on";
+                                Report(parts[3] + " is now " + (part.enabled ? "on" : "off"));
+                                yield break;
+                            }
+                        }
+                        Report("FAILED no such component on the camera");
+                        yield break;
+                    }
+                    Report("camera at " + main.transform.position.ToString("F1") + " hdr " + main.allowHDR + " far " + main.farClipPlane.ToString("F0"));
+                    foreach (var part in main.GetComponents<Behaviour>())
+                    {
+                        if (part == null || !part.enabled) { continue; }
+                        var numbers = new List<string>();
+                        foreach (var field in part.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
+                        {
+                            if (field.FieldType == typeof(float) || field.FieldType == typeof(bool) || field.FieldType == typeof(int) || field.FieldType == typeof(Color))
+                            {
+                                object value = null;
+                                try { value = field.GetValue(part); } catch (Exception) { }
+                                numbers.Add(field.Name + "=" + (value is float ? ((float)value).ToString("F3") : value + ""));
+                            }
+                        }
+                        Report("  " + part.GetType().Name + ": " + string.Join(" ", numbers.Take(40).ToArray()));
+                    }
+                    yield break;
+                }
                 if (parts.Length > 2 && parts[1] == "shot")
                 {
                     // fika shot NAME: a picture of this game's own screen, in a raid.
@@ -2901,7 +2939,7 @@ namespace ZeroMenuTime
             try
             {
                 full = ScreenCapture.CaptureScreenshotAsTexture();
-                int width = Mathf.Min(1280, full.width);
+                int width = Mathf.Min(1920, full.width);
                 int height = Mathf.RoundToInt(full.height * (width / (float)full.width));
                 target = RenderTexture.GetTemporary(width, height, 0);
                 Graphics.Blit(full, target);

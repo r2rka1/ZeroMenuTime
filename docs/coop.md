@@ -1,8 +1,8 @@
 # Zero Menu Time with friends (Fika)
 
-**Experimental.** This describes the co-op build on the `fika` branches. It has been tested by
-its author's test scripts with two game copies and a headless host on one machine, not yet by
-people playing together. Back up your profiles before trying it.
+Zero Menu Time works with Fika, on a player's own game or on a headless host. This is the first
+co-op release: it has been through a long scripted test with two game copies and a headless host
+on one machine, and far less play by people. Back up your profiles before trying it.
 
 ## What you need
 
@@ -71,12 +71,18 @@ are put back at your last save, as alone.
 
 ## Known limits
 
-- Nothing here has been played by real people yet.
-- Transits in co-op, with or without a dead teammate, have not been tested at all.
+- With a dead teammate, the transit refuses whoever uses it before the dead one has been brought
+  there. A notice tells you so; use the transit again.
 - With *Keep items*, gear can be doubled: a teammate can carry your dropped gear through a
-  transit while you also get copies from your save.
+  transit while you also get the gear of your save.
 - The stash cannot be sorted in co-op.
+- A game that crashes can come back into the same raid with **Join a friend**; the host drops a
+  lost player after about half a minute.
 - On a headless host the hideout's floor does not exist for the host itself; things dropped on
   the hideout floor may behave oddly.
 - Repairs change durability on your own machine only; others see the old numbers.
-- Two computers with 32 GB of memory or less: use small maps when hosting on your own game.
+- A thing laid down for everyone (a purchase, a reward) appears for the others a moment later.
+  Leave it a second before picking it up.
+- Hosting on your own game needs a lot of memory with two players on a large map.
+- Tested with two players and a headless host. More players, and play over a real network,
+  have not been tried by the author.

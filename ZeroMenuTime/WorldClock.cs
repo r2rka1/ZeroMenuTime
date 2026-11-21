@@ -68,6 +68,24 @@ namespace ZeroMenuTime
             game.StatedRealDateTime = DateTime.UtcNow;
             game.StatedGameDateTime = Epoch.AddSeconds(seconds);
             _lastKnown = seconds;
+            // On a co-op client the sky keeps a clock object of its own (alone, and on the host, it
+            // is this same one): without this the client's sky stays at the hour it joined with.
+            try
+            {
+                var sky = TODSkyProvider.Instance;
+                var skyClock = sky != null && sky.CurrentTime != null ? sky.CurrentTime.GameDateTime : null;
+                if (skyClock != null && !ReferenceEquals(skyClock, game))
+                {
+                    skyClock._realtimeSinceStartup = game._realtimeSinceStartup;
+                    skyClock.StatedRealDateTime = game.StatedRealDateTime;
+                    skyClock.StatedGameDateTime = game.StatedGameDateTime;
+                    skyClock.TimeFactor = game.TimeFactor;
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("World clock: the sky's own clock was not set: " + e.Message);
+            }
         }
 
         /// <summary>At raid start: carry on from where the clock stood when the last raid ended.</summary>

@@ -142,8 +142,17 @@ and the next raid at the save: as in 1.2.4.
     the waiting room in between.
 15. A raid a player hosted and whose game then died stayed on the join list, and that player's
     own "Join a friend" could pick it: one's own raid is no longer listed.
-16. The harness setting "undying off" stays in the settings file: `protect` in the kit sets it
+16. **Found while taking the release pictures, at normal video settings:** on a client the sky
+    did not follow the clock (the sky keeps a clock object of its own there): night on one
+    machine, noon on the other. The sky's clock is now set too.
+17. Found the same way: a dead player's view of a teammate was flat and washed white (or nearly
+    black at night). The game lights the scene around where the camera stands before drawing,
+    and the camera was still in the waiting room then. It is now moved late in the frame as well.
+18. The harness setting "undying off" stays in the settings file: `protect` in the kit sets it
     back before every group.
+
+The test set runs at the lowest video settings, which hid 16 and 17: pictures for the release
+are worth taking at normal settings for that reason alone.
 
 Running the suite as a whole (rather than each scenario by hand) is what found 11 to 15: each
 group starts from whatever the last one left in the profiles, as real play does.
