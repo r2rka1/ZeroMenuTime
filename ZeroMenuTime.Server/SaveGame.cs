@@ -594,6 +594,51 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         }
     }
 
+    /// <summary>
+    /// Continue was chosen and Vagabond says the character is on no map at all (seen in the field:
+    /// after the game was closed in a raid on a heavily modded install). Rather than doing nothing,
+    /// the character is put where the last save was made, or at the Customs hideout door if there
+    /// never was one. Says which map that is.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public SaveResponse Recover(MongoId sessionId)
+    {
+        try
+        {
+            string id = sessionId.ToString();
+            lock (_gate)
+            {
+                string before = VagabondMap(id) ?? "";
+                if (before.Length > 0)
+                {
+                    return new SaveResponse { Ok = true, Exit = before };
+                }
+                var meta = ReadMeta(id);
+                if (meta != null && (!string.IsNullOrEmpty(meta.Hideout) || (!string.IsNullOrEmpty(meta.Map) && !string.IsNullOrEmpty(meta.Exit))))
+                {
+                    if (!string.IsNullOrEmpty(meta.Hideout))
+                    {
+                        // At the bed, inside, as after any raid that did not end properly.
+                        meta.Resume = true;
+                        WriteMeta(id, meta);
+                    }
+                    PlaceAt(id, meta);
+                }
+                else
+                {
+                    PlaceAt(id, "customs");
+                }
+                string after = VagabondMap(id) ?? "";
+                Console.WriteLine("[ZeroMenuTime] The character was on no map; put back " + (meta != null ? "at the last save" : "at the Customs hideout door") + ": " + (after.Length > 0 ? after : "(Vagabond still says nowhere)"));
+                return new SaveResponse { Ok = after.Length > 0, Exit = after, Has = meta != null, Hideout = meta?.Hideout ?? "", Error = after.Length > 0 ? null : "Vagabond still has no map for the character" };
+            }
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.GetType().Name + ": " + e.Message };
+        }
+    }
+
     /// <summary>A raid has ended. After a death the save is put back; otherwise the bed stops being where the next raid begins.</summary>
     public void RaidEnded(MongoId sessionId, bool died)
     {

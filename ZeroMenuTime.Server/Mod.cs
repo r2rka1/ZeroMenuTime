@@ -17,7 +17,7 @@ public class ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.r2rka1.zeromenutime";
     public string Name { get; init; } = "ZeroMenuTime";
     public string Author { get; init; } = "r2rka1";
-    public SemanticVersioning.Version Version { get; init; } = new("2.0.0");
+    public SemanticVersioning.Version Version { get; init; } = new("2.0.1");
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.6");
     public bool HasPrepatcher { get; init; }
     public string? Url { get; init; } = "https://github.com/r2rka1/ZeroMenuTime";
@@ -238,6 +238,10 @@ public class ZeroMenuTimeRouter(
     new RouteAction<SaveRequest>(
         "/zeromenutime/test/travel",
         (_, payload, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.Travel(sessionId, payload)) ?? "{}")
+    ),
+    new RouteAction<SaveRequest>(
+        "/zeromenutime/save/recover",
+        (_, _, sessionId, _, _) => ValueTask.FromResult(jsonUtil.Serialize(saves.Recover(sessionId)) ?? "{}")
     ),
     new RouteAction<SaveRequest>(
         "/zeromenutime/save/status",

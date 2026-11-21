@@ -108,8 +108,60 @@ namespace ZeroMenuTime
             }
             var state = stateTask.Status == TaskStatus.RanToCompletion ? stateTask.Result : null;
             Plugin.Log.LogInfo("Continue: map=" + (state?.CurrentMap ?? "?"));
-            StartRaid(state?.CurrentMap ?? LastLocationId);
+            string map = !string.IsNullOrEmpty(state?.CurrentMap) ? state.CurrentMap : LastLocationId;
+            if (string.IsNullOrEmpty(map))
+            {
+                // Vagabond has the character on no map. Nothing could start; put them back at their
+                // last save (or the Customs hideout) and go on from there.
+                var recovering = Recover();
+                while (!recovering.IsCompleted)
+                {
+                    yield return null;
+                }
+                map = recovering.Status == TaskStatus.RanToCompletion ? recovering.Result : null;
+                if (!string.IsNullOrEmpty(map))
+                {
+                    // Vagabond's own word for that map, as it gives it on every other Continue.
+                    var again = FetchVagabondState();
+                    while (!again.IsCompleted)
+                    {
+                        yield return null;
+                    }
+                    var placed = again.Status == TaskStatus.RanToCompletion ? again.Result : null;
+                    if (!string.IsNullOrEmpty(placed?.CurrentMap))
+                    {
+                        map = placed.CurrentMap;
+                    }
+                }
+                if (string.IsNullOrEmpty(map))
+                {
+                    NotificationManager.DisplayWarningNotification(
+                        "Zero Menu Time could not work out where your character is, and could not put them back at a save. Choose Reset for a fresh start, or report this with your log.",
+                        ENotificationDurationType.Infinite);
+                    _running = false;
+                    yield break;
+                }
+                NotificationManager.DisplayMessageNotification("Your character was on no map. Continuing from your last save.", ENotificationDurationType.Long);
+            }
+            StartRaid(map);
             _running = false;
+        }
+
+        /// <summary>Asks the server to put a character who is on no map back at their save; the map, or null.</summary>
+        private static async Task<string> Recover()
+        {
+            try
+            {
+                var reply = Newtonsoft.Json.Linq.JObject.Parse(await SPT.Common.Http.RequestHandler.PostJsonAsync("/zeromenutime/save/recover", "{}"));
+                string map = (string)reply["Exit"] ?? "";
+                Plugin.Log.LogWarning("Continue: the character was on no map; the server put them back: " + (map != "" ? map : "failed: " + reply["Error"]));
+                return map != "" ? map : null;
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Continue: could not put the character back on a map: " + e.Message);
+                return null;
+            }
         }
 
         /// <summary>Runs when the main menu appears after a raid or after leaving the hideout.</summary>
@@ -155,7 +207,7 @@ namespace ZeroMenuTime
             }
             else
             {
-                StartRaid(state?.CurrentMap ?? LastLocationId);
+                StartRaid(!string.IsNullOrEmpty(state?.CurrentMap) ? state.CurrentMap : LastLocationId);
             }
             _running = false;
         }

@@ -66,7 +66,7 @@ namespace ZeroMenuTime
 
         private static void Sweep()
         {
-            _nextSweep = Time.unscaledTime + 1f;
+            _nextSweep = Time.unscaledTime + 0.1f;   // other mods switch bots back on; a second was long enough for one to shoot
             try
             {
                 var world = Singleton<GameWorld>.Instance;
