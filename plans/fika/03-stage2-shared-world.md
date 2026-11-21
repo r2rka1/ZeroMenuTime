@@ -126,3 +126,5 @@ Still off in a group: trading, deliveries, quest hand-in at the counter, hideout
 - Alone, a trader's room does not freeze the raid (unchanged). In co-op a room counts as inside.
 - The host sends what it builds *from*, not the finished positions: one build path for everyone,
   with the positions compared afterwards as a check.
+
+**Test campaign, 2026-11-21.** Now run: a client whose own doors file differs builds the host's rooms and matches them; the guest's clock catches up after the raid; wait and sleep move the clock for the group by agreement; a late joiner gets layout and clock. See `TESTING.md`.

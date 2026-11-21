@@ -323,8 +323,29 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         }
     }
 
+    /// <summary>
+    /// A guest who went through a transit with the group: their place is made the owner's again,
+    /// the transit under way included, so that their game loads the map the group is going to.
+    /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static SaveResponse CopyPlace(string guest, string owner)
+    public SaveResponse FollowTheOwner(MongoId sessionId, string owner)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(owner) || owner == sessionId.ToString())
+            {
+                return new SaveResponse { Ok = true };
+            }
+            return CopyPlace(sessionId.ToString(), owner, true);
+        }
+        catch (Exception e)
+        {
+            return new SaveResponse { Error = e.Message };
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static SaveResponse CopyPlace(string guest, string owner, bool following = false)
     {
         var theirs = Vagabond.Common.Api.Api.GetState(owner);
         var mine = Vagabond.Common.Api.Api.GetState(guest);
@@ -332,11 +353,15 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         {
             return new SaveResponse { Error = "no Vagabond state" };
         }
+        if (following && mine.CurrentMap == theirs.CurrentMap && mine.LastExit == theirs.LastExit && Equals(mine.TransitState, theirs.TransitState))
+        {
+            return new SaveResponse { Ok = true, Exit = theirs.LastExit ?? "" };
+        }
         mine.CurrentMap = theirs.CurrentMap;
         mine.LastExit = theirs.LastExit;
-        mine.TransitState = null;
+        mine.TransitState = following ? theirs.TransitState : null;
         Vagabond.Common.Api.Api.SaveState(guest, mine);
-        Console.WriteLine("[ZeroMenuTime] " + guest + " joins the world of " + owner + ": now on " + theirs.CurrentMap + " by " + theirs.LastExit);
+        Console.WriteLine("[ZeroMenuTime] " + guest + (following ? " follows " : " joins the world of ") + owner + ": now on " + theirs.CurrentMap + " by " + theirs.LastExit);
         return new SaveResponse { Ok = true, Exit = theirs.LastExit ?? "" };
     }
 

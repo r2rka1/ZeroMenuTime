@@ -138,3 +138,5 @@ the overview must say so.
 - The two menu entries by hand (the harness calls what they call).
 - A raid long under way: opened doors, looted containers, dead bots and their bodies.
 - A player whose game died coming back by Fika's reconnect.
+
+**Test campaign, 2026-11-21.** Now run: joining from the menu; a late joiner sees doors changed earlier, bodies and laid items; leaving and coming back on a headless host; a game closed without leaving comes back. Found and fixed: the host did not tell a newcomer about changed doors, lamps and windows; the late-join patch stood in the way of Fika's own reconnect, so a crashed player was refused; with three machines every message to all arrived twice. See `TESTING.md`.

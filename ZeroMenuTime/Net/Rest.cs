@@ -79,6 +79,8 @@ namespace ZeroMenuTime
                     Waiting.Add(human.ProfileId);
                 }
             }
+            Plugin.Log.LogInfo("Rest: asked by " + from + "; living: " + string.Join(", ", System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(Afterlife.Living(), h => h.Name + "/" + h.ProfileId)))
+                               + "; to answer: " + Waiting.Count);
             if (Waiting.Count == 0)
             {
                 Do();
@@ -115,13 +117,10 @@ namespace ZeroMenuTime
             string what = parts[1] == "sleep" ? "sleep for " : "wait for ";
             float hours = float.Parse(parts[2], CultureInfo.InvariantCulture);
             string text = NameOf(parts[3]) + " wants to " + what + hours.ToString("0.#") + " hours.\n\nTime moves on for everyone. Agree?";
-            var ui = ItemUiContext.Instance;
-            if (ui == null)
+            if (!Prompt.Ask(text, () => Answer(id, true), () => Answer(id, false), "REST", VoteSeconds - 2f))
             {
                 Answer(id, false);
-                return;
             }
-            ui.ShowMessageWindow(text, () => Answer(id, true), () => Answer(id, false), "REST", VoteSeconds - 2f);
         }
 
         private static string _lastAsked;
@@ -148,6 +147,7 @@ namespace ZeroMenuTime
         public static void OnAnswer(byte[] body, string from)
         {
             string[] parts = Encoding.UTF8.GetString(body).Split(' ');
+            Plugin.Log.LogInfo("Rest: answer '" + Encoding.UTF8.GetString(body) + "' from " + from);
             if (!Net.IsHost || parts.Length < 2 || parts[0] != _vote.ToString() || !Waiting.Contains(from))
             {
                 return;

@@ -94,19 +94,91 @@ namespace ZeroMenuTime
                 return;
             }
             var at = new Vector3(float.Parse(parts[0], CultureInfo.InvariantCulture), float.Parse(parts[1], CultureInfo.InvariantCulture), float.Parse(parts[2], CultureInfo.InvariantCulture));
+            if (_coming || Plugin.Instance == null)
+            {
+                return;
+            }
+            Plugin.Instance.StartCoroutine(Come(me, at, parts.Length > 3 ? int.Parse(parts[3], CultureInfo.InvariantCulture) : -1));
+        }
+
+        private static bool _coming;
+
+        private static System.Collections.IEnumerator Come(Player me, Vector3 at, int pointId)
+        {
+            _coming = true;
+            if (Vector3.Distance(me.Transform.position, at) > 3f)
+            {
+                if (!_inLimbo)
+                {
+                    // Standing in another transit already (the living stood in that one first). Going
+                    // straight from one transit's zone into another leaves the host believing the ghost
+                    // is in neither, and the transit then refuses everyone. So: out of the world for a
+                    // moment, then in.
+                    me.Teleport(LimboAt + Vector3.up * 0.1f, false);
+                    yield return new WaitForSecondsRealtime(1.2f);
+                }
+                _inLimbo = false;
+                if (Dead)
+                {
+                    me.Teleport(at + Vector3.up * 0.1f, false);
+                    Plugin.Log.LogInfo("Afterlife: brought to the transit at " + at.ToString("F1") + " with the living");
+                }
+            }
             _inLimbo = false;
-            me.Teleport(at + Vector3.up * 0.1f, false);
-            Plugin.Log.LogInfo("Afterlife: brought to the transit at " + at.ToString("F1") + " with the living");
+            _coming = false;
+            // Standing there is not enough: each player asks to go through, and so must the dead.
+            if (Dead && pointId >= 0 && Time.unscaledTime - _askedTransit > 6f)
+            {
+                _askedTransit = Time.unscaledTime;
+                yield return AskTransit(me, pointId);
+            }
+        }
+
+        private static float _askedTransit = -100f;
+        private static bool _toldLiving;
+
+        /// <summary>On a living player's machine: the dead have been brought into the transit.</summary>
+        public static void OnGhostThere(byte[] body, string from)
+        {
+            if (!Dead && GamePlayerOwner.MyPlayer != null)
+            {
+                NotificationManager.DisplayMessageNotification("Your fallen teammates are with you. If the transit refused you, use it again.", ENotificationDurationType.Long);
+            }
+        }
+
+        private static System.Collections.IEnumerator AskTransit(Player me, int pointId)
+        {
+            // A moment for the transit to notice who has arrived in it.
+            yield return new WaitForSecondsRealtime(1.5f);
+            foreach (var transit in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.TransitPoint>())
+            {
+                if (transit.parameters.id == pointId && transit.Controller != null && Dead)
+                {
+                    me.TransitInteraction(transit.Controller, pointId, "", JsonType.EDateTime.CURR);
+                    Plugin.Log.LogInfo("Afterlife: asked to go through transit " + pointId + " with the living");
+                    if (!_toldLiving)
+                    {
+                        // A living player who asked before the dead had arrived was refused; they have to ask once more.
+                        _toldLiving = true;
+                        Net.Current.Send("zmt.ghost.there", new byte[0], true);
+                    }
+                    yield break;
+                }
+            }
         }
 
         public static void OnRaidStarted()
         {
             Ghosts.Clear();
+            _toldLiving = false;
             bool arrive = _arriveDead;
             _arriveDead = false;
             Dead = false;
             _inLimbo = false;
             _wipe = false;
+            _shielded = false;
+            _backCheck = 0f;
+            _coming = false;
             if (arrive && Plugin.Instance != null)
             {
                 Plugin.Instance.StartCoroutine(Regroup.ArriveAfterDeath());
@@ -231,6 +303,17 @@ namespace ZeroMenuTime
                 yield return null;
             }
             yield return new WaitForSecondsRealtime(0.5f);
+            if (Dead && HideoutDoors.Inside != null)
+            {
+                // Fallen inside the hideout: leave it properly first (its light, its sound, "inside"),
+                // or the player would come back to life on the map still counted as indoors.
+                HideoutDoors.Leave();
+                float outBy = Time.unscaledTime + 15f;
+                while ((HideoutDoors.Inside != null || HideoutDoors.Busy) && Time.unscaledTime < outBy)
+                {
+                    yield return null;
+                }
+            }
             if (Dead)
             {
                 me.Teleport(LimboAt + Vector3.up * 0.1f, false);
@@ -297,6 +380,23 @@ namespace ZeroMenuTime
             }
             if (parts[0] == "on")
             {
+                var me = GamePlayerOwner.MyPlayer;
+                if (me != null && me.ProfileId == parts[1] && !Dead)
+                {
+                    // This player was a ghost, their game closed, and they have come back into the
+                    // same raid: still dead. The gear was dropped the first time.
+                    Dead = true;
+                    Ghosts.Add(parts[1]);
+                    me.ActiveHealthController.SetDamageCoeff(0f);
+                    me.Teleport(LimboAt + Vector3.up * 0.1f, false);
+                    _inLimbo = true;
+                    // Where this game came in this time is the waiting room; the reviver's entry point is used instead.
+                    _hasCameIn = false;
+                    Plugin.Log.LogWarning("Afterlife: back in the raid, and still a ghost");
+                    NotificationManager.DisplayWarningNotification("You are still dead in this raid. A teammate can bring you back at a trader or at the hideout's medical station.",
+                        ENotificationDurationType.Long);
+                    return;
+                }
                 if (Ghosts.Add(parts[1]) && !Net.Headless)
                 {
                     NotificationManager.DisplayWarningNotification(name + " died. Revive them at a trader (" + ReviveCost.ToString("N0", CultureInfo.InvariantCulture)
@@ -402,7 +502,8 @@ namespace ZeroMenuTime
 
         private static void Revive(string profile)
         {
-            var body = Encoding.UTF8.GetBytes(profile);
+            // The reviver's own entry point goes along, for a ghost that does not know one of its own.
+            var body = Encoding.UTF8.GetBytes(profile + (_hasCameIn ? " " + Num(_cameInAt.x) + " " + Num(_cameInAt.y) + " " + Num(_cameInAt.z) : ""));
             Net.Current.Send("zmt.revive", body, true);
         }
 
@@ -410,10 +511,15 @@ namespace ZeroMenuTime
         public static void OnRevive(byte[] body, string from)
         {
             var me = GamePlayerOwner.MyPlayer;
-            string profile = Encoding.UTF8.GetString(body);
-            if (me == null || me.ProfileId != profile || !Dead)
+            string[] parts = Encoding.UTF8.GetString(body).Split(' ');
+            if (me == null || me.ProfileId != parts[0] || !Dead)
             {
                 return;
+            }
+            if (!_hasCameIn && parts.Length > 3)
+            {
+                _cameInAt = new Vector3(float.Parse(parts[1], CultureInfo.InvariantCulture), float.Parse(parts[2], CultureInfo.InvariantCulture), float.Parse(parts[3], CultureInfo.InvariantCulture));
+                _hasCameIn = true;
             }
             ComeBack(me);
         }
@@ -433,7 +539,11 @@ namespace ZeroMenuTime
             }
             health.ChangeEnergy(30f - health.Energy.Current);
             health.ChangeHydration(30f - health.Hydration.Current);
-            health.SetDamageCoeff(Plugin.Undying != null && Plugin.Undying.Value ? 0f : 1f);
+            // Nothing can hurt them until they are seen standing where they were put: the ground there
+            // may not be solid yet for a player who comes from far below the map, and a fall would
+            // kill them again at once.
+            health.SetDamageCoeff(0f);
+            _shielded = true;
             Dead = false;
             _inLimbo = false;
             Ghosts.Remove(me.ProfileId);
@@ -445,6 +555,7 @@ namespace ZeroMenuTime
         }
 
         private static bool _inLimbo;
+        private static bool _shielded;
         private static Vector3 _backAt;
         private static float _backCheck;
 
@@ -472,11 +583,23 @@ namespace ZeroMenuTime
             {
                 // A move out of the waiting room does not always land; look, and do it again if not.
                 _backCheck = 0f;
-                if (Vector3.Distance(me.Transform.position, _backAt) > 5f)
+                if (Dead)
+                {
+                    // Dead again since; the waiting room is where they belong.
+                    _shielded = false;
+                }
+                else if (Vector3.Distance(me.Transform.position, _backAt) > 5f)
                 {
                     Plugin.Log.LogWarning("Afterlife: not where the revival put the player (" + me.Transform.position.ToString("F1") + "); moved again");
                     me.Teleport(_backAt + Vector3.up * 0.1f, false);
                     _backCheck = Time.unscaledTime + 1.5f;
+                }
+                else if (_shielded)
+                {
+                    // Standing where they were put: they can be hurt again.
+                    _shielded = false;
+                    me.ActiveHealthController.SetDamageCoeff(Plugin.Undying != null && Plugin.Undying.Value ? 0f : 1f);
+                    Plugin.Log.LogInfo("Afterlife: the revived player stands at " + me.Transform.position.ToString("F1") + "; no longer shielded");
                 }
             }
             if (Dead && me != null)

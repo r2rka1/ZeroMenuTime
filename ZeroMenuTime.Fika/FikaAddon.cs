@@ -109,6 +109,118 @@ namespace ZeroMenuTime.Fika
             }
         }
 
+        /// <summary>Doors and other things opened or shut since the raid began, lamps switched, windows broken.</summary>
+        private void SendWorldTo(FikaServer server, NetPeer peer)
+        {
+            try
+            {
+                var world = Singleton<GameWorld>.Instance;
+                if (server == null || world == null || world.World == null)
+                {
+                    return;
+                }
+                int doors = 0, lamps = 0, windows = 0;
+                var forSync = HarmonyLib.AccessTools.Field(typeof(World), "_interactableObjectsForNetSync").GetValue(world.World) as EFT.Interactive.WorldInteractiveObject[];
+                var changed = new List<EFT.Interactive.WorldInteractiveObject.InteractiveObjectStatusInfo>();
+                foreach (var thing in forSync ?? new EFT.Interactive.WorldInteractiveObject[0])
+                {
+                    if (thing == null)
+                    {
+                        continue;
+                    }
+                    var door = thing as EFT.Interactive.Door;
+                    if ((thing.DoorState != thing.InitialDoorState && thing.DoorState != EFT.Interactive.EDoorState.Interacting) || (door != null && door.IsBroken))
+                    {
+                        changed.Add(thing.GetStatusInfo(true));
+                    }
+                }
+                if (changed.Count > 0)
+                {
+                    var packet = new global::Fika.Core.Networking.Packets.World.ReconnectPacket
+                    {
+                        Type = global::Fika.Core.Networking.Packets.World.ReconnectPacket.EReconnectDataType.Interactives, InteractivesData = changed,
+                    };
+                    server.SendDataToPeer(ref packet, DeliveryMethod.ReliableOrdered, peer);
+                    doors = changed.Count;
+                }
+                var lampStates = new Dictionary<int, byte>();
+                foreach (var lamp in LocationScene.GetAllObjects<EFT.Interactive.LampController>(false))
+                {
+                    if (lamp.NetId != 0 && !lampStates.ContainsKey(lamp.NetId))
+                    {
+                        lampStates.Add(lamp.NetId, (byte)lamp.LampState);
+                    }
+                }
+                if (lampStates.Count > 0)
+                {
+                    var packet = new global::Fika.Core.Networking.Packets.World.ReconnectPacket
+                    {
+                        Type = global::Fika.Core.Networking.Packets.World.ReconnectPacket.EReconnectDataType.LampControllers, LampStates = lampStates,
+                    };
+                    server.SendDataToPeer(ref packet, DeliveryMethod.ReliableOrdered, peer);
+                    lamps = lampStates.Count;
+                }
+                var broken = new Dictionary<int, Vector3>();
+                foreach (var window in world.Windows.GetValuesEnumerator())
+                {
+                    if (window.AvailableToSync && window.IsDamaged && window.FirstHitPosition.HasValue)
+                    {
+                        broken[window.NetId] = window.FirstHitPosition.Value;
+                    }
+                }
+                if (broken.Count > 0)
+                {
+                    var packet = new global::Fika.Core.Networking.Packets.World.ReconnectPacket
+                    {
+                        Type = global::Fika.Core.Networking.Packets.World.ReconnectPacket.EReconnectDataType.Windows, WindowBreakerStates = broken,
+                    };
+                    server.SendDataToPeer(ref packet, DeliveryMethod.ReliableOrdered, peer);
+                    windows = broken.Count;
+                }
+                Plugin.Log.LogInfo("Net: a newcomer was told of " + doors + " door(s) and the like changed, " + lamps + " lamp(s), " + windows + " broken window(s)");
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Net: telling a newcomer about doors, lamps and windows failed: " + e);
+            }
+        }
+
+        private float _nextTransitLook;
+        private bool _transitStopAsked;
+
+        /// <summary>
+        /// After a transit Fika holds each player until they press its "leave" key. Here the step is
+        /// taken for them, clients first and the hosting player once the others have gone, so a
+        /// group moves to the next map by standing in the transit and nothing more.
+        /// </summary>
+        private void Update()
+        {
+            if (Net.Headless || Time.unscaledTime < _nextTransitLook)
+            {
+                return;
+            }
+            _nextTransitLook = Time.unscaledTime + 1f;
+            CoopHandler coop;
+            var game = Singleton<global::Fika.Core.Main.GameMode.IFikaGame>.Instance;
+            if (game == null || !CoopHandler.TryGetCoopHandler(out coop) || coop.MyPlayer == null)
+            {
+                _transitStopAsked = false;
+                return;
+            }
+            if (_transitStopAsked || game.ExitStatus != ExitStatus.Transit || coop.QuitState != CoopHandler.EQuitState.Extracted)
+            {
+                return;
+            }
+            if (FikaBackendUtils.IsServer && coop.HumanPlayers.Count > 1)
+            {
+                // The hosting player goes last.
+                return;
+            }
+            _transitStopAsked = true;
+            Plugin.Log.LogInfo("Net: through the transit; on to " + game.ExitLocation);
+            game.Stop(coop.MyPlayer.ProfileId, ExitStatus.Transit, game.ExitLocation, 0f);
+        }
+
         private void OnManager(FikaNetworkManagerCreatedEvent created)
         {
             var manager = created.Manager;
@@ -116,15 +228,19 @@ namespace ZeroMenuTime.Fika
             {
                 manager.RegisterPacket<ModMessagePacket, NetPeer>((packet, peer) =>
                 {
-                    if (packet.ToAll)
+                    if (packet.Kind == "zmt.world?")
                     {
-                        manager.SendData(ref packet, DeliveryMethod.ReliableOrdered, peer);
+                        // A player who came into a raid already running: Fika tells such things only to
+                        // someone reconnecting. The same packets are sent to the newcomer.
+                        SendWorldTo(manager as FikaServer, peer);
+                        return;
                     }
+                    // A client's message "to all" has been passed on to the other clients by Fika's host
+                    // already (the sender marks it so); passing it on here as well would deliver it twice.
                     Net.Deliver(packet.Kind, packet.Body, packet.From);
                 });
                 manager.RegisterPacket<WorldItemPacket, NetPeer>((packet, peer) =>
                 {
-                    manager.SendData(ref packet, DeliveryMethod.ReliableOrdered, peer);
                     FikaLayer.Lay(packet);
                 });
             }
@@ -487,12 +603,27 @@ namespace ZeroMenuTime.Fika
         private static System.Reflection.PropertyInfo _flag;
         private static object _controller;
 
-        public static void Before(out bool __state)
+        public static void Before(object[] __args, out bool __state)
         {
             __state = false;
             if (Plugin.LateJoin == null || !Plugin.LateJoin.Value)
             {
                 return;
+            }
+            // Someone whose game died is let back in by Fika itself, under its own word; with the raid
+            // made to look not started, Fika would ask for the other word and refuse them.
+            try
+            {
+                object request = __args != null && __args.Length > 0 ? __args[0] : null;
+                object data = request != null ? HarmonyLib.AccessTools.Property(request.GetType(), "Data")?.GetValue(request) : null;
+                var peek = data != null ? HarmonyLib.AccessTools.Method(data.GetType(), "PeekString", Type.EmptyTypes) : null;
+                if (peek != null && peek.Invoke(data, null) as string == "fika.reconnect")
+                {
+                    return;
+                }
+            }
+            catch (Exception)
+            {
             }
             var game = Singleton<global::Fika.Core.Main.GameMode.IFikaGame>.Instance;
             if (game == null || game.GameController == null || !game.GameController.RaidStarted)

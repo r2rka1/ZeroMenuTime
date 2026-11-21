@@ -447,7 +447,7 @@ namespace ZeroMenuTime
             string text = "Join " + who + " on " + map + "?\n\n" + raid.Players + " player(s) there" + (raid.Headless ? ", on a headless host" : "")
                           + (raid.Mine ? ". You were in this raid before." : ".")
                           + "\n\nYou come in where they came into the map." + (index + 1 < raids.Count ? "\n\nNo: see the next raid." : "");
-            ItemUiContext.Instance.ShowMessageWindow(text, () =>
+            Prompt.Ask(text, () =>
             {
                 Guide.Close();
                 _ = Coop.Join(raid);

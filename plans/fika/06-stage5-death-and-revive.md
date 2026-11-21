@@ -157,3 +157,5 @@ on it.
 - A headless host; three or more players; a ghost choosing to leave the raid.
 - Fika's own "revive" option switched on at the same time. It must be off; the mod does not
   check it yet.
+
+**Test campaign, 2026-11-21.** Now run from the "not tested" list: the medical station's REVIVE button; the spectating view (picture looked at); bots and a ghost (none is after it); deaths by headshot, grenade, exhaustion, fall and dehydration; a headless host; a ghost leaving (closing the game) and coming back. Found and fixed: dying inside the hideout left the player counted as inside; a ghost whose game closed came back as a living player under the map (it is a ghost again, and a revive puts it at the reviver's entry point). Still open: Fika's own revive option is not checked. See `TESTING.md`.

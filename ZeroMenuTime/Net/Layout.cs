@@ -23,6 +23,9 @@ namespace ZeroMenuTime
         public List<HideoutSpot> Hideouts = new List<HideoutSpot>();
         /// <summary>Where the host's rooms and doors ended up, to compare against.</summary>
         public List<string> Built = new List<string>();
+
+        /// <summary>The map the host is on. A client's own idea of it can be an older one after a transit.</summary>
+        public string Map = "";
     }
 
     /// <summary>
@@ -35,6 +38,9 @@ namespace ZeroMenuTime
     {
         /// <summary>On a client: what the host sent. Null alone and on the host: one's own settings count.</summary>
         public static LayoutData Active;
+
+        /// <summary>The map this raid is on, as the raid-start build settled it (the host's word on a client).</summary>
+        public static string Map = "";
 
         private static GameWorld _waiting;
         private static float _askedAt;
@@ -52,6 +58,9 @@ namespace ZeroMenuTime
                 Rooms = TraderRoom.Enabled.Value, Depth = TraderRoom.Depth.Value, Shell = RoomProps.Use != null && RoomProps.Use.Value,
                 CustomSpots = Plugin.UseCustomSpots.Value, Hideouts = HideoutDoors.Load(), Built = Built(),
             };
+            var world = Comfort.Common.Singleton<GameWorld>.Instance;
+            var me = EFT.GamePlayerOwner.MyPlayer;
+            data.Map = (me != null ? me.Location : world != null ? world.LocationId : "") ?? "";
             try
             {
                 if (File.Exists(TraderConfig.DoorsPath))

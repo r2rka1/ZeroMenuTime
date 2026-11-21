@@ -171,6 +171,11 @@ public class ZeroMenuTimeRouter(
             ValueTask.FromResult(jsonUtil.Serialize(saves.GoWhereTheOwnerIs(sessionId, payload.TraderId)) ?? "{}")
     ),
     new RouteAction<MailRequest>(
+        "/zeromenutime/coop/follow",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(saves.FollowTheOwner(sessionId, payload.TraderId)) ?? "{}")
+    ),
+    new RouteAction<MailRequest>(
         "/zeromenutime/coop/savedgear",
         (_, _, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(saves.SavedGearOf(sessionId)) ?? "{}")

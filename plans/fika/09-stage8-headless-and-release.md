@@ -117,3 +117,5 @@ Each release: profile backup advice in the notes, since saves gain new files.
   the co-op features switched off on an unknown one (the add-on only logs the version).
 - The Forge listing and release notes: nothing is released.
 - A `zmt matrix` command.
+
+**Test campaign, 2026-11-21.** Done since: a scripted suite in the dev kit (`devkit/coop-suite.sh`, ten groups) in place of the planned `zmt matrix`; three processes at once (headless and two players); version mismatch (told on both sides, the odd client kept out of the rooms). Still not done: the six-hour soak, more than two players, the hideout floor on the headless, the Fika version and revive-option checks at start, the Forge listing. See `TESTING.md`.

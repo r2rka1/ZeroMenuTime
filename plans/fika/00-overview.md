@@ -154,8 +154,12 @@ That is a releasable first version ("co-op beta"). Stages 5 to 7 add the rules i
 
 All eight stages have code, on branches `fika/stage1` to `fika/stage8` (each built on the one
 before; `main` is the released 1.2.4). Each stage file ends with a "Result" section: what was
-built, what was seen working, what was not tested. `TESTING.md` lists what to try by hand.
-The largest untested piece is transits in co-op.
+built, what was seen working, what was not tested.
+
+**2026-11-21: test campaign.** Every rule of section 5 has now been run by script on the test
+set, transits included, on a player host and on a headless host with two players. Fifteen faults
+were found and fixed on the way. `TESTING.md` has the list of what passed, what was fixed, what
+is known and open, and what only people can judge; `devkit/coop-suite.sh` runs it all again.
 
 ## 8. The biggest risks
 

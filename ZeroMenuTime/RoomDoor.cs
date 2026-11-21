@@ -368,6 +368,11 @@ namespace ZeroMenuTime
             {
                 return;
             }
+            // Going down into a room (never the way out) is refused when this game's version differs from the host's.
+            if (Destination.y < transform.position.y - 50f && !Coop.Allowed(Coop.Feature.Rooms))
+            {
+                return;
+            }
             Plugin.Instance.StartCoroutine(Travel(Destination, DestinationYaw));
         }
 

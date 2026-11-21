@@ -134,3 +134,5 @@ On: trade, collect deliveries, quest hand-in, repair. Still off in a group: hide
 - When a teammate takes an item from another player's table, the owner's list of "what is on my
   table" can go on showing it for a while; the mail bookkeeping still marks it taken.
 - Items with nothing solid on them get a look-at box only on the machine that laid them.
+
+**Test campaign, 2026-11-21.** Now run: two players buying from one trader at the same moment; selling in co-op (the item is gone for the host, the payment is laid in the room on both machines); repair with a kit. See `TESTING.md`.

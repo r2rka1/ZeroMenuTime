@@ -197,7 +197,7 @@ namespace ZeroMenuTime
             var first = waking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? waking.Result : null;
             string wakeAt = first != null && ((bool?)first["Resume"] ?? false) ? (string)first["Hideout"] : null;
             KeyValuePair<Vector3, float> wakeFront;
-            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy && Coop.Allowed(Coop.Feature.Hideout, false))
+            if (wakeAt != null && Fronts.TryGetValue(wakeAt, out wakeFront) && Inside == null && !_busy && !(Net.Coop && Seamless.Joined) && Coop.Allowed(Coop.Feature.Hideout, false))
             {
                 RoomDoor.Fade = 1f;
                 RoomDoor.FadeText = "Waking up...";
@@ -254,7 +254,7 @@ namespace ZeroMenuTime
             var status = asking.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? asking.Result : null;
             string bed = status != null && ((bool?)status["Resume"] ?? false) ? (string)status["Hideout"] : null;
             KeyValuePair<Vector3, float> front;
-            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null && Coop.Allowed(Coop.Feature.Hideout, false))
+            if (bed != null && Fronts.TryGetValue(bed, out front) && Inside == null && !_busy && GamePlayerOwner.MyPlayer != null && !(Net.Coop && Seamless.Joined) && Coop.Allowed(Coop.Feature.Hideout, false))
             {
                 Plugin.Log.LogInfo("Waking up at the bed of hideout '" + bed + "'");
                 var consumed = SaveGame.Status(true);

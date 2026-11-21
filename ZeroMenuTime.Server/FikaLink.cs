@@ -233,6 +233,12 @@ public static class FikaLink
                 {
                     continue;
                 }
+                // A raid the asker hosted themself and whose game died is still on Fika's list for a
+                // while: nobody can join their own dead raid.
+                if (entry.Key?.ToString() == asking.ToString())
+                {
+                    continue;
+                }
                 var type = match.GetType();
                 var raid = new CoopRaid
                 {
@@ -246,7 +252,8 @@ public static class FikaLink
                 string instance = type.GetProperty("ServerGuid")?.GetValue(match)?.ToString() ?? "";
                 if (type.GetProperty("Players")?.GetValue(match) is IDictionary players)
                 {
-                    raid.Players = players.Count;
+                    // A headless host is on the list too; it is not a player.
+                    raid.Players = players.Count - (raid.Headless && players.Contains((MongoId)entry.Key) ? 1 : 0);
                     // Fika forgets a player who leaves; this mod remembers which raid each was last in.
                     // "Mine" is only for someone still on Fika's own list (their game died and the host
                     // holds the character). Someone who left properly comes back as a fresh arrival.

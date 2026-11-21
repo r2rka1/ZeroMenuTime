@@ -159,3 +159,5 @@ go to menu, trader save, death handling of this mod (Fika's stock death applies)
 
 - The stash is registered with the raid directly rather than as an object lying in the world.
 - Whatever a guest puts into the stash is the owner's when the raid ends. The docs must say so.
+
+**Test campaign, 2026-11-21.** Now run: owner builds and the guest sees it and cannot build; power noticed by the guest; a guest's craft known to the owner; sleep and wait asked, refused, unanswered and agreed. Found and fixed: a collected craft went into the stash on one machine only (it is now laid in front of the player); the game answered the in-raid question by itself (the mod draws its own, Y / N with a countdown). See `TESTING.md`.

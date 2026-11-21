@@ -31,12 +31,7 @@ namespace ZeroMenuTime
         /// </summary>
         public static void AskEndForAll(string exitName)
         {
-            var ui = ItemUiContext.Instance;
-            if (ui == null)
-            {
-                return;
-            }
-            ui.ShowMessageWindow("You host this raid. Leaving ends it for everyone in it.\n\nEach living player leaves with you and starts next time from here. "
+            Prompt.Ask("You host this raid. Leaving ends it for everyone in it.\n\nEach living player leaves with you and starts next time from here. "
                                  + "Anyone who is dead stays dead, and their own death setting applies.\n\nEnd the raid for everyone?",
                 () => EndForAll(exitName), () => { }, "SAVE AND GO TO MENU");
         }
@@ -140,7 +135,8 @@ namespace ZeroMenuTime
                 {
                     _lastCall = Time.unscaledTime;
                     var at = living[0].Position;
-                    string told = at.x.ToString("F2", CultureInfo.InvariantCulture) + " " + at.y.ToString("F2", CultureInfo.InvariantCulture) + " " + at.z.ToString("F2", CultureInfo.InvariantCulture);
+                    string told = at.x.ToString("F2", CultureInfo.InvariantCulture) + " " + at.y.ToString("F2", CultureInfo.InvariantCulture) + " " + at.z.ToString("F2", CultureInfo.InvariantCulture)
+                                  + " " + transit.parameters.id.ToString(CultureInfo.InvariantCulture);
                     var bytes = Encoding.UTF8.GetBytes(told);
                     Net.Current.Send("zmt.ghost.come", bytes, true);
                     Afterlife.OnCome(bytes, "");
@@ -148,6 +144,49 @@ namespace ZeroMenuTime
                     return;
                 }
             }
+        }
+
+        /// <summary>
+        /// A guest who went through a transit: for the next half minute the server is asked to make
+        /// this player's place the owner's. The owner's own game ends its raid last, so its place
+        /// changes a little later; without this the guest's game can load the next map believing it
+        /// is still on the last one, and finds no trader there.
+        /// </summary>
+        public static void OnRaidEnded(ExitStatus status, string exit)
+        {
+            _followDone = false;
+            if (status != ExitStatus.Transit || Net.Role != Role.Client || string.IsNullOrEmpty(Coop.Owner) || Coop.IsOwner || Plugin.Instance == null)
+            {
+                return;
+            }
+            string owner = Coop.Owner;
+            int run = ++_followRun;
+            // Not a coroutine: the game stands still for long stretches while it loads the next map,
+            // and that is exactly when this has to keep asking.
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                string body = Newtonsoft.Json.JsonConvert.SerializeObject(new { TraderId = owner });
+                for (int i = 0; i < 60 && run == _followRun && !_followDone; i++)
+                {
+                    try
+                    {
+                        await RequestHandler.PostJsonAsync("/zeromenutime/coop/follow", body);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    await System.Threading.Tasks.Task.Delay(1500);
+                }
+            });
+        }
+
+        private static int _followRun;
+        private static volatile bool _followDone;
+
+        /// <summary>The next raid has begun: the place no longer needs to follow anyone's.</summary>
+        public static void OnRaidStarted()
+        {
+            _followDone = true;
         }
 
         // ---- Arriving on the next map after dying on the last ----

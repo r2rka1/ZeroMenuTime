@@ -258,6 +258,26 @@ namespace ZeroMenuTime
                 }
                 yield break;
             }
+            if (verb == "prompt")
+            {
+                // prompt: the yes/no question on screen now. prompt yes | prompt no: answers it.
+                if (parts.Length > 1)
+                {
+                    Report(Prompt.Answer(parts[1] == "yes"));
+                }
+                else
+                {
+                    Report(Prompt.Text != null ? "asked: " + Prompt.Text.Replace("\n", " ") : "nothing is asked");
+                }
+                yield break;
+            }
+            if (verb == "menupress")
+            {
+                // menupress WORDS: clicks an entry of this mod's menu by its words (main menu, or the Esc menu in a raid).
+                string words = string.Join(" ", parts, 1, parts.Length - 1);
+                Report(MainMenu.Press(words) ? "pressed '" + words + "'" : "FAILED no menu entry '" + words + "'; entries: " + string.Join(" | ", MainMenu.Items().ToArray()));
+                yield break;
+            }
             if (verb == "fika")
             {
                 // fika: what Fika says this game is. fika host | fika join HOSTPROFILEID: from the menu, start a raid through Fika.
@@ -355,6 +375,256 @@ namespace ZeroMenuTime
                         Report("  " + human.Name + (human.IsLocal ? " (me)" : "") + " alive " + human.Alive + " at " + human.Position.ToString("F1"));
                     }
                     Report("humans listed");
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "transits")
+                {
+                    // fika transits: the map's transits: id, name, where to, where it is, whether it can be used.
+                    foreach (var transit in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.TransitPoint>())
+                    {
+                        var zone = transit.GetComponentInChildren<Collider>();
+                        Report("  " + transit.parameters.id + " '" + transit.parameters.name + "' to " + transit.parameters.location + " at " + transit.transform.position.ToString("F1")
+                               + (zone != null ? " zone " + zone.bounds.center.ToString("F1") + " size " + zone.bounds.size.ToString("F1") : " no zone")
+                               + " enabled " + transit.Enabled + " active " + transit.IsActive + " controller " + (transit.Controller != null ? transit.Controller.GetType().Name : "none"));
+                    }
+                    // What the transit controller itself believes: who stands in which transit, who has asked to go.
+                    object controller = null;
+                    foreach (var any in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.TransitPoint>())
+                    {
+                        controller = controller ?? any.Controller;
+                    }
+                    if (controller != null)
+                    {
+                        for (var type = controller.GetType(); type != null && type != typeof(object); type = type.BaseType)
+                        {
+                            foreach (var field in type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly))
+                            {
+                                var held = field.GetValue(controller) as System.Collections.IDictionary;
+                                if (held == null)
+                                {
+                                    continue;
+                                }
+                                var shown = new List<string>();
+                                foreach (System.Collections.DictionaryEntry entry in held)
+                                {
+                                    var who = entry.Key as Player;
+                                    shown.Add((who != null ? who.Profile.Nickname : entry.Key + "") + "=" + (entry.Value is Player ? ((Player)entry.Value).Profile.Nickname : entry.Value + ""));
+                                    if (shown.Count >= 6)
+                                    {
+                                        break;
+                                    }
+                                }
+                                Report("  controller " + type.Name + "." + field.Name + " (" + held.Count + "): " + string.Join(", ", shown.ToArray()));
+                            }
+                        }
+                    }
+                    Report("transits listed");
+                    yield break;
+                }
+                if (parts.Length > 2 && parts[1] == "transit")
+                {
+                    // fika transit ID [stand]: go and stand in that transit and ask to go through, as the game's own prompt does.
+                    EFT.Interactive.TransitPoint chosen = null;
+                    foreach (var transit in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.TransitPoint>())
+                    {
+                        if (transit.parameters.id.ToString() == parts[2])
+                        {
+                            chosen = transit;
+                        }
+                    }
+                    if (chosen == null)
+                    {
+                        Report("FAILED no transit with that id");
+                        yield break;
+                    }
+                    var zoneOf = chosen.GetComponentInChildren<Collider>();
+                    var centre = zoneOf != null ? zoneOf.bounds.center : chosen.transform.position;
+                    RaycastHit under;
+                    var stand = Physics.Raycast(centre + Vector3.up * 2f, Vector3.down, out under, 30f, LayerMask.GetMask("HighPolyCollider", "LowPolyCollider", "Terrain"), QueryTriggerInteraction.Ignore)
+                        ? under.point + Vector3.up * 0.1f : centre;
+                    player.Teleport(stand, false);
+                    yield return new WaitForSecondsRealtime(2.5f);
+                    if (parts.Length > 3 && parts[3] == "stand")
+                    {
+                        Report("standing in transit " + parts[2] + " at " + player.Transform.position.ToString("F1"));
+                        yield break;
+                    }
+                    if (chosen.Controller == null)
+                    {
+                        Report("FAILED the transit has no controller");
+                        yield break;
+                    }
+                    // The call the game's own "go through" prompt makes; in co-op it reaches the host from any machine.
+                    player.TransitInteraction(chosen.Controller, chosen.parameters.id, "", JsonType.EDateTime.CURR);
+                    Report("asked to go through transit " + parts[2] + " to " + chosen.parameters.location + " from " + player.Transform.position.ToString("F1"));
+                    yield break;
+                }
+                if (parts.Length > 3 && parts[1] == "hurt")
+                {
+                    // fika hurt PART AMOUNT [KIND]: real damage to the local player, as a hit would do it.
+                    EBodyPart part;
+                    Enum.TryParse(parts[2], true, out part);
+                    EDamageType kind = EDamageType.Bullet;
+                    if (parts.Length > 4)
+                    {
+                        Enum.TryParse(parts[4], true, out kind);
+                    }
+                    player.ActiveHealthController.ApplyDamage(part, Number(parts[3]), new EFT.Ballistics.DamageInfo { DamageType = kind, Damage = Number(parts[3]) });
+                    Report("hurt " + part + " by " + parts[3] + " (" + kind + "); alive " + player.HealthController.IsAlive + ", ghost " + Afterlife.Dead);
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "bots")
+                {
+                    // fika bots [R]: bots within R metres: shown or switched off, and whom each is after.
+                    float reach = parts.Length > 2 ? Number(parts[2]) : 80f;
+                    int n = 0, after = 0;
+                    var world = Comfort.Common.Singleton<GameWorld>.Instance;
+                    foreach (var other in world.AllPlayersEverExisted)
+                    {
+                        if (other == null || !other.IsAI || other.HealthController == null || !other.HealthController.IsAlive
+                            || Vector3.Distance(other.Transform.position, player.Transform.position) > reach)
+                        {
+                            continue;
+                        }
+                        n++;
+                        string goal = "nobody";
+                        var owner = other.AIData != null ? other.AIData.BotOwner : null;
+                        if (owner != null && owner.Memory != null && owner.Memory.GoalEnemy != null && owner.Memory.GoalEnemy.Person != null)
+                        {
+                            goal = owner.Memory.GoalEnemy.Person.Profile.Nickname + (Afterlife.Ghosts.Contains(owner.Memory.GoalEnemy.Person.ProfileId) ? " (A GHOST)" : "");
+                            after++;
+                        }
+                        if (n <= 12)
+                        {
+                            Report("  " + other.Profile.Nickname + " " + Vector3.Distance(other.Transform.position, player.Transform.position).ToString("F0") + " m, "
+                                   + (other.gameObject.activeInHierarchy ? "active" : "switched off") + ", after " + goal);
+                        }
+                    }
+                    Report(n + " bot(s) within " + reach + " m, " + after + " after someone");
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "killbot")
+                {
+                    // fika killbot: the nearest living bot dies where it stands (on the host), leaving a body.
+                    Player nearest = null;
+                    foreach (var other in Comfort.Common.Singleton<GameWorld>.Instance.AllAlivePlayersList)
+                    {
+                        if (other != null && other.IsAI && (nearest == null || Vector3.Distance(other.Transform.position, player.Transform.position) < Vector3.Distance(nearest.Transform.position, player.Transform.position)))
+                        {
+                            nearest = other;
+                        }
+                    }
+                    if (nearest == null)
+                    {
+                        Report("FAILED no bot alive");
+                        yield break;
+                    }
+                    var where = nearest.Transform.position;
+                    nearest.ActiveHealthController.Kill(EDamageType.Bullet);
+                    Report("killed " + nearest.Profile.Nickname + " at " + where.ToString("F1"));
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "bodies")
+                {
+                    int bodies = 0;
+                    foreach (var corpse in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.Corpse>())
+                    {
+                        bodies++;
+                        if (bodies <= 6)
+                        {
+                            Report("  body at " + corpse.transform.position.ToString("F1") + " " + corpse.GetType().Name);
+                        }
+                    }
+                    Report(bodies + " body/bodies in the raid");
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "door")
+                {
+                    // fika door [open|list]: the nearest door of the map (not one of this mod's): its state; "open" uses it as the game's menu would.
+                    EFT.Interactive.Door near = null;
+                    foreach (var door in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.Door>())
+                    {
+                        if (door.Operatable && door.DoorState != EFT.Interactive.EDoorState.Locked
+                            && (near == null || Vector3.Distance(door.transform.position, player.Transform.position) < Vector3.Distance(near.transform.position, player.Transform.position)))
+                        {
+                            near = door;
+                        }
+                    }
+                    if (near == null)
+                    {
+                        Report("FAILED no usable door");
+                        yield break;
+                    }
+                    if (parts.Length > 2 && parts[2] == "open")
+                    {
+                        player.Teleport(near.transform.position + near.transform.forward * 0.9f, false);
+                        yield return new WaitForSecondsRealtime(1.5f);
+                        var offeredDoor = InteractionContextHelper.GetAvailableActions(player.GetComponent<GamePlayerOwner>(), near);
+                        if (offeredDoor == null || offeredDoor.Actions.Count == 0)
+                        {
+                            Report("FAILED the game offers nothing for door " + near.Id);
+                            yield break;
+                        }
+                        Report("doing '" + offeredDoor.Actions[0].Name + "' on door " + near.Id);
+                        offeredDoor.Actions[0].Action();
+                        yield return new WaitForSecondsRealtime(3f);
+                    }
+                    Report("door " + near.Id + " at " + near.transform.position.ToString("F1") + " is " + near.DoorState);
+                    yield break;
+                }
+                if (parts.Length > 2 && parts[1] == "doorstate")
+                {
+                    foreach (var door in UnityEngine.Object.FindObjectsOfType<EFT.Interactive.Door>())
+                    {
+                        // Some door ids hold a space.
+                        if (door.Id == string.Join(" ", parts.Skip(2)))
+                        {
+                            Report("door " + door.Id + " is " + door.DoorState);
+                            yield break;
+                        }
+                    }
+                    Report("FAILED no such door");
+                    yield break;
+                }
+                if (parts.Length > 2 && parts[1] == "shot")
+                {
+                    // fika shot NAME: a picture of this game's own screen, in a raid.
+                    yield return new WaitForEndOfFrame();
+                    Screenshot(parts[2]);
+                    yield break;
+                }
+                if (parts.Length > 3 && parts[1] == "set" && parts[2] == "death")
+                {
+                    Death.OnDeath.Value = parts[3] == "everything" ? Death.Loss.LoseEverything : parts[3] == "gear" ? Death.Loss.LoseCarriedGear : Death.Loss.KeepItems;
+                    Report("when you die: " + Death.OnDeath.Value);
+                    yield break;
+                }
+                if (parts.Length > 1 && parts[1] == "secure")
+                {
+                    var secure = player.Profile.Inventory.Equipment.GetSlot(EFT.InventoryLogic.EquipmentSlot.SecuredContainer).ContainedItem as EFT.InventoryLogic.CompoundItem;
+                    int inside = 0;
+                    foreach (var grid in secure != null ? secure.Grids : new EFT.InventoryLogic.Grid[0])
+                    {
+                        inside += System.Linq.Enumerable.Count(grid.Items);
+                    }
+                    Report("secure container holds " + inside + " thing(s)");
+                    yield break;
+                }
+                if (parts.Length > 3 && parts[1] == "wear")
+                {
+                    // fika wear WORD POINTS: wears down the carried thing whose name holds WORD, so there is something to repair.
+                    foreach (var carried in LocalTrade.CarriedItems(player))
+                    {
+                        var repairable = carried.GetItemComponent<EFT.InventoryLogic.RepairableComponent>();
+                        if (repairable != null && carried.ShortName.Localized().IndexOf(parts[2], StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            repairable.Durability = Mathf.Max(1f, repairable.Durability - Number(parts[3]));
+                            carried.RaiseRefreshEvent();
+                            Report("worn: " + carried.ShortName.Localized() + " now " + repairable.Durability.ToString("F1") + "/" + repairable.MaxDurability.ToString("F1"));
+                            yield break;
+                        }
+                    }
+                    Report("FAILED nothing repairable named like that");
                     yield break;
                 }
                 if (parts.Length > 2 && parts[1] == "endforall")

@@ -116,9 +116,12 @@ namespace ZeroMenuTime
             Net.On("zmt.layout?", Layout.OnAsked);
             Net.On("zmt.layout", Layout.OnTold);
             Net.RaidEnded += (status, exit) => Layout.Reset();
+            Net.RaidEnded += Regroup.OnRaidEnded;
+            Net.RaidStarted += Regroup.OnRaidStarted;
             Net.RaidStarted += Layout.TellBuilt;
             Net.On("zmt.endraid", Regroup.OnEndRaid);
             Net.On("zmt.ghost.come", Afterlife.OnCome);
+            Net.On("zmt.ghost.there", Afterlife.OnGhostThere);
             Net.On("zmt.left", Net.OnLeft);
             Net.On("zmt.ghost", Afterlife.OnGhost);
             Net.On("zmt.ghosts?", Afterlife.OnAskedGhosts);
@@ -138,7 +141,8 @@ namespace ZeroMenuTime
             Net.On("zmt.stash.any?", HideoutStash.OnAskedIfAny);
             Net.On("zmt.stash", HideoutStash.OnTold);
             Net.RaidEnded += (status, exit) => HideoutStash.Forget();
-            Net.RaidStarted += () => { if (Net.Role == Role.Client) { Net.Current.Send("zmt.stash.any?", new byte[0], false); } };
+            Net.RaidStarted += () => { if (Net.Role == Role.Client) { Net.Current.Send("zmt.stash.any?", new byte[0], false); Net.Current.Send("zmt.world?", new byte[0], false); } };
+            Net.On("zmt.world?", (body, from) => { });
             Net.On("zmt.inv", InventorySync.OnTold);
             Net.On("zmt.where", Presence.OnWhere);
             Net.RaidStarted += Presence.Reset;
@@ -274,6 +278,7 @@ namespace ZeroMenuTime
                 return;
             }
             Afterlife.Draw();
+            Prompt.Draw();
             if (RoomDoor.Fade <= 0f)
             {
                 return;
@@ -325,6 +330,7 @@ namespace ZeroMenuTime
             HideoutPower.Tick();
             Presence.Tick();
             Rest.Tick();
+            Prompt.Tick();
             Afterlife.Tick();
             Regroup.Tick();
             BotFreeze.Tick();
@@ -523,6 +529,14 @@ namespace ZeroMenuTime
                 }
 
                 string map = (player != null ? player.Location : __instance.LocationId) ?? "";
+                // A co-op client's own idea of the map can be an older one (after a transit, or when its
+                // own travel state differs from the host's); the host says which map this is.
+                if (Layout.Active != null && !string.IsNullOrEmpty(Layout.Active.Map) && !string.Equals(map, Layout.Active.Map, StringComparison.OrdinalIgnoreCase))
+                {
+                    Plugin.Log.LogWarning("Raid start: this game says '" + map + "', the host says '" + Layout.Active.Map + "'; going by the host");
+                    map = Layout.Active.Map;
+                }
+                Layout.Map = map;
                 int count = 0;
 
                 // Traders stand at Vagabond's trader extracts when Vagabond is installed.

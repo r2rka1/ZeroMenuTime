@@ -194,6 +194,9 @@ namespace ZeroMenuTime
         /// <summary>In co-op: the profile id of the host whose raid the next start joins. Null: host one's own.</summary>
         public static string JoinHost;
 
+        /// <summary>This raid was joined as a guest: the player comes in beside the group, never at a bed.</summary>
+        public static bool Joined;
+
         /// <summary>The co-op layer's part first (create or join the match), then the game's own start.</summary>
         private static async void Launch(RaidSettings settings, Func<Task> start)
         {
@@ -201,6 +204,8 @@ namespace ZeroMenuTime
             {
                 string join = JoinHost;
                 JoinHost = null;
+                // Joining someone's raid in progress (not asking a headless for one's own).
+                Joined = join != null && join != "headless";
                 if (!await Net.Current.PrepareRaid(settings, join))
                 {
                     Plugin.Log.LogWarning("The raid was not started: the co-op match could not be " + (join == null ? "created" : "joined"));
@@ -344,7 +349,7 @@ namespace ZeroMenuTime
             HideoutDoors.Close();
             try
             {
-                Seamless.LastLocationId = GamePlayerOwner.MyPlayer?.Location ?? Seamless.LastLocationId;
+                Seamless.LastLocationId = (Layout.Map != "" ? Layout.Map : GamePlayerOwner.MyPlayer?.Location) ?? Seamless.LastLocationId;
                 // A transit already goes raid-to-raid by itself.
                 bool toMenu = Seamless.SaveAndMenuRequested;
                 Seamless.SaveAndMenuRequested = false;

@@ -162,3 +162,5 @@ The three modes, applied in the raid at the moment of respawn after a transit or
   originals were left behind.
 - A living player who is made to leave by the host's "end for everyone" keeps their last save
   as it was; only where they start next time changes.
+
+**Test campaign, 2026-11-21.** Transits were run for the first time: two players together (player host and headless host); with a dead teammate, who arrives alive; each death setting on arrival, keep-items through a real transit included; two transits in a row. Found and fixed: a client's transit request never reached the host; Fika waited for a key press after the transit; the ghost has to ask too and is told when it has been brought to the transit. See `TESTING.md`.
