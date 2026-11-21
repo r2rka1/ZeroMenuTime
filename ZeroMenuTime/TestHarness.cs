@@ -2768,6 +2768,28 @@ namespace ZeroMenuTime
                     Report((fell < 1.5f ? "PASS" : "FAILED") + " dropped item fell " + fell.ToString("F2") + " m and is at " + dropped.transform.position.ToString("F2"));
                     break;
                 }
+                case "throw":
+                {
+                    // throw WORD: drops a worn or carried thing whose name holds WORD, as the player's own
+                    // Discard does, and says where it is a few seconds later (or that it is gone).
+                    string wanted = parts.Length > 1 ? parts[1].Replace('_', ' ') : "";
+                    var mine = LocalTrade.CarriedItems(player).Concat(player.Profile.Inventory.Equipment.GetAllSlots().Select(sl => sl.ContainedItem).Where(i => i != null))
+                        .FirstOrDefault(i => i.ShortName.Localized().IndexOf(wanted, StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (mine == null)
+                    {
+                        Report("FAILED nothing worn or carried matches '" + wanted + "'");
+                        break;
+                    }
+                    string thrownId = mine.Id;
+                    int inside = mine.GetAllItems().Count() - 1;
+                    bool thrown = false;
+                    player.InventoryController.ThrowItem(mine, false, result => { thrown = true; });
+                    yield return new WaitForSecondsRealtime(4f);
+                    var lying = UnityEngine.Object.FindObjectsOfType<EFT.Interactive.LootItem>().FirstOrDefault(l => l.Item != null && l.Item.Id == thrownId);
+                    Report((lying != null ? "PASS " : "FAILED GONE: ") + mine.ShortName.Localized() + " with " + inside + " thing(s) inside, thrown " + thrown
+                           + (lying != null ? ", lies at " + lying.transform.position.ToString("F2") + ", player at " + player.Transform.position.ToString("F2") : ", no loot object holds it"));
+                    break;
+                }
                 case "broadphase":
                 {
                     // Rebuilds the physics engine's collision regions around the given box.
