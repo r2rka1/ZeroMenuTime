@@ -53,10 +53,6 @@ On a headless host the settings are the headless host's own: set them in its `Be
 Each is a door the map already has. None can be opened, none has anything behind it that a player can get to, and none is at a
 way out of the map or a transit. They were found by a survey of each map's scenery and then looked at one by one in the game.
 
-Reserve has no doors in this version: the game closed by itself there with a trader's room on the map, and until that is
-understood no trader can be put there from the settings.
-
-
 ### Customs
 
 | Door | Where | Position | |
@@ -131,6 +127,19 @@ understood no trader can be put there from the settings.
 | `lighthouse-10` | Grey door in white siding, Treatment Containers area, 195 m from Armored Train | -52.72, 1.65, -689.86 | ![](doors/list/lighthouse-10.jpg) |
 | `lighthouse-11` | Door beside a high-voltage box, Roof Beach area, 240 m from Armored Train | 32.46, 4.91, -636.15 | ![](doors/list/lighthouse-11.jpg) |
 | `lighthouse-13` | Rusty shed door under the stairs, Treatment Beach area, 320 m from Armored Train | 47.95, 4.79, -558.53 | ![](doors/list/lighthouse-13.jpg) |
+
+### Reserve
+
+No trader starts on Reserve.
+
+| Door | Where | Position | |
+|---|---|---|---|
+| `reserve-01` | Plain door indoors, 140 m from Scav Lands (Co-Op) | -166.49, -9.38, -6.86 | ![](doors/list/reserve-01.jpg) |
+| `reserve-04` | Grey door in a green wall, Barrack area, 150 m from Sewer Manhole | -99.45, -14.54, 16.95 | ![](doors/list/reserve-04.jpg) |
+| `reserve-06` | Door in a two-tone wall, Barrack area, 125 m from Scav Lands (Co-Op) | -78.32, -3.78, -29.64 | ![](doors/list/reserve-06.jpg) |
+| `reserve-08` | Blast door of a concrete dome, 40 m from Cliff Descent | -8.1, 29.61, 170.97 | ![](doors/list/reserve-08.jpg) |
+| `reserve-12` | Door of a guard post, by sandbags, 35 m from Sewer Manhole | 61.37, -6.3, 104.11 | ![](doors/list/reserve-12.jpg) |
+| `reserve-15` | Pale door indoors, 95 m from Armored Train | 171.29, -6.85, -239.73 | ![](doors/list/reserve-15.jpg) |
 
 ### Shoreline
 

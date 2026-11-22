@@ -214,7 +214,7 @@ Every door is one of the map's own doors. With **[Dynamic Maps](https://sp-mod.c
 **Every trader's door is a setting.** Press **F12**, open **r2rka1-ZeroMenuTime**, find **Trader - NAME**:
 
 - **Map**: the map the trader is on.
-- **Door**: go through that map's doors with the arrows. There are 6 to 12 per map, 78 in all: doors the maps already have, that cannot be opened, with nothing behind them and no way out of the map at them. Each was looked at in the game.
+- **Door**: go through that map's doors with the arrows. There are 6 to 12 per map, 84 in all on nine maps (Reserve included): doors the maps already have, that cannot be opened, with nothing behind them and no way out of the map at them. Each was looked at in the game.
 - The change applies from the next raid.
 
 On the map where Vagabond has the trader, its extract for them stays, so **Save and go to menu** works as before. On another map the trader has a door and a room; **Save** works there, **Save and go to menu** does not.

@@ -809,7 +809,7 @@ namespace ZeroMenuTime
                 yield return Seamless.AfterMenuShown();
                 yield break;
             }
-            if (player == null && verb != "wait" && verb != "post" && verb != "settings" && verb != "menukey" && verb != "place" && verb != "screenshot")
+            if (player == null && verb != "wait" && verb != "post" && verb != "settings" && verb != "menukey" && verb != "physicsold" && verb != "place" && verb != "screenshot")
             {
                 Report("not in a raid");
                 yield break;
@@ -2168,6 +2168,12 @@ namespace ZeroMenuTime
                     Report("settings window " + (open ? "open" : "closed"));
                     break;
                 }
+                case "physicsold":
+                    // physicsold on|off: the physics box is redrawn after the raid has begun, as before 2.1.0, to compare.
+                    LevelPhysicsPatch.OldWay = parts.Length > 1 && parts[1] == "on";
+                    LevelPhysicsPatch.TestCells = parts.Length > 2 ? int.Parse(parts[2]) : 0;
+                    Report("physics box the old way: " + LevelPhysicsPatch.OldWay + ", cells for a test: " + LevelPhysicsPatch.TestCells);
+                    break;
                 case "menukey":
                 {
                     // menukey: gives the main menu the inventory key, as the keyboard would, and says what came of it.

@@ -30,11 +30,9 @@ namespace ZeroMenuTime
     public static class DoorList
     {
         /// <summary>
-        /// The maps, by the short names used in the settings. Reserve is not among them: with a
-        /// trader's room on that map the game closed by itself in testing, and until that is
-        /// understood no trader is put there from the settings.
+        /// The maps, by the short names used in the settings.
         /// </summary>
-        public static readonly string[] Maps = { "Customs", "Factory", "Ground Zero", "Interchange", "Lighthouse", "Shoreline", "Streets", "Woods" };
+        public static readonly string[] Maps = { "Customs", "Factory", "Ground Zero", "Interchange", "Lighthouse", "Reserve", "Shoreline", "Streets", "Woods" };
 
         /// <summary>The short name of the map the game calls this; empty if it is none of them.</summary>
         public static string MapOf(string location)
@@ -129,6 +127,12 @@ namespace ZeroMenuTime
             D("groundzero-11", "Ground Zero", "Door in a wall of wooden slats, 90 m from Emercom Checkpoint", 124.65f, 22.77f, -10.85f, 180.0f),
             D("groundzero-12", "Ground Zero", "Staff door, 170 m from Nakatani Basement Stairs", 139.17f, 23.39f, 265.92f, 0.0f),
             D("groundzero-14", "Ground Zero", "Plain door, 65 m from Mira Ave (Flare)", 165.9f, 16.93f, -2.27f, 0.0f),
+            D("reserve-01", "Reserve", "Plain door indoors, 140 m from Scav Lands (Co-Op)", -166.49f, -9.38f, -6.86f, 15.0f),
+            D("reserve-04", "Reserve", "Grey door in a green wall, Barrack area, 150 m from Sewer Manhole", -99.45f, -14.54f, 16.95f, 285.0f),
+            D("reserve-06", "Reserve", "Door in a two-tone wall, Barrack area, 125 m from Scav Lands (Co-Op)", -78.32f, -3.78f, -29.64f, 15.0f),
+            D("reserve-08", "Reserve", "Blast door of a concrete dome, 40 m from Cliff Descent", -8.1f, 29.61f, 170.97f, 180.0f),
+            D("reserve-12", "Reserve", "Door of a guard post, by sandbags, 35 m from Sewer Manhole", 61.37f, -6.3f, 104.11f, 285.0f),
+            D("reserve-15", "Reserve", "Pale door indoors, 95 m from Armored Train", 171.29f, -6.85f, -239.73f, 285.0f),
             D("shoreline-01", "Shoreline", "Bunker hatch D2, 155 m from Road to North V-Ex", -389.05f, -2.86f, -386.63f, 336.0f),
             D("shoreline-02", "Shoreline", "Grey door on a porch, 320 m from Climber's Trail", -361.55f, -3.74f, -80.01f, 180.0f),
             D("shoreline-06", "Shoreline", "Rusty door of a white brick hut, Power Station area, 365 m from Pier Boat", -248.58f, -41.01f, 205.29f, 178.0f),
