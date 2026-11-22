@@ -232,8 +232,19 @@ namespace ZeroMenuTime
                     Plugin.Log.LogInfo("Physics box: the map's own, as enlarged at loading, takes in the rooms; nothing redrawn");
                     return;
                 }
+                // Never drawn again once the raid has begun: on Reserve that closed the game, at the next
+                // step through a room's door. A thing dropped in a room outside the box may fall through the floor.
                 Plugin.Log.LogWarning("Physics box: the map's own " + level.center.ToString("F0") + " size " + level.size.ToString("F0")
-                                      + " does not take in " + needed.center.ToString("F0") + " size " + needed.size.ToString("F0") + "; redrawing");
+                                      + " does not take in " + needed.center.ToString("F0") + " size " + needed.size.ToString("F0") + "; left as it is");
+                return;
+            }
+            // Only a map that drew no box of its own as it loaded comes this far. Reserve is known to
+            // draw one, and to close the game when it is drawn after the raid has begun: never there.
+            string location = Comfort.Common.Singleton<EFT.GameWorld>.Instantiated ? Comfort.Common.Singleton<EFT.GameWorld>.Instance.LocationId ?? "" : "";
+            if (location.Equals("RezervBase", StringComparison.OrdinalIgnoreCase) && !LevelPhysicsPatch.OldWay)
+            {
+                Plugin.Log.LogWarning("Physics box: not enlarged as Reserve loaded, and not drawn now; things dropped in the rooms may fall through the floor");
+                return;
             }
             try
             {
@@ -586,6 +597,10 @@ namespace ZeroMenuTime
     {
         /// <summary>The box as the game drew it for the map that is loaded.</summary>
         public static Bounds? Box;
+        /// <summary>For the test harness: leave the map's box alone at loading, as versions before 2.1.0 did.</summary>
+        public static bool OldWay;
+        /// <summary>For the test harness: this many cells a side in place of the map's own number; 0 leaves it.</summary>
+        public static int TestCells;
 
         protected override MethodBase GetTargetMethod()
         {
@@ -598,6 +613,11 @@ namespace ZeroMenuTime
             try
             {
                 Box = null;
+                if (OldWay)
+                {
+                    Plugin.Log.LogWarning("Physics box left as the game drew it at loading (the old way, for a test)");
+                    return;
+                }
                 if (TraderRoom.RedrawPhysics != null && !TraderRoom.RedrawPhysics.Value)
                 {
                     return;
@@ -612,10 +632,11 @@ namespace ZeroMenuTime
                 var now = was;
                 now.SetMinMax(was.min - new Vector3(450f, depth + 450f, 450f), was.max + new Vector3(450f, 0f, 450f));
                 now.Encapsulate(new Bounds(new Vector3(0f, -depth - 100f, 0f), new Vector3(500f, 700f, 500f)));
-                Physics.RebuildBroadphaseRegions(now, __instance._mbpSubdivisions);
+                int cells = TestCells > 0 ? TestCells : __instance._mbpSubdivisions;
+                Physics.RebuildBroadphaseRegions(now, cells);
                 Box = now;
                 Plugin.Log.LogInfo("Physics box of the map enlarged at loading: from centre " + was.center.ToString("F0") + ", size " + was.size.ToString("F0")
-                                   + " to centre " + now.center.ToString("F0") + ", size " + now.size.ToString("F0") + ", cells " + __instance._mbpSubdivisions);
+                                   + " to centre " + now.center.ToString("F0") + ", size " + now.size.ToString("F0") + ", cells " + cells);
             }
             catch (Exception e)
             {
