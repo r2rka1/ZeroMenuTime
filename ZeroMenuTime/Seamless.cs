@@ -32,6 +32,28 @@ namespace ZeroMenuTime
         public static ConfigEntry<bool> Enabled;
         public static ConfigEntry<float> Delay;
         public static ConfigEntry<KeyCode> StayKey;
+        public static ConfigEntry<bool> SaveAfterTravel;
+
+        /// <summary>The raid that just ended was left by a transit: the next one begins on another map.</summary>
+        public static bool CameByTransit;
+
+        /// <summary>Once the player has arrived on the new map: saves there, so a death goes back no further than this map.</summary>
+        public static System.Collections.IEnumerator SaveOnArrival(EFT.GameWorld world)
+        {
+            yield return new WaitForSeconds(10f);
+            var me = EFT.GamePlayerOwner.MyPlayer;
+            if (me == null || !ReferenceEquals(world, Comfort.Common.Singleton<EFT.GameWorld>.Instance) || Afterlife.Dead)
+            {
+                yield break;
+            }
+            string exit = VagabondLink.NearestWayIn(world, me.Transform.position);
+            if (string.IsNullOrEmpty(exit))
+            {
+                Plugin.Log.LogInfo("No save on arrival: Vagabond has no way in on this map to continue at");
+                yield break;
+            }
+            _ = SaveGame.SaveNow("after travelling", exit);
+        }
 
         /// <summary>A raid just ended, or the hideout was just left: act when the menu next appears.</summary>
         public static bool Armed;
@@ -58,6 +80,8 @@ namespace ZeroMenuTime
                 "How long the menu stays up before the next raid or the hideout loads.");
             StayKey = config.Bind("No menus", "Stay in menu key", KeyCode.Backspace,
                 "Hold this while the countdown runs to stay in the main menu instead.");
+            SaveAfterTravel = config.Bind("Saving", "Save after travelling to another map", false,
+                "On: the game is saved each time you arrive on another map, at the way in you came by. A death then sets you back to the start of that map, not to your last bed or trader. Alone, or as the host.");
         }
 
         public class VagabondState
@@ -108,8 +132,9 @@ namespace ZeroMenuTime
             }
             var state = stateTask.Status == TaskStatus.RanToCompletion ? stateTask.Result : null;
             Plugin.Log.LogInfo("Continue: map=" + (state?.CurrentMap ?? "?"));
-            string map = !string.IsNullOrEmpty(state?.CurrentMap) ? state.CurrentMap : LastLocationId;
-            if (string.IsNullOrEmpty(map))
+            // "Nil" is Vagabond's word for no map at all.
+            string map = !string.IsNullOrEmpty(state?.CurrentMap) && state.CurrentMap != "Nil" ? state.CurrentMap : LastLocationId;
+            if (string.IsNullOrEmpty(map) || map == "Nil")
             {
                 // Vagabond has the character on no map. Nothing could start; put them back at their
                 // last save (or the Customs hideout) and go on from there.
@@ -119,6 +144,10 @@ namespace ZeroMenuTime
                     yield return null;
                 }
                 map = recovering.Status == TaskStatus.RanToCompletion ? recovering.Result : null;
+                if (map == "Nil")
+                {
+                    map = null;
+                }
                 if (!string.IsNullOrEmpty(map))
                 {
                     // Vagabond's own word for that map, as it gives it on every other Continue.
@@ -128,7 +157,7 @@ namespace ZeroMenuTime
                         yield return null;
                     }
                     var placed = again.Status == TaskStatus.RanToCompletion ? again.Result : null;
-                    if (!string.IsNullOrEmpty(placed?.CurrentMap))
+                    if (!string.IsNullOrEmpty(placed?.CurrentMap) && placed.CurrentMap != "Nil")
                     {
                         map = placed.CurrentMap;
                     }
@@ -406,6 +435,7 @@ namespace ZeroMenuTime
                 bool toMenu = Seamless.SaveAndMenuRequested;
                 Seamless.SaveAndMenuRequested = false;
                 Seamless.SkipResults = Seamless.Enabled.Value && exitStatus != ExitStatus.Transit;
+                Seamless.CameByTransit = exitStatus == ExitStatus.Transit;
                 // Dying (or going missing, or abandoning the raid) ends the run: stay in the menu.
                 bool died = exitStatus == ExitStatus.Killed || exitStatus == ExitStatus.MissingInAction || exitStatus == ExitStatus.Left;
                 Seamless.Died = died;
@@ -473,6 +503,7 @@ namespace ZeroMenuTime
         public static void Postfix()
         {
             QuestSync.Send("menu");
+            TraderPlaces.FindCustom(true);
             if (Death.Pending && Plugin.Instance != null)
             {
                 Plugin.Instance.StartCoroutine(Death.AskNow());

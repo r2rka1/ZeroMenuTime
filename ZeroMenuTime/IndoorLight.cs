@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using EFT;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -74,6 +75,7 @@ namespace ZeroMenuTime
                     _reflection = RenderSettings.reflectionIntensity;
                     Camera.onPreCull += Hold;
                     PushAmbient();
+                    Snow(false);
                 }
                 else if (_pushed != Indoors())
                 {
@@ -194,6 +196,75 @@ namespace ZeroMenuTime
             return "sky lights back on " + lit + ", level settings of " + applied;
         }
 
+        private static readonly List<SnowWetRenderer> SnowOff = new List<SnowWetRenderer>();
+        private static bool _winter;
+
+        /// <summary>
+        /// In winter the game lays snow over every surface that faces up, as an effect of the camera,
+        /// and so over the floors of the rooms and the hideout too. Indoors that effect is switched
+        /// off, and on again on the way out.
+        /// </summary>
+        private static void Snow(bool on)
+        {
+            try
+            {
+                if (on)
+                {
+                    foreach (var snow in SnowOff)
+                    {
+                        if (snow != null)
+                        {
+                            snow.enabled = true;
+                        }
+                    }
+                    SnowOff.Clear();
+                    if (_winter)
+                    {
+                        Shader.EnableKeyword("WINTER_SNOW");
+                        _winter = false;
+                    }
+                    return;
+                }
+                foreach (var snow in UnityEngine.Object.FindObjectsOfType<SnowWetRenderer>())
+                {
+                    if (snow.enabled)
+                    {
+                        snow.enabled = false;
+                        SnowOff.Add(snow);
+                        // Switched off, it no longer renews its pass over the picture, but the pass
+                        // already hung on the camera stays: that is taken off too. Switched on
+                        // again, it makes itself a new one.
+                        var passes = HarmonyLib.AccessTools.Field(typeof(SnowWetRenderer), "_cbSnowManager")?.GetValue(snow) as CommandBufferManager;
+                        if (passes != null)
+                        {
+                            foreach (var pass in new List<KeyValuePair<Camera, UnityEngine.Rendering.CommandBuffer>>(passes.Cameras))
+                            {
+                                if (pass.Key != null && pass.Value != null)
+                                {
+                                    pass.Key.RemoveCommandBuffer(passes.CameraEvent, pass.Value);
+                                }
+                            }
+                            HarmonyLib.AccessTools.Method(typeof(CommandBufferManager), "DestroyBuffers")?.Invoke(passes, null);
+                        }
+                    }
+                }
+                // The surfaces themselves draw snow while this is on, whatever the effect above does.
+                _winter = Shader.IsKeywordEnabled("WINTER_SNOW");
+                if (_winter)
+                {
+                    Shader.DisableKeyword("WINTER_SNOW");
+                }
+                if (SnowOff.Count > 0 || _winter)
+                {
+                    Plugin.Log.LogInfo("Indoors: the snow on surfaces is switched off (effects " + SnowOff.Count + ", winter surfaces " + _winter + ")");
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning("Switching the snow failed: " + e.Message);
+            }
+        }
+
         public static void Restore()
         {
             if (!_dark)
@@ -213,6 +284,7 @@ namespace ZeroMenuTime
                 RenderSettings.reflectionIntensity = _reflection;
                 HideoutBunker.Sun(true);
                 PushAmbient();
+                Snow(true);
             }
             catch (Exception e)
             {

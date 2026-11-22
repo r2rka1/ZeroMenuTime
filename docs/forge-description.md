@@ -209,6 +209,27 @@ Every door is one of the map's own doors. With **[Dynamic Maps](https://sp-mod.c
 
 ![Fence, Lighthouse](https://raw.githubusercontent.com/r2rka1/ZeroMenuTime/main/docs/doors/12-fence-lighthouse.jpg)
 
+### Moving traders, custom traders
+
+**Every trader's door is a setting.** Press **F12**, open **r2rka1-ZeroMenuTime**, find **Trader - NAME**:
+
+- **Map**: the map the trader is on.
+- **Door**: go through that map's doors with the arrows. There are 6 to 12 per map, 78 in all: doors the maps already have, that cannot be opened, with nothing behind them and no way out of the map at them. Each was looked at in the game.
+- The change applies from the next raid.
+
+On the map where Vagabond has the trader, its extract for them stays, so **Save and go to menu** works as before. On another map the trader has a door and a room; **Save** works there, **Save and go to menu** does not.
+
+**Traders of other mods** are found by themselves and listed as **Custom trader - NAME**. They are on no map until you place them, and the game says so at the menu:
+
+1. Set **Map**, then pick a **Door**.
+2. Choose the **Room**: plain, or furnished like the room of one of the game's traders.
+3. Choose the **Figure** that stands in it.
+4. Start the next raid on that map. The door shows on the map with Dynamic Maps.
+
+Already gave a trader an extract in Vagabond's `trader_locations.json`? They are placed there by themselves, door by the extract.
+
+With friends, the host's settings count for everyone. The full list of doors, with a picture of each: [docs/trader-places.md](https://github.com/r2rka1/ZeroMenuTime/blob/main/docs/trader-places.md).
+
 ### Install
 
 1. Install SPT 4.1.6 and Vagabond first, and start the game once with Vagabond.

@@ -384,6 +384,100 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
         return Vagabond.Common.Api.Api.GetState(sessionId)?.CurrentMap;
     }
 
+    /// <summary>
+    /// A name of a map, as against nothing at all or "Nil": Vagabond's word for no map, which is what
+    /// it holds for the whole of a raid the character came into by a transit. A save made in such a
+    /// raid used to be written with "Nil" for its map, and nothing could be continued from it.
+    /// </summary>
+    private static bool IsMap(string? map)
+    {
+        return !string.IsNullOrEmpty(map) && !string.Equals(map, "Nil", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Vagabond's name for the map the game calls this (or the name itself, if it is one already).</summary>
+    private static string MapOfLocation(string? location)
+    {
+        switch ((location ?? "").ToLowerInvariant())
+        {
+            case "bigmap": case "customs": return "Customs";
+            case "factory4_day": case "factoryday": return "FactoryDay";
+            case "factory4_night": case "factorynight": return "FactoryNight";
+            case "sandbox": case "sandbox_high": case "groundzero": return "GroundZero";
+            case "tarkovstreets": case "streets": return "Streets";
+            case "woods": return "Woods";
+            case "interchange": return "Interchange";
+            case "lighthouse": return "Lighthouse";
+            case "rezervbase": case "reserve": return "Reserve";
+            case "shoreline": return "Shoreline";
+            case "laboratory": case "labs": return "Labs";
+            default: return "";
+        }
+    }
+
+    /// <summary>The map an exit of Vagabond's is on, looked up in Vagabond's own files; empty if it is in none.</summary>
+    private static string MapOfExit(string? exit)
+    {
+        if (string.IsNullOrEmpty(exit))
+        {
+            return "";
+        }
+        try
+        {
+            string? ours = System.IO.Path.GetDirectoryName(typeof(VagabondTraders).Assembly.Location);
+            foreach (string folder in new[]
+                     {
+                         string.IsNullOrEmpty(ours) ? "" : System.IO.Path.GetFullPath(System.IO.Path.Combine(ours, "..", "Vagabond", "config", "exfils")),
+                         System.IO.Path.GetFullPath(System.IO.Path.Combine("user", "mods", "Vagabond", "config", "exfils")),
+                     })
+            {
+                if (folder.Length == 0 || !Directory.Exists(folder))
+                {
+                    continue;
+                }
+                foreach (string file in Directory.GetFiles(folder, "*.json"))
+                {
+                    if (!File.ReadAllText(file).Contains("\"" + exit + "\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    string map = MapOfLocation(System.IO.Path.GetFileNameWithoutExtension(file).Replace("_", ""));
+                    if (map.Length > 0)
+                    {
+                        return map;
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not look up the map of " + exit + ": " + e.Message);
+        }
+        return "";
+    }
+
+    /// <summary>The map a save is being made on: Vagabond's word, else the game's own, else the map the exit is on.</summary>
+    private static string MapForSave(string sessionId, string? location, string exit)
+    {
+        string map = "";
+        try
+        {
+            map = VagabondMap(sessionId) ?? "";
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[ZeroMenuTime] Could not ask Vagabond which map the save was made on: " + e.Message);
+        }
+        if (!IsMap(map))
+        {
+            map = MapOfLocation(location);
+        }
+        if (!IsMap(map))
+        {
+            map = MapOfExit(exit);
+        }
+        return IsMap(map) ? map : "";
+    }
+
     /// <summary>Where the character continues from a save: the bed of its hideout, or the trader it was made at.</summary>
     private static void PlaceAt(string sessionId, SaveMeta meta)
     {
@@ -392,7 +486,12 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
             PlaceAt(sessionId, meta.Hideout);
             return;
         }
-        if (string.IsNullOrEmpty(meta.Map) || string.IsNullOrEmpty(meta.Exit))
+        if (!IsMap(meta.Map) && !string.IsNullOrEmpty(meta.Exit))
+        {
+            // A save from before this was put right: the map is the one its exit is on.
+            meta.Map = MapOfExit(meta.Exit);
+        }
+        if (!IsMap(meta.Map) || string.IsNullOrEmpty(meta.Exit))
         {
             return;
         }
@@ -448,7 +547,7 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
             string hideout = (request.Hideout ?? "").ToLowerInvariant();
             // A save can also be made standing at a trader, without ending the raid.
             string exit = request.Exit ?? "";
-            bool atTrader = hideout.Length == 0 && exit.StartsWith("VGB_EXT_", StringComparison.OrdinalIgnoreCase);
+            bool atTrader = hideout.Length == 0 && exit.StartsWith("VGB_", StringComparison.OrdinalIgnoreCase);
             if ((!atTrader && !HideoutsService.Known.Contains(hideout)) || request.Profile == null)
             {
                 return new SaveResponse { Error = "A save needs a hideout or a trader, and the character" };
@@ -493,15 +592,7 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                 SaveMeta meta;
                 if (atTrader)
                 {
-                    string map = "";
-                    try
-                    {
-                        map = VagabondMap(id) ?? "";
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("[ZeroMenuTime] Could not ask Vagabond which map the trader save was made on: " + e.Message);
-                    }
+                    string map = MapForSave(id, request.Map, exit);
                     meta = new SaveMeta { Hideout = "", Map = map, Exit = exit, SavedAtUtc = DateTime.UtcNow.ToString("u"), Resume = true };
                     WriteMeta(id, meta);
                     PlaceAt(id, meta);
@@ -537,14 +628,7 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
             return;
         }
         string map = "";
-        try
-        {
-            map = VagabondMap(id) ?? "";
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine("[ZeroMenuTime] Could not ask Vagabond which map the trader save was made on: " + e.Message);
-        }
+        map = MapForSave(id, null, exit);
         Directory.CreateDirectory(Dir(id));
         foreach (string file in new[] { CharacterFile(id), HideoutsFile(id) })
         {
@@ -609,12 +693,20 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
             lock (_gate)
             {
                 string before = VagabondMap(id) ?? "";
-                if (before.Length > 0)
+                if (IsMap(before))
                 {
                     return new SaveResponse { Ok = true, Exit = before };
                 }
                 var meta = ReadMeta(id);
-                if (meta != null && (!string.IsNullOrEmpty(meta.Hideout) || (!string.IsNullOrEmpty(meta.Map) && !string.IsNullOrEmpty(meta.Exit))))
+                if (meta != null && string.IsNullOrEmpty(meta.Hideout) && !IsMap(meta.Map) && !string.IsNullOrEmpty(meta.Exit))
+                {
+                    meta.Map = MapOfExit(meta.Exit);
+                    if (IsMap(meta.Map))
+                    {
+                        WriteMeta(id, meta);
+                    }
+                }
+                if (meta != null && (!string.IsNullOrEmpty(meta.Hideout) || (IsMap(meta.Map) && !string.IsNullOrEmpty(meta.Exit))))
                 {
                     if (!string.IsNullOrEmpty(meta.Hideout))
                     {
@@ -629,6 +721,16 @@ public sealed class SaveGameService(SaveServer saveServer, LocationLifecycleServ
                     PlaceAt(id, "customs");
                 }
                 string after = VagabondMap(id) ?? "";
+                if (!IsMap(after))
+                {
+                    // The save could not place them either: the Customs hideout door always can.
+                    PlaceAt(id, "customs");
+                    after = VagabondMap(id) ?? "";
+                }
+                if (!IsMap(after))
+                {
+                    after = "";
+                }
                 Console.WriteLine("[ZeroMenuTime] The character was on no map; put back " + (meta != null ? "at the last save" : "at the Customs hideout door") + ": " + (after.Length > 0 ? after : "(Vagabond still says nowhere)"));
                 return new SaveResponse { Ok = after.Length > 0, Exit = after, Has = meta != null, Hideout = meta?.Hideout ?? "", Error = after.Length > 0 ? null : "Vagabond still has no map for the character" };
             }

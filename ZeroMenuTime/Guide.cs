@@ -108,6 +108,17 @@ namespace ZeroMenuTime
             },
             new Page
             {
+                Title = "Moving traders, and traders of other mods",
+                Text = "Every trader's place is a setting. Press <b>F12</b> in game, open <b>r2rka1-ZeroMenuTime</b> and find the group <b>Trader - NAME</b> (Ref, whom Vagabond gives no place, has one too): pick the <b>Map</b>, then go through that map's doors with the arrows at <b>Door</b>. Each door is one the map already has, shut for good. The change applies from the next raid." + "\n\n"
+                       + "A trader added by <b>another mod</b> has no place until you give them one. They are listed as <b>Custom trader - NAME</b> with the map set to <b>Not placed</b>:" + "\n"
+                       + "1. Set <b>Map</b> to the map they should be on.\n"
+                       + "2. Pick a <b>Door</b> with the arrows (a door already taken says by whom).\n"
+                       + "3. Choose the <b>Room</b> (plain, or furnished like one of the game's traders) and the <b>Figure</b> that stands in it.\n"
+                       + "4. Start the next raid on that map: the door is marked on the map like the others." + "\n\n"
+                       + "Playing with friends, the host's settings count for everyone.",
+            },
+            new Page
+            {
                 Title = "Real trader models and voices",
                 Pictures = "models",
                 ModelsStatus = true,

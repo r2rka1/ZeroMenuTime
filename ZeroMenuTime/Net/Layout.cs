@@ -24,6 +24,9 @@ namespace ZeroMenuTime
         /// <summary>Where the host's rooms and doors ended up, to compare against.</summary>
         public List<string> Built = new List<string>();
 
+        /// <summary>Where the host has each trader (see TraderPlaces). Null from a host of an older version.</summary>
+        public List<TraderPlace> Places;
+
         /// <summary>The map the host is on. A client's own idea of it can be an older one after a transit.</summary>
         public string Map = "";
     }
@@ -56,7 +59,7 @@ namespace ZeroMenuTime
             var data = new LayoutData
             {
                 Rooms = TraderRoom.Enabled.Value, Depth = TraderRoom.Depth.Value, Shell = RoomProps.Use != null && RoomProps.Use.Value,
-                CustomSpots = Plugin.UseCustomSpots.Value, Hideouts = HideoutDoors.Load(), Built = Built(),
+                CustomSpots = Plugin.UseCustomSpots.Value, Hideouts = HideoutDoors.Load(), Built = Built(), Places = TraderPlaces.Mine(),
             };
             var world = Comfort.Common.Singleton<GameWorld>.Instance;
             var me = EFT.GamePlayerOwner.MyPlayer;

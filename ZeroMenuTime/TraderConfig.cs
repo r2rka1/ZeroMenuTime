@@ -57,7 +57,11 @@ namespace ZeroMenuTime
                 case Mechanic: return "Mechanic";
                 case Ragman: return "Ragman";
                 case Jaeger: return "Jaeger";
-                default: return "the trader";
+                default:
+                {
+                    string custom;
+                    return TraderPlaces.CustomNames.TryGetValue(traderId ?? "", out custom) ? custom : "the trader";
+                }
             }
         }
 
@@ -68,8 +72,8 @@ namespace ZeroMenuTime
         public static string DoorsPath => Path.Combine(Dir, "doors.json");
 
         /// <summary>
-        /// A hand-picked place for a trader's door on a map, for where the automatic choice of wall
-        /// is poor. doors.json holds a list of the same entries as traders.json: TraderId, Maps,
+        /// A place of the player's own for a trader's door on a map, which comes before the door set
+        /// in the settings. doors.json holds a list of the same entries as traders.json: TraderId, Maps,
         /// Position (on the ground) and RotationY (the way the door faces). Null if there is none.
         /// </summary>
         public static TraderSpot DoorFor(string traderId, string map)
@@ -82,62 +86,7 @@ namespace ZeroMenuTime
                     : File.Exists(DoorsPath)
                         ? JsonConvert.DeserializeObject<List<TraderSpot>>(File.ReadAllText(DoorsPath)) ?? new List<TraderSpot>()
                         : new List<TraderSpot>();
-                // Doors picked by hand; an entry in doors.json for the same trader and map comes first.
-                doors.Add(new TraderSpot
-                {
-                    // The wooden door in the corridor right at Prapor's spot.
-                    Name = "Prapor", TraderId = Prapor, Maps = new List<string> { "TarkovStreets" },
-                    Position = new[] { -32.50f, 6.60f, -108.74f }, RotationY = 0f, Hidden = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // The shut door of the shed north of his spot; picked in game, standing with the back to it.
-                    Name = "Skier", TraderId = Skier, Maps = new List<string> { "bigmap" },
-                    Position = new[] { 88.95f, 1.33f, -106.78f }, RotationY = 140f, Hidden = true, AtFeet = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // A shut door by his spot on Streets; picked in game, standing with the back to it.
-                    Name = "Fence", TraderId = Fence, Maps = new List<string> { "TarkovStreets" },
-                    Position = new[] { 73.89f, -2.05f, 48.81f }, RotationY = 90f, Hidden = true, AtFeet = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // A shut door of the mall by his spot on Interchange; picked in game, standing with the back to it.
-                    Name = "Ragman", TraderId = Ragman, Maps = new List<string> { "Interchange" },
-                    Position = new[] { -51.22f, 21.33f, 46.19f }, RotationY = 7f, Hidden = true, AtFeet = true,
-                });
-                // The rest were measured in game on the door itself: position on the ground at the door, facing out.
-                doors.Add(new TraderSpot
-                {
-                    // The steel door of the stone bunker in the rock face.
-                    Name = "Jaeger", TraderId = Jaeger, Maps = new List<string> { "Woods" },
-                    Position = new[] { -156.25f, 51.2f, -272.45f }, RotationY = 357f, Hidden = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // The wooden door in the side wall of the basement corridor.
-                    Name = "Mechanic", TraderId = Mechanic, Maps = new List<string> { "factory4_day", "factory4_night" },
-                    Position = new[] { 1.09f, -2.63f, 57.45f }, RotationY = 270f, Hidden = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // The office door at the end of the corridor, second floor of the TerraGroup building.
-                    Name = "Therapist", TraderId = Therapist, Maps = new List<string> { "Sandbox", "Sandbox_high" },
-                    Position = new[] { -26.85f, 29.72f, 92.94f }, RotationY = 180f, Hidden = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // The steel gate of checkpoint 11.
-                    Name = "Peacekeeper", TraderId = Peacekeeper, Maps = new List<string> { "Shoreline" },
-                    Position = new[] { -968.6f, -59.6f, 378.95f }, RotationY = 162f, Hidden = true,
-                });
-                doors.Add(new TraderSpot
-                {
-                    // The doors of the shipping container in the drug lab.
-                    Name = "Fence", TraderId = Fence, Maps = new List<string> { "Lighthouse" },
-                    Position = new[] { -125.39f, 10.6f, -839.8f }, RotationY = 90f, Hidden = true,
-                });
+                // The doors picked for the traders are in DoorList; this file is for a place of one's own choosing.
                 foreach (var door in doors)
                 {
                     if (door.Enabled && door.TraderId == traderId && door.Position != null && door.Position.Length >= 3

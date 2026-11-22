@@ -71,7 +71,7 @@ namespace ZeroMenuTime
                     Plugin.Log.LogInfo("Dropped " + dropped + " damage record(s) with no kind of damage");
                 }
                 var descriptor = new ProfileDescriptor(player.Profile, VisualsOnlySearchController.Instance);
-                var body = new JObject { ["Hideout"] = atTrader ? "" : HideoutDoors.Inside, ["Exit"] = atTrader ? traderExit : "", ["Profile"] = descriptor.ToUnparsedData(new Newtonsoft.Json.JsonConverter[0]).JObject };
+                var body = new JObject { ["Hideout"] = atTrader ? "" : HideoutDoors.Inside, ["Exit"] = atTrader ? traderExit : "", ["Map"] = Layout.Map.Length > 0 ? Layout.Map : (player.Location ?? ""), ["Profile"] = descriptor.ToUnparsedData(new Newtonsoft.Json.JsonConverter[0]).JObject };
                 var reply = JObject.Parse(await RequestHandler.PostJsonAsync("/zeromenutime/save", body.ToString(Newtonsoft.Json.Formatting.None)));
                 if (!((bool?)reply["Ok"] ?? false))
                 {

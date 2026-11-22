@@ -214,11 +214,11 @@ namespace ZeroMenuTime
         }
 
         /// <summary>Stands the trader's model at the spot. Returns false if there is no model for them.</summary>
-        public static bool TryPlace(string traderId, string traderName, Vector3 ground, float rotationY, GameObject markerBox)
+        public static bool TryPlace(string traderId, string traderName, Vector3 ground, float rotationY, GameObject markerBox, string lookOf = null)
         {
             try
             {
-                if (!Enabled.Value || !Models.TryGetValue(traderId, out string modelName) || !Load())
+                if (!Enabled.Value || !Models.TryGetValue(lookOf ?? traderId, out string modelName) || !Load())
                 {
                     return false;
                 }

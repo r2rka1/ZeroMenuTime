@@ -184,7 +184,7 @@ namespace ZeroMenuTime
         public static string Dress(TraderRoom room)
         {
             var looks = ReadLayouts();
-            string style = TraderRoom.LookOverride ?? room.TraderName ?? "";
+            string style = TraderRoom.LookOverride ?? room.Style ?? room.TraderName ?? "";
             Look own, common;
             looks.TryGetValue(style, out own);
             looks.TryGetValue("*", out common);

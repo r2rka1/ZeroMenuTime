@@ -23,6 +23,8 @@ namespace ZeroMenuTime
         {
             public string TraderId;
             public string ExfilIdentifier;
+            /// <summary>The map, by Vagabond's name for it (Customs, FactoryDay, GroundZero, ...).</summary>
+            public string Raid;
         }
 
         /// <summary>Extract points that belong to a trader in this raid (by Unity instance id).</summary>
@@ -126,7 +128,7 @@ namespace ZeroMenuTime
                     var exfil = (string)entry["exfilIdentifier"];
                     if (!string.IsNullOrEmpty(traderId) && !string.IsNullOrEmpty(exfil))
                     {
-                        result.Add(new TraderExtract { TraderId = traderId, ExfilIdentifier = exfil });
+                        result.Add(new TraderExtract { TraderId = traderId, ExfilIdentifier = exfil, Raid = (string)entry["raid"] ?? "" });
                     }
                 }
             }
@@ -153,6 +155,48 @@ namespace ZeroMenuTime
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// The way into the map of Vagabond's that lies nearest a point: where a save made at a trader
+        /// with no extract of their own continues. Null if Vagabond has none on this map.
+        /// </summary>
+        public static string NearestWayIn(GameWorld world, Vector3 point)
+        {
+            string best = null;
+            float bestDistance = float.MaxValue;
+            var points = world?.ExfiltrationController?.ExfiltrationPoints ?? new ExfiltrationPoint[0];
+            foreach (var exit in points)
+            {
+                // An extract switched off here is still a place Vagabond can start the next raid at.
+                if (exit == null || !exit.gameObject.name.StartsWith("VGB_", StringComparison.OrdinalIgnoreCase)
+                    || exit.gameObject.name.StartsWith("VGB_HO_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                float distance = (exit.transform.position - point).sqrMagnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = exit.gameObject.name;
+                }
+            }
+            // Vagabond's own transits between maps are ways in too, and the ones a traveller arrives by.
+            foreach (var transit in UnityEngine.Object.FindObjectsOfType<TransitPoint>())
+            {
+                string name = transit.parameters != null ? transit.parameters.name : null;
+                if (string.IsNullOrEmpty(name) || !name.StartsWith("VGB_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                float distance = (transit.transform.position - point).sqrMagnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = name;
+                }
+            }
+            return best;
         }
 
         /// <summary>Start the normal extraction countdown at a trader's extract.</summary>

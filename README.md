@@ -216,6 +216,23 @@ Press **F12** in game and open **r2rka1-ZeroMenuTime**.
 | Pictures | Picture size | 2 | Saved picture size, in multiples of the screen |
 | Testing | Undying, Free hideout, Self-test key, Test harness | off | For development only |
 
+### Moving traders, and traders of other mods
+
+Each trader has a group **Trader - NAME** with a **Map** and a **Door**; a trader added by another mod gets **Custom trader -
+NAME** with **Map**, **Door**, **Room** and **Figure**, and is on no map until you place them. The doors to choose from are
+doors the maps already have that cannot be opened, have nothing behind them and no way out of the map at them. How it works, and
+every door with a picture: **[docs/trader-places.md](docs/trader-places.md)**.
+
+| Section | Setting | Default | What it does |
+|---|---|---|---|
+| Trader - NAME | Map | where Vagabond has them | The map the trader is on |
+| Trader - NAME | Door | the door picked for them | The door on that map; arrows go through the map's doors |
+| Custom trader - NAME | Map | Not placed | The map a trader of another mod is on |
+| Custom trader - NAME | Door | the first free door | Their door on that map |
+| Custom trader - NAME | Room | Plain | Plain, or furnished like one of the game's traders' rooms |
+| Custom trader - NAME | Figure | Fence | Whose figure stands in the room |
+| Saving | Save after travelling to another map | off | Saves each time you arrive on another map, at the way in you came by |
+
 ### Placing doors yourself
 
 Every trader door is placed on a real door of the map (see "Where the doors are"). A trader added at a new spot gets a door against the nearest building wall. To move one:
