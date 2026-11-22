@@ -47,6 +47,7 @@ namespace ZeroMenuTime
 
         private static ConfigEntry<bool> _taken;
         private static ConfigEntry<string> _told;
+        private static ConfigEntry<string> _names;
         private static readonly List<Entry> Entries = new List<Entry>();
         private static ConfigFile _config;
         private static bool _looked;
@@ -96,6 +97,9 @@ namespace ZeroMenuTime
             _config = config;
             _taken = config.Bind("Trader places", "Taken from Vagabond", false, new ConfigDescription(
                 "Set by the mod once it has looked at where Vagabond has the traders and set the groups \"Trader - NAME\" to match. Turn off to have it look again at the next raid; that puts the game's traders back where Vagabond has them.",
+                null, new ConfigurationManagerAttributes { IsAdvanced = true }));
+            _names = config.Bind("Trader places", "Names of add-on traders", "", new ConfigDescription(
+                "Kept by the mod: the name each trader of another mod was first listed under, so that their settings stay theirs.",
                 null, new ConfigurationManagerAttributes { IsAdvanced = true }));
             _told = config.Bind("Trader places", "Traders pointed out", "", new ConfigDescription(
                 "The traders of other mods the mod has already told you have no door. Empty it to be told again.",
@@ -186,14 +190,32 @@ namespace ZeroMenuTime
                     {
                         continue;
                     }
-                    string name = Clean(trader.LocalizedName);
-                    if (name.Length == 0 || name.Contains(id))
+                    // The name a trader was first listed under is kept: the game does not always have a trader's
+                    // name ready (it then gives "ID Nickname"), and a group of settings under another name next
+                    // time would leave the player's choice behind.
+                    var names = new Dictionary<string, string>();
+                    foreach (var pair in (_names.Value ?? "").Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries))
                     {
-                        name = Clean(trader.Settings != null ? trader.Settings.Nickname : "");
+                        int cut = pair.IndexOf(':');
+                        if (cut > 0)
+                        {
+                            names[pair.Substring(0, cut)] = pair.Substring(cut + 1);
+                        }
                     }
-                    if (name.Length == 0)
+                    string name;
+                    if (!names.TryGetValue(id, out name) || name.Length == 0)
                     {
-                        name = "Trader " + id.Substring(Math.Max(0, id.Length - 4));
+                        name = Clean(trader.LocalizedName).Replace("|", " ").Replace(":", " ").Trim();
+                        if (name.Length == 0 || name.Contains(id) || name.EndsWith(" Nickname", StringComparison.Ordinal))
+                        {
+                            name = Clean(trader.Settings != null ? trader.Settings.Nickname : "").Replace("|", " ").Replace(":", " ").Trim();
+                        }
+                        if (name.Length == 0 || name.EndsWith(" Nickname", StringComparison.Ordinal) || Entries.Any(e => e.Name == name))
+                        {
+                            name = "Trader " + id.Substring(Math.Max(0, id.Length - 4));
+                        }
+                        names[id] = name;
+                        _names.Value = string.Join("|", names.Select(n => n.Key + ":" + n.Value));
                     }
                     CustomNames[id] = name;
                     // Ref is the game's own, but Vagabond gives him no place: he can be given one like a trader of another mod.
@@ -381,17 +403,40 @@ namespace ZeroMenuTime
             {
                 return null;
             }
-            var chosen = DoorList.Find(place.Door);
-            if (chosen != null && chosen.Map == place.Map)
+            // Doors that were chosen go first: two traders set to one door, the one listed first keeps it.
+            var taken = new HashSet<string>();
+            var given = new Dictionary<TraderPlace, MapDoor>();
+            foreach (var other in all.Where(p => p.Map == place.Map))
             {
-                // Two traders set to one door: the one listed first keeps it.
-                var first = all.First(p => p.Map == place.Map && p.Door == place.Door);
-                if (ReferenceEquals(first, place))
+                var chosen = DoorList.Find(other.Door);
+                if (chosen != null && chosen.Map == other.Map && taken.Add(chosen.Id))
                 {
-                    return chosen;
+                    given[other] = chosen;
                 }
             }
-            return FirstFree(place.TraderId, place.Map, all, null);
+            MapDoor mine;
+            if (given.TryGetValue(place, out mine))
+            {
+                return mine;
+            }
+            // Then the traders with no door of their own, in the order listed, each the first door still free:
+            // so that several of them left without a door do not all end up behind the same one.
+            var doors = DoorList.On(place.Map);
+            foreach (var other in all.Where(p => p.Map == place.Map && p.Door != AtExtract && !given.ContainsKey(p)).Concat(new[] { place }))
+            {
+                var free = doors.FirstOrDefault(d => d.For == other.TraderId && !taken.Contains(d.Id))
+                           ?? doors.FirstOrDefault(d => d.For == null && !taken.Contains(d.Id))
+                           ?? doors.FirstOrDefault(d => !taken.Contains(d.Id));
+                if (ReferenceEquals(other, place))
+                {
+                    return free;
+                }
+                if (free != null)
+                {
+                    taken.Add(free.Id);
+                }
+            }
+            return null;
         }
 
         private static MapDoor FirstFree(string traderId, string map, List<TraderPlace> all, Entry asking)
