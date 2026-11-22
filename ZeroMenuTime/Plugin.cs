@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 
 namespace ZeroMenuTime
 {
-    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "2.0.1")]
+    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "2.1.0")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
     // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
     [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]
@@ -519,7 +519,7 @@ namespace ZeroMenuTime
                 if (listed != null)
                 {
                     chosen = new TraderSpot { Name = name, TraderId = traderId, Position = new[] { listed.X, listed.Y, listed.Z }, RotationY = listed.Yaw, Hidden = true, AtFeet = listed.AtFeet };
-                    how = "at the door '" + listed.Id + "' (" + listed.Label + ")" + (listed.Id != place.Door ? ", the one set ('" + place.Door + "') not being free or on this map" : "");
+                    how = "at the door '" + listed.Id + "' (" + listed.Label + ")" + (listed.Id == place.Door ? "" : string.IsNullOrEmpty(place.Door) ? ", the first one free, none being set" : ", the one set ('" + place.Door + "') not being free or on this map");
                 }
             }
             if (exfil == null && chosen == null)

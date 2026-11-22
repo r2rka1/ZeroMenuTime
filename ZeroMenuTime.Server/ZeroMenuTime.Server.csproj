@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>ZeroMenuTime.Server</AssemblyName>
-    <Version>2.0.1</Version>
+    <Version>2.1.0</Version>
     <RootNamespace>ZeroMenuTime.Server</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
