@@ -19,6 +19,7 @@ namespace ZeroMenuTime
     {
         public static ConfigEntry<bool> Enabled;
         public static ConfigEntry<float> Depth;
+        public static ConfigEntry<bool> RedrawPhysics;
 
         // Inside measurements, in metres.
         private const float Width = 6f, Height = 3f, Length = 7f, Wall = 0.3f;
@@ -26,6 +27,8 @@ namespace ZeroMenuTime
 
         public string TraderId;
         public string TraderName;
+        /// <summary>Whose room this is furnished like, when not the trader's own ("Base" for plain).</summary>
+        public string Style;
         public GameObject Root;
 
         /// <summary>True for the plain room made in code, which takes furniture from the game.</summary>
@@ -65,6 +68,9 @@ namespace ZeroMenuTime
             // BepInEx forbids = \n \t \ " ' [ ] in section and key names.
             Enabled = config.Bind("Trader rooms", "Put traders in rooms", true,
                 "Each trader gets a room of their own, entered through a door at their spot. Turn off to have traders stand in the open as before. Applies from the next raid.");
+            RedrawPhysics = config.Bind("Trader rooms", "Redraw the physics box", true, new ConfigDescription(
+                "The rooms lie outside the part of the world the physics engine looks after, so that part is redrawn to take them in; without it, things dropped in a room fall through the floor. Turn off only to find out whether a crash comes from it.",
+                null, new ConfigurationManagerAttributes { IsAdvanced = true }));
             Depth = config.Bind("Trader rooms", "Room depth below the door", 300f,
                 "How far under the map the rooms are built, in metres. Only change this if a map misbehaves down there.");
         }
@@ -99,7 +105,14 @@ namespace ZeroMenuTime
         }
 
         /// <summary>Builds the room for a trader whose door is at the given spot on the map.</summary>
-        public static TraderRoom Build(string traderId, string traderName, Vector3 doorGround)
+        public static TraderRoom Build(string traderId, string traderName, Vector3 doorGround, string style)
+        {
+            var room = Build(traderId, traderName, doorGround, style, true);
+            room.Style = style;
+            return room;
+        }
+
+        private static TraderRoom Build(string traderId, string traderName, Vector3 doorGround, string style, bool styled)
         {
             // Rooms on the same map are kept well apart so one cannot be seen or heard from another.
             var origin = doorGround + new Vector3(Rooms.Count * 40f, -Mathf.Abs(Layout.Depth), 0f);
@@ -107,7 +120,7 @@ namespace ZeroMenuTime
             // With furniture from the game, the room is a plain shell made here and filled in once the
             // hideout interior is at hand; otherwise it is one of the rooms built in Unity.
             bool shell = Layout.Shell;
-            var prefab = shell ? null : RoomBundle.Prefab("TraderRoom_" + (LookOverride ?? traderName)) ?? RoomBundle.Prefab("TraderRoom_Base");
+            var prefab = shell ? null : RoomBundle.Prefab("TraderRoom_" + (LookOverride ?? style ?? traderName)) ?? RoomBundle.Prefab("TraderRoom_Base");
             if (prefab != null)
             {
                 try
@@ -185,11 +198,42 @@ namespace ZeroMenuTime
         /// because walking uses a different kind of check). The rooms lie outside that box, so it is
         /// redrawn here to take in the whole map and the rooms. Call once all rooms are built.
         /// </summary>
+        /// <summary>The box as last drawn in this raid.</summary>
+        private static Bounds? _box;
+        private static int _boxWorld;
+
         public static void ExtendPhysics()
         {
             if (Rooms.Count == 0 && !HideoutBunker.Loaded)
             {
                 return;
+            }
+            if (RedrawPhysics != null && !RedrawPhysics.Value)
+            {
+                Plugin.Log.LogInfo("Physics box left alone by the setting");
+                return;
+            }
+            // The map's own box was made deeper and wider when the map loaded (see LevelPhysicsPatch).
+            // When that takes in every room and the place of the hideout, nothing is redrawn at all.
+            if (LevelPhysicsPatch.Box.HasValue)
+            {
+                var level = LevelPhysicsPatch.Box.Value;
+                float deep = Mathf.Abs(Layout.Depth);
+                var needed = new Bounds(new Vector3(0f, -deep, 0f), new Vector3(300f, 100f, 300f));
+                foreach (var room in Rooms)
+                {
+                    if (room.Root != null)
+                    {
+                        needed.Encapsulate(new Bounds(room.Root.transform.position, new Vector3(30f, 20f, 30f)));
+                    }
+                }
+                if (level.Contains(needed.min) && level.Contains(needed.max))
+                {
+                    Plugin.Log.LogInfo("Physics box: the map's own, as enlarged at loading, takes in the rooms; nothing redrawn");
+                    return;
+                }
+                Plugin.Log.LogWarning("Physics box: the map's own " + level.center.ToString("F0") + " size " + level.size.ToString("F0")
+                                      + " does not take in " + needed.center.ToString("F0") + " size " + needed.size.ToString("F0") + "; redrawing");
             }
             try
             {
@@ -222,8 +266,49 @@ namespace ZeroMenuTime
                     Plugin.Log.LogWarning("Physics box left alone: only " + counted + " colliders found");
                     return;
                 }
+                // Room is left from the start for the hideout interior, which is loaded under the middle
+                // of the map later in the raid: the box is then drawn once. Drawing it a second time
+                // while the raid runs brought the game down on Reserve.
+                // A new raid is a new world: nothing drawn before counts.
+                int worldNow = Comfort.Common.Singleton<EFT.GameWorld>.Instantiated ? Comfort.Common.Singleton<EFT.GameWorld>.Instance.GetInstanceID() : 0;
+                if (worldNow != _boxWorld)
+                {
+                    _boxWorld = worldNow;
+                    _box = null;
+                }
+                float depth = Mathf.Abs(Layout.Depth);
+                world.Encapsulate(new Bounds(new Vector3(0f, -depth, 0f), new Vector3(400f, 2f * depth + 200f, 400f)));
                 world.Expand(20f);
+                if (_box.HasValue && _box.Value.Contains(world.min) && _box.Value.Contains(world.max))
+                {
+                    Plugin.Log.LogInfo("Physics box already takes in everything; left as it is");
+                    return;
+                }
+                if (_box.HasValue)
+                {
+                    // Grown a little beyond what is needed now, so it need not be drawn again soon.
+                    world.Encapsulate(_box.Value);
+                    world.Expand(50f);
+                }
+                // What is left outside the box: for the log, to know what the box does not take in.
+                int outside = 0;
+                var named = new List<string>();
+                foreach (var collider in UnityEngine.Object.FindObjectsOfType<Collider>())
+                {
+                    if (collider.enabled && !world.Intersects(collider.bounds))
+                    {
+                        outside++;
+                        if (named.Count < 6)
+                        {
+                            named.Add(collider.name + (collider.attachedRigidbody != null ? (collider.attachedRigidbody.isKinematic ? " (moved by the game)" : " (falls)") : "")
+                                      + (collider.isTrigger ? " (trigger)" : "") + " at " + collider.bounds.center.ToString("F0"));
+                        }
+                    }
+                }
+                Plugin.Log.LogInfo("Physics box: " + outside + " collider(s) lie outside it" + (outside > 0 ? ": " + string.Join("; ", named) : ""));
+                Plugin.Log.LogInfo("Physics box: redrawing to centre " + world.center.ToString("F0") + ", size " + world.size.ToString("F0") + ", from " + counted + " colliders");
                 Physics.RebuildBroadphaseRegions(world, 8);
+                _box = world;
                 Plugin.Log.LogInfo("Physics box redrawn to take in the rooms: centre " + world.center.ToString("F0") + ", size "
                                    + world.size.ToString("F0") + ", from " + counted + " colliders in " + timer.ElapsedMilliseconds + " ms");
             }
@@ -486,6 +571,56 @@ namespace ZeroMenuTime
             if (__result == null)
             {
                 __result = TraderRoom.IndoorAt(pos);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Each map says what box the physics engine is to look after, and the game draws it once, as the
+    /// map loads. The rooms and the hideout lie under the map, outside that box, where a dropped
+    /// item would fall through every floor. Here a deeper and somewhat wider box is drawn right after
+    /// the game draws the map's own, so it never has to be drawn again while a raid runs: doing
+    /// that brought the game down on Reserve.
+    /// </summary>
+    public class LevelPhysicsPatch : ModulePatch
+    {
+        /// <summary>The box as the game drew it for the map that is loaded.</summary>
+        public static Bounds? Box;
+
+        protected override MethodBase GetTargetMethod()
+        {
+            return HarmonyLib.AccessTools.Method(typeof(LevelPhysicsSettings), nameof(LevelPhysicsSettings.ApplySettings));
+        }
+
+        [PatchPostfix]
+        public static void Postfix(LevelPhysicsSettings __instance)
+        {
+            try
+            {
+                Box = null;
+                if (TraderRoom.RedrawPhysics != null && !TraderRoom.RedrawPhysics.Value)
+                {
+                    return;
+                }
+                // The box as the game has just drawn it, in the world's own measure. The map's
+                // settings are left as they are: the larger box is drawn right after the game's.
+                var was = __instance.GetGlobalBounds();
+                float depth = Mathf.Abs(TraderRoom.Depth != null ? TraderRoom.Depth.Value : 300f);
+                // Down to under the deepest room there could be (a door at the bottom of the map and
+                // a room that far again below it), out to the sides for the rooms that are set apart
+                // from one another, and over the place of the hideout, under the middle of the world.
+                var now = was;
+                now.SetMinMax(was.min - new Vector3(450f, depth + 450f, 450f), was.max + new Vector3(450f, 0f, 450f));
+                now.Encapsulate(new Bounds(new Vector3(0f, -depth - 100f, 0f), new Vector3(500f, 700f, 500f)));
+                Physics.RebuildBroadphaseRegions(now, __instance._mbpSubdivisions);
+                Box = now;
+                Plugin.Log.LogInfo("Physics box of the map enlarged at loading: from centre " + was.center.ToString("F0") + ", size " + was.size.ToString("F0")
+                                   + " to centre " + now.center.ToString("F0") + ", size " + now.size.ToString("F0") + ", cells " + __instance._mbpSubdivisions);
+            }
+            catch (Exception e)
+            {
+                Box = null;
+                Plugin.Log.LogWarning("Enlarging the map's physics box failed: " + e.Message);
             }
         }
     }

@@ -806,7 +806,7 @@ namespace ZeroMenuTime
                 yield return Seamless.AfterMenuShown();
                 yield break;
             }
-            if (player == null && verb != "wait" && verb != "post")
+            if (player == null && verb != "wait" && verb != "post" && verb != "settings" && verb != "menukey" && verb != "place" && verb != "screenshot")
             {
                 Report("not in a raid");
                 yield break;
@@ -1254,12 +1254,16 @@ namespace ZeroMenuTime
                             owner = trader;
                         }
                     }
-                    if (owner == null || owner.Exfil == null)
+                    if (owner != null)
                     {
-                        Report("not in a trader's room with an extract");
+                        Report("the trader offers: " + string.Join(" | ", owner.GetActions().Actions.Select(x => x.Name)));
+                    }
+                    if (owner == null || (owner.Exfil == null && string.IsNullOrEmpty(owner.SaveExit)))
+                    {
+                        Report("not in a trader's room where a save can be made");
                         break;
                     }
-                    var saved = SaveGame.SaveNow("harness, at a trader", owner.Exfil.gameObject.name);
+                    var saved = SaveGame.SaveNow("harness, at a trader", owner.Exfil != null ? owner.Exfil.gameObject.name : owner.SaveExit);
                     while (!saved.IsCompleted)
                     {
                         yield return null;
@@ -2126,6 +2130,89 @@ namespace ZeroMenuTime
                     }
                     break;
                 }
+                case "settings":
+                {
+                    // settings [WORD]: opens the settings window (the Configuration Manager), searching for WORD. settings close: shuts it.
+                    object manager = null;
+                    foreach (var plugin in BepInEx.Bootstrap.Chainloader.PluginInfos.Values)
+                    {
+                        if (plugin.Instance != null && plugin.Instance.GetType().Name == "ConfigurationManager")
+                        {
+                            manager = plugin.Instance;
+                        }
+                    }
+                    if (manager == null)
+                    {
+                        Report("FAILED no Configuration Manager among the plugins");
+                        break;
+                    }
+                    bool open = !(parts.Length > 1 && parts[1] == "close");
+                    var shown = HarmonyLib.AccessTools.Property(manager.GetType(), "DisplayingWindow");
+                    shown.SetValue(manager, open);
+                    if (open && parts.Length > 1)
+                    {
+                        var search = HarmonyLib.AccessTools.Property(manager.GetType(), "SearchString");
+                        if (search != null && search.CanWrite)
+                        {
+                            search.SetValue(manager, parts[1].Replace('_', ' '));
+                        }
+                        else
+                        {
+                            Report("the window has no search that can be set");
+                        }
+                    }
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    Report("settings window " + (open ? "open" : "closed"));
+                    break;
+                }
+                case "menukey":
+                {
+                    // menukey: gives the main menu the inventory key, as the keyboard would, and says what came of it.
+                    var screen = UnityEngine.Object.FindObjectOfType<EFT.UI.MenuScreen>();
+                    var bar = UnityEngine.Object.FindObjectOfType<EFT.UI.MenuTaskBar>();
+                    string outcome = "";
+                    if (screen != null)
+                    {
+                        outcome += "menu screen: " + screen.TranslateCommand(EFT.InputSystem.ECommand.ToggleInventory);
+                    }
+                    if (bar != null)
+                    {
+                        outcome += "; bar: " + bar.TranslateCommand(EFT.InputSystem.ECommand.ToggleInventory);
+                    }
+                    yield return new WaitForSecondsRealtime(2f);
+                    var inventory = UnityEngine.Object.FindObjectOfType<EFT.UI.InventoryScreen>();
+                    Report((inventory != null && inventory.gameObject.activeInHierarchy ? "FAILED the character screen opened" : "PASS the character screen stayed shut") + " (" + outcome + ")");
+                    break;
+                }
+                case "treat":
+                {
+                    // treat: what treatment at Therapist would cost now, and buys it.
+                    int price = Treatment.Cost();
+                    Report("treatment would cost " + price + "; roubles carried " + Afterlife.CarriedRoubles(player));
+                    if (price > 0)
+                    {
+                        var bought = Treatment.Buy();
+                        while (!bought.IsCompleted)
+                        {
+                            yield return null;
+                        }
+                        yield return new WaitForSecondsRealtime(1f);
+                        Report("treatment: " + bought.Result + "; cost now " + Treatment.Cost() + "; roubles carried " + Afterlife.CarriedRoubles(player));
+                    }
+                    break;
+                }
+                case "place":
+                    // place: the settings of every trader's place. place WORD MAP [DOOR [ROOM [FIGURE]]]: sets one (MAP with _ for a space; DOOR - for the first free).
+                    Report(parts.Length < 3 ? TraderPlaces.Report()
+                        : TraderPlaces.Set(parts[1], parts[2].Replace('_', ' '), parts.Length > 3 ? (parts[3] == "-" ? "" : parts[3]) : null,
+                            parts.Length > 4 ? parts[4] : null, parts.Length > 5 ? parts[5] : null));
+                    break;
+                case "doorsurvey":
+                    // doorsurvey: looks through the map for scenery doors a trader's room could be put behind; writes survey/doors_MAP.json.
+                    // doorsurvey X Y Z: the same, and says of everything door-like within four metres of the point why it was taken or not.
+                    DoorSurvey.Probe = parts.Length > 3 ? new Vector3(Number(parts[1]), Number(parts[2]), Number(parts[3])) : (Vector3?)null;
+                    Report(DoorSurvey.Run(Layout.Map.Length > 0 ? Layout.Map : player.Location));
+                    break;
                 case "exits":
                 {
                     // exits: every way out the game knows on this map, and its state.

@@ -52,7 +52,7 @@ namespace ZeroMenuTime
         private static readonly List<GameObject> Anchors = new List<GameObject>();
 
         /// <summary>Stand a figure at a spot on the ground. When it is ready, the marker box is hidden.</summary>
-        public static async void Spawn(string traderId, string traderName, Vector3 ground, float rotationY, GameObject markerBox)
+        public static async void Spawn(string traderId, string traderName, Vector3 ground, float rotationY, GameObject markerBox, string lookOf = null)
         {
             try
             {
@@ -63,7 +63,7 @@ namespace ZeroMenuTime
                 }
 
                 // The trader's own model, when it has been built from the player's copy of the game.
-                if (TraderModelBundle.TryPlace(traderId, traderName, ground, rotationY, markerBox))
+                if (TraderModelBundle.TryPlace(traderId, traderName, ground, rotationY, markerBox, lookOf))
                 {
                     return;
                 }
@@ -76,7 +76,7 @@ namespace ZeroMenuTime
                 // Start from the player's own look so every body part has a valid entry, then change clothes and head.
                 var customization = new BodyCustomization(player.Profile.Customization);
                 Look look;
-                if (Looks.TryGetValue(traderId, out look))
+                if (Looks.TryGetValue(lookOf ?? traderId, out look))
                 {
                     customization[EBodyModelPart.Body] = look.Body;
                     customization[EBodyModelPart.Feet] = look.Feet;

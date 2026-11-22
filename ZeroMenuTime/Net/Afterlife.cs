@@ -452,6 +452,26 @@ namespace ZeroMenuTime
             return LocalTrade.CarriedItems(player).Where(i => i.TemplateId == Roubles).Sum(i => i.StackObjectsCount);
         }
 
+        /// <summary>Takes this many roubles from what the player carries, smallest stacks first. False if a stack could not be taken.</summary>
+        public static async System.Threading.Tasks.Task<bool> Pay(Player me, int amount)
+        {
+            int left = amount;
+            foreach (var stack in LocalTrade.CarriedItems(me).Where(i => i.TemplateId == Roubles).OrderBy(i => i.StackObjectsCount).ToList())
+            {
+                if (left <= 0)
+                {
+                    break;
+                }
+                int take = Math.Min(left, stack.StackObjectsCount);
+                if (!await LocalTrade.Take(me, stack, take))
+                {
+                    return false;
+                }
+                left -= take;
+            }
+            return left <= 0;
+        }
+
         /// <summary>At a trader: pays the price from carried roubles and brings the player back. Says how it went.</summary>
         public static async System.Threading.Tasks.Task<string> ReviveForMoney(string profile, string name)
         {
@@ -469,19 +489,9 @@ namespace ZeroMenuTime
                 NotificationManager.DisplayWarningNotification("You need " + ReviveCost.ToString("N0", CultureInfo.InvariantCulture) + " roubles on you.", ENotificationDurationType.Long);
                 return "not enough roubles";
             }
-            int left = ReviveCost;
-            foreach (var stack in LocalTrade.CarriedItems(me).Where(i => i.TemplateId == Roubles).OrderBy(i => i.StackObjectsCount).ToList())
+            if (!await Pay(me, ReviveCost))
             {
-                if (left <= 0)
-                {
-                    break;
-                }
-                int take = Math.Min(left, stack.StackObjectsCount);
-                if (!await LocalTrade.Take(me, stack, take))
-                {
-                    return "the payment failed";
-                }
-                left -= take;
+                return "the payment failed";
             }
             Revive(profile);
             NotificationManager.DisplayMessageNotification("Paid. " + name + " is brought back at the place they came in.", ENotificationDurationType.Long);

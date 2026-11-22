@@ -78,6 +78,7 @@ namespace ZeroMenuTime
                 "Vagabond's own exits to its hideout serve no purpose with this mod's hideout. On: they are switched off in the raid.");
             Metabolism.Bind(Config);
             TraderRoom.Bind(Config);
+            TraderPlaces.Bind(Config);
             RoomProps.Bind(Config);
             Photo.Bind(Config);
             TestHarness.Bind(Config);
@@ -91,12 +92,12 @@ namespace ZeroMenuTime
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new AfterlifeKillPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
-                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(),
+                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(), new MenuInventoryKeyPatch(), new MenuBarInventoryKeyPatch(), new LevelPhysicsPatch(),
             };
             if (Net.Headless)
             {
                 // No player, no screens: only the start and the end of a raid are of interest here.
-                _patches.RemoveAll(patch => !(patch is SpawnTradersPatch || patch is RaidStopPatch));
+                _patches.RemoveAll(patch => !(patch is SpawnTradersPatch || patch is RaidStopPatch || patch is LevelPhysicsPatch));
             }
             foreach (var patch in _patches.ToArray())
             {
@@ -502,6 +503,125 @@ namespace ZeroMenuTime
         }
 
         /// <summary>
+        /// One trader: their door on the map, the room behind it, and the trader in the room. With an
+        /// extract of Vagabond the trader's spot is the extract; without one it is the door itself.
+        /// False when there is nowhere to put them.
+        /// </summary>
+        private static bool PlaceTrader(string traderId, TraderPlace place, List<TraderPlace> everywhere, string map, ExfiltrationPoint exfil, GameWorld world, bool headless)
+        {
+            string name = place != null && !string.IsNullOrEmpty(place.Name) ? place.Name : TraderConfig.NameOf(traderId);
+            // A door of the player's own in doors.json comes first, then the door of the settings.
+            var chosen = TraderConfig.DoorFor(traderId, map);
+            string how = "where doors.json has it";
+            if (chosen == null && place != null && !(place.Door == TraderPlaces.AtExtract && exfil != null))
+            {
+                var listed = place.Door == TraderPlaces.AtExtract ? TraderPlaces.DoorOf(new TraderPlace { TraderId = place.TraderId, Map = place.Map, Door = "" }, everywhere) : TraderPlaces.DoorOf(place, everywhere);
+                if (listed != null)
+                {
+                    chosen = new TraderSpot { Name = name, TraderId = traderId, Position = new[] { listed.X, listed.Y, listed.Z }, RotationY = listed.Yaw, Hidden = true, AtFeet = listed.AtFeet };
+                    how = "at the door '" + listed.Id + "' (" + listed.Label + ")" + (listed.Id != place.Door ? ", the one set ('" + place.Door + "') not being free or on this map" : "");
+                }
+            }
+            if (exfil == null && chosen == null)
+            {
+                Plugin.Log.LogWarning(name + " is set to this map but no door is left for them here; not placed");
+                return false;
+            }
+            var spot = exfil != null ? exfil.transform.position : new Vector3(chosen.Position[0], chosen.Position[1], chosen.Position[2]);
+            float facing = exfil != null ? exfil.transform.rotation.eulerAngles.y : chosen.RotationY;
+            // In the open the trader stands on the spot; with rooms, a door stands there and the trader waits inside.
+            var ground = spot;
+            string saveExit = null;
+            Vector3? trader_door = null;
+            if (Layout.RoomsOn)
+            {
+                string style = place == null || string.IsNullOrEmpty(place.Room) || place.Room == name ? null : place.Room == TraderPlaces.Plain ? "Base" : place.Room;
+                var room = TraderRoom.Build(traderId, name, spot, style);
+                // The door goes where it was chosen, else against the nearest wall, else on the spot.
+                var doorGround = spot;
+                float doorFacing = facing;
+                if (chosen != null)
+                {
+                    doorGround = new Vector3(chosen.Position[0], chosen.Position[1], chosen.Position[2]);
+                    doorFacing = chosen.RotationY;
+                    if (!chosen.Hidden || chosen.AtFeet)
+                    {
+                        RoomDoor.BackToWall(ref doorGround, ref doorFacing);
+                    }
+                }
+                else if (RoomDoor.FindWall(spot, out doorGround, out doorFacing))
+                {
+                    how = "against the nearest wall";
+                }
+                else
+                {
+                    how = "on the trader's spot";
+                }
+                Plugin.Log.LogInfo("Door for " + name + " " + how + ": " + doorGround.ToString("F1") + " facing " + doorFacing.ToString("F0"));
+                RoomDoor door;
+                if (chosen != null && chosen.Hidden)
+                {
+                    // Laid over a door that is already part of the map, and not drawn.
+                    door = RoomDoor.Spawn("Enter " + name + "'s room", doorGround + Vector3.up * (RoomDoor.Height / 2f)
+                        + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0f, 0.08f), doorFacing);
+                    var drawn = door.GetComponent<MeshRenderer>();
+                    if (drawn != null)
+                    {
+                        drawn.enabled = false;
+                    }
+                }
+                else
+                {
+                    door = RoomDoor.SpawnOutside("Enter " + name + "'s room", doorGround, doorFacing);
+                }
+                room.OutsideDoor = door;
+                door.Destination = room.Entry;
+                door.DestinationYaw = room.EntryYaw;
+                // Coming back out, the player stands just in front of the door, facing away from it.
+                var outside = doorGround + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0.05f, 1.0f);
+                float outsideYaw = doorFacing;
+                if (exfil != null)
+                {
+                    // The trader's spot is where the player is meant to stand, so it is outside. When
+                    // it lies close by on the other side of the door from the way the door was
+                    // recorded as facing, that record is the wrong way round: come out on the
+                    // spot's side (Jaeger's bunker door and Prapor's office door were such).
+                    var behind = doorGround + Quaternion.Euler(0f, doorFacing + 180f, 0f) * new Vector3(0f, 0.05f, 1.0f);
+                    float toFront = Vector2.Distance(new Vector2(outside.x, outside.z), new Vector2(spot.x, spot.z));
+                    float toBehind = Vector2.Distance(new Vector2(behind.x, behind.z), new Vector2(spot.x, spot.z));
+                    if (Mathf.Abs(spot.y - doorGround.y) < 2.5f && toBehind < 6f && toBehind + 0.5f < toFront)
+                    {
+                        outside = behind;
+                        outsideYaw = doorFacing + 180f;
+                        Plugin.Log.LogInfo("Door for " + name + ": the way out is on the trader's side, facing " + (outsideYaw % 360f).ToString("F0"));
+                    }
+                }
+                RoomDoor.KeepClear(ref outside);
+                room.ExitDoor.Destination = outside;
+                room.ExitDoor.DestinationYaw = outsideYaw;
+                ground = room.TraderStand;
+                facing = room.TraderYaw;
+                if (exfil == null)
+                {
+                    saveExit = VagabondLink.NearestWayIn(world, doorGround);
+                    trader_door = doorGround;
+                }
+            }
+            var at = ground + new Vector3(0f, 0.9f, 0f);
+            var trader = TraderInteractable.Spawn(name, traderId, at, facing, Plugin.ShowMarkers.Value);
+            trader.Exfil = exfil;
+            trader.SaveExit = saveExit;
+            trader.Door = trader_door;
+            if (Plugin.ShowFigures.Value && !headless)
+            {
+                string look = place != null && !string.IsNullOrEmpty(place.Model) && place.Model != name ? TraderConfig.IdOf(place.Model) : null;
+                TraderFigure.Spawn(traderId, name, ground, facing, trader.gameObject, look);
+            }
+            Plugin.Log.LogInfo("Placed " + name + (exfil != null ? " at Vagabond extract " + exfil.gameObject.name : " with no extract (a save there continues at " + (saveExit ?? "nowhere") + ")") + " " + at.ToString("F1"));
+            return true;
+        }
+
+        /// <summary>
         /// Puts this map's traders, rooms and doors in place. In co-op a client first asks the host
         /// how (see <see cref="Layout"/>) and comes back here with <paramref name="told"/> set.
         /// A headless host has no player: it builds the rooms the others stand in, and nothing for itself.
@@ -549,6 +669,16 @@ namespace ZeroMenuTime
                 }
                 var extracts = VagabondLink.LoadTraderExtracts();
                 VagabondLink.SwitchOffHideoutExits(__instance);
+                // Where each trader is comes from the settings (the host's in co-op): see TraderPlaces.
+                TraderPlaces.FindCustom(false);
+                if (Layout.Active == null)
+                {
+                    TraderPlaces.TakeFromVagabond(extracts);
+                }
+                var everywhere = TraderPlaces.All();
+                string shortMap = DoorList.MapOf(map);
+                var here = everywhere.Where(p => p.Map == shortMap).ToList();
+                var placed = new HashSet<string>();
                 foreach (var extract in extracts)
                 {
                     var exfil = VagabondLink.FindExfil(__instance, extract.ExfilIdentifier);
@@ -557,86 +687,30 @@ namespace ZeroMenuTime
                     {
                         continue;
                     }
-                    string name = TraderConfig.NameOf(extract.TraderId);
-                    float facing = exfil.transform.rotation.eulerAngles.y;
-                    // In the open the trader stands on the extract; with rooms, a door stands there
-                    // and the trader waits inside.
-                    var ground = exfil.transform.position;
-                    if (Layout.RoomsOn)
+                    var place = here.FirstOrDefault(p => p.TraderId == extract.TraderId);
+                    if (place == null && TraderPlaces.Manages(extract.TraderId))
                     {
-                        var room = TraderRoom.Build(extract.TraderId, name, exfil.transform.position);
-                        // The door goes where doors.json says, else against the nearest wall, else on the spot.
-                        var doorGround = exfil.transform.position;
-                        float doorFacing = facing;
-                        var chosen = TraderConfig.DoorFor(extract.TraderId, map);
-                        string how = "on the trader's spot";
-                        if (chosen != null)
-                        {
-                            doorGround = new Vector3(chosen.Position[0], chosen.Position[1], chosen.Position[2]);
-                            doorFacing = chosen.RotationY;
-                            how = "where it was placed by hand";
-                            if (!chosen.Hidden || chosen.AtFeet)
-                            {
-                                RoomDoor.BackToWall(ref doorGround, ref doorFacing);
-                            }
-                        }
-                        else if (RoomDoor.FindWall(exfil.transform.position, out doorGround, out doorFacing))
-                        {
-                            how = "against the nearest wall";
-                        }
-                        Plugin.Log.LogInfo("Door for " + name + " " + how + ": " + doorGround.ToString("F1") + " facing " + doorFacing.ToString("F0"));
-                        RoomDoor door;
-                        if (chosen != null && chosen.Hidden)
-                        {
-                            // Laid over a door that is already part of the map, and not drawn.
-                            door = RoomDoor.Spawn("Enter " + name + "'s room", doorGround + Vector3.up * (RoomDoor.Height / 2f)
-                                + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0f, 0.08f), doorFacing);
-                            var drawn = door.GetComponent<MeshRenderer>();
-                            if (drawn != null)
-                            {
-                                drawn.enabled = false;
-                            }
-                        }
-                        else
-                        {
-                            door = RoomDoor.SpawnOutside("Enter " + name + "'s room", doorGround, doorFacing);
-                        }
-                        room.OutsideDoor = door;
-                        door.Destination = room.Entry;
-                        door.DestinationYaw = room.EntryYaw;
-                        // Coming back out, the player stands just in front of the door, facing away from it.
-                        var outside = doorGround + Quaternion.Euler(0f, doorFacing, 0f) * new Vector3(0f, 0.05f, 1.0f);
-                        float outsideYaw = doorFacing;
-                        // The trader's spot is where the player is meant to stand, so it is outside. When
-                        // it lies close by on the other side of the door from the way the door was
-                        // recorded as facing, that record is the wrong way round: come out on the
-                        // spot's side (Jaeger's bunker door and Prapor's office door were such).
-                        var spot = exfil.transform.position;
-                        var behind = doorGround + Quaternion.Euler(0f, doorFacing + 180f, 0f) * new Vector3(0f, 0.05f, 1.0f);
-                        float toFront = Vector2.Distance(new Vector2(outside.x, outside.z), new Vector2(spot.x, spot.z));
-                        float toBehind = Vector2.Distance(new Vector2(behind.x, behind.z), new Vector2(spot.x, spot.z));
-                        if (Mathf.Abs(spot.y - doorGround.y) < 2.5f && toBehind < 6f && toBehind + 0.5f < toFront)
-                        {
-                            outside = behind;
-                            outsideYaw = doorFacing + 180f;
-                            Plugin.Log.LogInfo("Door for " + name + ": the way out is on the trader's side, facing " + (outsideYaw % 360f).ToString("F0"));
-                        }
-                        RoomDoor.KeepClear(ref outside);
-                        room.ExitDoor.Destination = outside;
-                        room.ExitDoor.DestinationYaw = outsideYaw;
-                        ground = room.TraderStand;
-                        facing = room.TraderYaw;
+                        // The settings have this trader elsewhere: the extract leads to nobody, so it is switched off.
+                        exfil.Disable();
+                        exfil.gameObject.SetActive(false);
+                        Plugin.Log.LogInfo(TraderConfig.NameOf(extract.TraderId) + " is not on this map by the settings; Vagabond's extract " + extract.ExfilIdentifier + " switched off");
+                        continue;
                     }
-                    var at = ground + new Vector3(0f, 0.9f, 0f);
-                    var trader = TraderInteractable.Spawn(name, extract.TraderId, at, facing, Plugin.ShowMarkers.Value);
-                    trader.Exfil = exfil;
-                    if (Plugin.ShowFigures.Value && !headless)
+                    if (PlaceTrader(extract.TraderId, place, everywhere, map, exfil, __instance, headless))
                     {
-                        TraderFigure.Spawn(extract.TraderId, name, ground, facing, trader.gameObject);
+                        placed.Add(extract.TraderId);
+                        VagabondLink.TraderExfils.Add(exfil.GetInstanceID());
+                        count++;
                     }
-                    VagabondLink.TraderExfils.Add(exfil.GetInstanceID());
-                    count++;
-                    Plugin.Log.LogInfo("Placed " + name + " at Vagabond extract " + extract.ExfilIdentifier + " " + at.ToString("F1"));
+                }
+                // Traders the settings put on this map where Vagabond has no extract for them: moved ones, and those of other mods.
+                foreach (var place in here)
+                {
+                    if (!placed.Contains(place.TraderId) && PlaceTrader(place.TraderId, place, everywhere, map, null, __instance, headless))
+                    {
+                        placed.Add(place.TraderId);
+                        count++;
+                    }
                 }
 
                 bool useFile = extracts.Count == 0 || Layout.CustomSpots;
@@ -669,6 +743,14 @@ namespace ZeroMenuTime
                 QuestSync.Send("raid start");
                 Death.SendMode();
                 Net.RaiseRaidStarted();
+                if (Seamless.CameByTransit)
+                {
+                    Seamless.CameByTransit = false;
+                    if (Seamless.SaveAfterTravel.Value && (!Net.Coop || Net.IsHost) && Plugin.Instance != null)
+                    {
+                        Plugin.Instance.StartCoroutine(Seamless.SaveOnArrival(__instance));
+                    }
+                }
                 if (count > 0 && Plugin.Instance != null)
                 {
                     Plugin.Instance.StartCoroutine(Plugin.NotifyLater("Traders in this area: " + count, 12f));

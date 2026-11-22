@@ -617,3 +617,56 @@ namespace ZeroMenuTime
         }
     }
 }
+
+namespace ZeroMenuTime
+{
+    /// <summary>
+    /// The main menu of the game opens the character screen, stash and all, on the inventory key,
+    /// through the menu screen itself and through the bar under it. With this mod the stash is in the
+    /// hideout and the character is looked at in the raid, so outside a raid the key does nothing.
+    /// </summary>
+    public class MenuInventoryKeyPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(MenuScreen), nameof(MenuScreen.TranslateCommand));
+        }
+
+        public static bool Held(EFT.InputSystem.ECommand command)
+        {
+            return command == EFT.InputSystem.ECommand.ToggleInventory
+                   && !(Singleton<GameWorld>.Instantiated && Singleton<GameWorld>.Instance.MainPlayer != null);
+        }
+
+        [PatchPrefix]
+        public static bool Prefix(EFT.InputSystem.ECommand command, ref EFT.InputSystem.InputNode.ETranslateResult __result)
+        {
+            if (!Held(command))
+            {
+                return true;
+            }
+            __result = EFT.InputSystem.InputNode.ETranslateResult.BlockAll;
+            return false;
+        }
+    }
+
+    /// <summary>The same key, as the bar under the menu takes it.</summary>
+    public class MenuBarInventoryKeyPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(MenuTaskBar), nameof(MenuTaskBar.TranslateCommand));
+        }
+
+        [PatchPrefix]
+        public static bool Prefix(EFT.InputSystem.ECommand command, ref EFT.InputSystem.InputNode.ETranslateResult __result)
+        {
+            if (!MenuInventoryKeyPatch.Held(command))
+            {
+                return true;
+            }
+            __result = EFT.InputSystem.InputNode.ETranslateResult.BlockAll;
+            return false;
+        }
+    }
+}

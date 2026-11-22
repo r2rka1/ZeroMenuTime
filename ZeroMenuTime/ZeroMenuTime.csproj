@@ -49,6 +49,7 @@
     <Reference Include="Sirenix.Serialization"><HintPath>$(Managed)Sirenix.Serialization.dll</HintPath></Reference>
     <Reference Include="UnityEngine"><HintPath>$(Managed)UnityEngine.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(Managed)UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AIModule"><HintPath>$(Managed)UnityEngine.AIModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Managed)UnityEngine.PhysicsModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.AssetBundleModule"><HintPath>$(Managed)UnityEngine.AssetBundleModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Managed)UnityEngine.InputLegacyModule.dll</HintPath></Reference>

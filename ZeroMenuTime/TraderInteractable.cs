@@ -13,6 +13,12 @@ namespace ZeroMenuTime
         /// <summary>The Vagabond extract this trader stands at, if any. Enables the "Leave raid" option.</summary>
         public ExfiltrationPoint Exfil;
 
+        /// <summary>For a trader with no extract of their own: the way into the map nearest their door, where a save made here continues.</summary>
+        public string SaveExit;
+
+        /// <summary>Where that trader's door is on the map, to look for the way in again if none was there when the raid began.</summary>
+        public Vector3? Door;
+
         public AvailableInteractionState GetActions()
         {
             var state = new AvailableInteractionState();
@@ -38,6 +44,19 @@ namespace ZeroMenuTime
                     Disabled = false,
                 });
             }
+            if (TraderId == TraderConfig.Therapist)
+            {
+                int cost = Treatment.Cost();
+                if (cost > 0)
+                {
+                    state.Actions.Add(new InteractionAction
+                    {
+                        Name = "Get treated (" + cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " roubles)",
+                        Action = () => { _ = Treatment.Buy(); },
+                        Disabled = false,
+                    });
+                }
+            }
             float untilMorning = HideoutSleep.HoursUntilMorning();
             state.Actions.Add(new InteractionAction
             {
@@ -58,6 +77,20 @@ namespace ZeroMenuTime
                 {
                     Name = "Save and go to menu",
                     Action = () => { if (Coop.Allowed(Coop.Feature.SaveAndLeave)) { VagabondLink.Leave(exfil); } },
+                    Disabled = false,
+                });
+            }
+            else if (Door.HasValue && string.IsNullOrEmpty(SaveExit))
+            {
+                SaveExit = VagabondLink.NearestWayIn(Comfort.Common.Singleton<EFT.GameWorld>.Instance, Door.Value);
+            }
+            if (Exfil == null && !string.IsNullOrEmpty(SaveExit))
+            {
+                string exit = SaveExit;
+                state.Actions.Add(new InteractionAction
+                {
+                    Name = "Save",
+                    Action = () => { if (Coop.Allowed(Coop.Feature.Save)) { _ = SaveGame.SaveNow("at a trader", exit); } },
                     Disabled = false,
                 });
             }
