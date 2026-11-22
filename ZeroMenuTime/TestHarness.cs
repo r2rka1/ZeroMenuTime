@@ -25,6 +25,9 @@ namespace ZeroMenuTime
     /// </summary>
     public static class TestHarness
     {
+        private static readonly Dictionary<string, Vector3> _botWas = new Dictionary<string, Vector3>();
+        private static float _botLook;
+
         public static ConfigEntry<bool> Enabled;
 
         public static string Dir => Path.Combine(TraderConfig.Dir, "test");
@@ -2182,6 +2185,52 @@ namespace ZeroMenuTime
                     yield return new WaitForSecondsRealtime(2f);
                     var inventory = UnityEngine.Object.FindObjectOfType<EFT.UI.InventoryScreen>();
                     Report((inventory != null && inventory.gameObject.activeInHierarchy ? "FAILED the character screen opened" : "PASS the character screen stayed shut") + " (" + outcome + ")");
+                    break;
+                }
+                case "bots":
+                {
+                    // bots: how many bots there are, how many are switched on, and what state the game has each in.
+                    // bots letrun on|off: lets ORBIT run during the pause, to compare with it held.
+                    if (parts.Length > 2 && parts[1] == "letrun")
+                    {
+                        OrbitLink.LetRun = parts[2] == "on";
+                    }
+                    float walked = 0f, furthest = 0f;
+                    var states = new Dictionary<string, int>();
+                    int all = 0, on = 0, moving = 0;
+                    foreach (var other in Comfort.Common.Singleton<GameWorld>.Instance.AllAlivePlayersList)
+                    {
+                        if (other == null || other.IsYourPlayer || !other.IsAI)
+                        {
+                            continue;
+                        }
+                        all++;
+                        if (other.gameObject.activeSelf)
+                        {
+                            on++;
+                        }
+                        var owner = other.gameObject.GetComponent<BotOwner>();
+                        string state = owner != null ? owner.BotState.ToString() : "no owner";
+                        int n;
+                        states.TryGetValue(state, out n);
+                        states[state] = n + 1;
+                        if (other.Velocity.sqrMagnitude > 0.05f)
+                        {
+                            moving++;
+                        }
+                        Vector3 before;
+                        if (_botWas.TryGetValue(other.ProfileId, out before))
+                        {
+                            float d = Vector3.Distance(before, other.Transform.position);
+                            walked += d;
+                            furthest = Mathf.Max(furthest, d);
+                        }
+                        _botWas[other.ProfileId] = other.Transform.position;
+                    }
+                    Report("bots " + all + ", switched on " + on + ", moving " + moving + ", states: " + string.Join(", ", states.Select(x => x.Key + " " + x.Value))
+                           + "; raid standing still " + BotFreeze.On + ", ORBIT held " + (BotFreeze.On && OrbitLink.Hooked && !OrbitLink.LetRun)
+                           + "; since the last look " + (Time.realtimeSinceStartup - _botLook).ToString("0") + " s: all walked " + walked.ToString("0.0") + " m, the furthest " + furthest.ToString("0.0") + " m");
+                    _botLook = Time.realtimeSinceStartup;
                     break;
                 }
                 case "treat":
