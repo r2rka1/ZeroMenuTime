@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 
 namespace ZeroMenuTime
 {
-    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "2.1.1")]
+    [BepInPlugin("com.r2rka1.zeromenutime", "r2rka1-ZeroMenuTime", "2.1.2")]
     [BepInDependency("dev.oogabooga.spt-vagabond", BepInDependency.DependencyFlags.SoftDependency)]
     // Loaded after UI Fixes, so its in-raid modding rule can be lifted inside the hideout.
     [BepInDependency("com.tyfon.uifixes", BepInDependency.DependencyFlags.SoftDependency)]
@@ -92,12 +92,12 @@ namespace ZeroMenuTime
                 new RaidStopPatch(), new SkipResultsPatch(), new MenuShownPatch(), new HideoutLeftPatch(), new QuestHandInNoticePatch(), new QuestRewardItemsPatch(), new AfterlifeKillPatch(), new IndoorAmbientPatch(), new IndoorReflectionPatch(), new QuestStartItemsPatch(), new RepairMenuPatch(),
                 new EnergyDrainPatch(), new HydrationDrainPatch(),
                 new RoomIndoorPatch(), new RoomIndoorBasePatch(),
-                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(), new MenuInventoryKeyPatch(), new MenuBarInventoryKeyPatch(), new LevelPhysicsPatch(),
+                new BunkerLevelSettingsAwakePatch(), new BunkerLevelSettingsDestroyPatch(), new BunkerEnvironmentDestroyPatch(), new MainMenuPatch(), new RangeBestScorePatch(), new HideoutMovePathPatch(), new HideoutModMovePatch(), new UiFixesInRaidPatch(), new MenuInventoryKeyPatch(), new MenuBarInventoryKeyPatch(), new LevelPhysicsPatch(), new IndoorRainPatch(), new IndoorWettingPatch(), new AirdropHoldPatch(), new WeatherCalendarPatch(),
             };
             if (Net.Headless)
             {
                 // No player, no screens: only the start and the end of a raid are of interest here.
-                _patches.RemoveAll(patch => !(patch is SpawnTradersPatch || patch is RaidStopPatch || patch is LevelPhysicsPatch));
+                _patches.RemoveAll(patch => !(patch is SpawnTradersPatch || patch is RaidStopPatch || patch is LevelPhysicsPatch || patch is AirdropHoldPatch));
             }
             foreach (var patch in _patches.ToArray())
             {

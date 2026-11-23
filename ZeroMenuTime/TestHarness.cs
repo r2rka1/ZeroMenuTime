@@ -1180,6 +1180,67 @@ namespace ZeroMenuTime
                     player.ActiveHealthController.Kill(EDamageType.Bullet);
                     break;
                 }
+                case "weather":
+                {
+                    // weather rain R [fog F] [cloud C] | weather off | weather letrain on|off: forces the
+                    // weather through the game's own debug switch, and says what the rain is doing now.
+                    var weather = EFT.Weather.WeatherController.Instance;
+                    if (weather == null)
+                    {
+                        Report("FAILED no weather on this map");
+                        break;
+                    }
+                    if (parts.Length > 1 && parts[1] == "off")
+                    {
+                        weather.WeatherDebug.Enabled = false;
+                    }
+                    else if (parts.Length > 2 && parts[1] == "letrain")
+                    {
+                        IndoorRain.LetRain = parts[2] == "on";
+                    }
+                    else if (parts.Length > 2 && parts[1] == "owncalendar")
+                    {
+                        WorldClock.WeatherByOwnCalendar = parts[2] == "on";
+                    }
+                    else if (parts.Length > 2)
+                    {
+                        weather.WeatherDebug.Enabled = true;
+                        for (int i = 1; i + 1 < parts.Length; i += 2)
+                        {
+                            if (parts[i] == "rain") weather.WeatherDebug.Rain = Number(parts[i + 1]);
+                            if (parts[i] == "fog") weather.WeatherDebug.Fog = Number(parts[i + 1]);
+                            if (parts[i] == "cloud") weather.WeatherDebug.CloudDensity = Number(parts[i + 1]);
+                        }
+                    }
+                    yield return new WaitForSecondsRealtime(2f);
+                    Report("weather: forced " + weather.WeatherDebug.Enabled + ", curve rain " + weather.WeatherCurve.Rain.ToString("F2") + " fog " + weather.WeatherCurve.Fog.ToString("F3")
+                           + "; rain drawn " + RainController.Intensity.ToString("F2") + ", wetting " + RainController.Wetting.ToString("F2") + ", camera under rain " + RainController.IsCameraUnderRain
+                           + "; shader rain " + Shader.GetGlobalFloat("_RainIntensity").ToString("F2") + "; indoors " + IndoorLight.Inside + ", let rain " + IndoorRain.LetRain
+                           + "; read at " + weather.WeatherCurve.CurrentNormalizedTimeValue.ToString("F3") + " of the server's weather, calendar shift " + WorldClock.DescribeWeatherShift() + ", own calendar " + WorldClock.WeatherByOwnCalendar);
+                    break;
+                }
+                case "airdrop":
+                {
+                    // airdrop [in SECONDS]: what the map's airdrop clock says; "in" has the next plane due
+                    // that many seconds from now, certain to come.
+                    var drops = AirdropHoldPatch.Seen;
+                    if (drops == null)
+                    {
+                        Report("FAILED no airdrop clock has ticked on this map");
+                        break;
+                    }
+                    if (parts.Length > 2 && parts[1] == "in")
+                    {
+                        drops._nextSpawnAirdropTime = drops._spawnAirdropTimer.Time + Number(parts[2]);
+                        drops.CachedAirdropParameters.PlaneAirdropChance = 1f;
+                        drops.CachedAirdropParameters.PlaneAirdropEnd = 100000;
+                        if (drops._planeAirdropMax < 5f) drops._planeAirdropMax = 5f;
+                    }
+                    Report("airdrop: can come " + drops.CanSummonAirdrop + ", clock " + drops._spawnAirdropTimer.Time.ToString("F0") + " s, held " + drops._spawnAirdropTimer.IsPaused
+                           + ", next due at " + drops._nextSpawnAirdropTime.ToString("F0") + " s, sent so far " + drops._currentAirdropsCount + " of " + drops._planeAirdropMax
+                           + ", chance " + drops.PlaneAirdropChance + ", ends " + drops.PlaneAirdropEnd + ", raid standing still " + BotFreeze.On);
+                    break;
+                }
                 case "sky":
                 {
                     // sky set ROOM POWERED DARK: try other indoor levels for the sky's ambient colour.

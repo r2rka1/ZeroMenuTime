@@ -23,6 +23,33 @@ namespace ZeroMenuTime
         private static float _nextSend;
         private static double _lastKnown;
 
+        // The weather the server sends is laid out along the raid's own calendar, which this clock
+        // replaces. What has to be added to this clock to read that calendar again:
+        private static GameDateTime _shiftFor;
+        private static long _weatherShift;
+        private static bool _hasShift;
+        /// <summary>For the test harness: read the weather by this clock's own calendar, as versions before 2.1.2 did.</summary>
+        public static bool WeatherByOwnCalendar;
+
+        /// <summary>The moment the weather is to be read at, or null to leave it to the game.</summary>
+        public static long? WeatherTicks
+        {
+            get
+            {
+                var game = Game();
+                if (!_hasShift || WeatherByOwnCalendar || game == null || !ReferenceEquals(_shiftFor, game))
+                {
+                    return null;
+                }
+                return game.Calculate().Ticks + _weatherShift;
+            }
+        }
+
+        public static string DescribeWeatherShift()
+        {
+            return _hasShift ? (_weatherShift / (double)TimeSpan.TicksPerDay).ToString("F2") + " days" : "none";
+        }
+
         private static GameDateTime Game()
         {
             return Singleton<GameWorld>.Instantiated ? Singleton<GameWorld>.Instance.GameDateTime : null;
@@ -62,6 +89,15 @@ namespace ZeroMenuTime
             if (game == null)
             {
                 return;
+            }
+            if (Net.IsHost && !ReferenceEquals(_shiftFor, game))
+            {
+                // First setting in this raid: the game still has the raid's own date. Kept, so the
+                // weather goes on being read where the server meant it, and moves on with sleep.
+                _shiftFor = game;
+                _weatherShift = game.Calculate().Ticks - Epoch.AddSeconds(seconds).Ticks;
+                _hasShift = true;
+                Plugin.Log.LogInfo("World clock: the weather is read " + DescribeWeatherShift() + " from this clock, on the raid's own calendar");
             }
             // Changed in place: the sky and the weather hold on to this same object.
             game._realtimeSinceStartup = Time.realtimeSinceStartup;
@@ -150,7 +186,11 @@ namespace ZeroMenuTime
         {
             if (_running && Net.Coop && Net.IsHost)
             {
-                Net.Current.Send("zmt.clock", BitConverter.GetBytes(Now), true);
+                // The time, then what the weather's calendar is off by (older versions read only the time).
+                var body = new byte[16];
+                BitConverter.GetBytes(Now).CopyTo(body, 0);
+                BitConverter.GetBytes(_hasShift && ReferenceEquals(_shiftFor, Game()) ? _weatherShift : long.MinValue).CopyTo(body, 8);
+                Net.Current.Send("zmt.clock", body, true);
             }
         }
 
@@ -171,6 +211,13 @@ namespace ZeroMenuTime
             bool first = !_running;
             double off = _running ? seconds - Now : 0;
             Set(seconds);
+            if (body.Length >= 16)
+            {
+                long shift = BitConverter.ToInt64(body, 8);
+                _hasShift = shift != long.MinValue;
+                _weatherShift = _hasShift ? shift : 0;
+                _shiftFor = Game();
+            }
             _running = true;
             if (first || Math.Abs(off) > 120)
             {
@@ -268,6 +315,30 @@ namespace ZeroMenuTime
                 Send("raid ending");
             }
             _running = false;
+        }
+    }
+
+    /// <summary>
+    /// The weather is a curve along the raid's calendar, read at the game's date and time. The world
+    /// clock puts its own date there, months away from the one the server laid the weather along,
+    /// so the weather was read at some other point of the curve: not what the server (or a weather
+    /// mod) meant for now. Here it is read on the raid's own calendar again.
+    /// </summary>
+    public class WeatherCalendarPatch : SPT.Reflection.Patching.ModulePatch
+    {
+        protected override System.Reflection.MethodBase GetTargetMethod()
+        {
+            return HarmonyLib.AccessTools.PropertyGetter(typeof(EFT.Weather.WeatherCurve), "Int64_0");
+        }
+
+        [SPT.Reflection.Patching.PatchPostfix]
+        public static void Postfix(ref long __result)
+        {
+            long? at = WorldClock.WeatherTicks;
+            if (at.HasValue)
+            {
+                __result = at.Value;
+            }
         }
     }
 }
