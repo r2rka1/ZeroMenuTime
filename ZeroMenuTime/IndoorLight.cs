@@ -15,6 +15,9 @@ namespace ZeroMenuTime
     public static class IndoorLight
     {
         private static bool _dark;
+
+        /// <summary>The player is in a trader's room or in the hideout now.</summary>
+        public static bool Inside => _dark;
         private static float _nextCheck, _nextSunCheck;
         private static AmbientMode _mode;
         private static Color _light, _sky, _equator, _ground;
