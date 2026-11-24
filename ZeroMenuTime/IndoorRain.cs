@@ -55,4 +55,26 @@ namespace ZeroMenuTime
             }
         }
     }
+
+    /// <summary>
+    /// Whether the camera stands under open sky. The game asks this for the sound of rain and the
+    /// drops on the screen, and weather mods ask it for their own rain sound, thunder and lightning.
+    /// In a trader's room or the hideout the answer is no: the player is under a roof.
+    /// </summary>
+    public class IndoorShelterPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return typeof(DepthPhotograper).GetMethod("CheckIfCameraUnderRain", BindingFlags.Instance | BindingFlags.Public);
+        }
+
+        [PatchPostfix]
+        public static void Postfix(ref bool __result)
+        {
+            if (IndoorRain.Hold)
+            {
+                __result = false;
+            }
+        }
+    }
 }
