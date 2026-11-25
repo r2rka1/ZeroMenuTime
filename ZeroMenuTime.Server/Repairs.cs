@@ -20,6 +20,17 @@ public sealed class KitRepairRequest : IRequestData
     public double Points { get; set; }
 }
 
+/// <summary>An item being repaired by a trader in a raid: what it is, how worn, by how many points, and by whom.</summary>
+public sealed class TraderRepairRequest : IRequestData
+{
+    public string Tpl { get; set; } = "";
+    public double Durability { get; set; }
+    public double MaxDurability { get; set; }
+    /// <summary>Durability points to put back.</summary>
+    public double Points { get; set; }
+    public string Trader { get; set; } = "";
+}
+
 public sealed class KitRepairResponse
 {
     public bool Ok { get; set; }
@@ -87,6 +98,72 @@ public static class Repairs
         {
             response.Error = e.GetType().Name + ": " + (e.InnerException?.Message ?? e.Message);
             Console.WriteLine("[ZeroMenuTime] Repair by kit failed: " + e);
+        }
+        return response;
+    }
+
+    /// <summary>
+    /// A trader's repair, by the server's own rule for it: the points asked for are put back and the
+    /// maximum wears by the trader's quality. The money is taken in the game, from what is carried.
+    /// </summary>
+    public static KitRepairResponse ByTrader(MongoId sessionId, TraderRepairRequest request, SPTarkov.Server.Core.Helpers.Traders.TraderHelper traders,
+        RepairService service, RepairHelper helper, TemplateTable templates)
+    {
+        var response = new KitRepairResponse();
+        try
+        {
+            MongoId tpl = request.Tpl;
+            if (!templates.Items.TryGetValue(tpl, out var template) || template?.Properties == null)
+            {
+                response.Error = "Unknown item";
+                return response;
+            }
+            if (request.Points <= 0)
+            {
+                response.Error = "Nothing to repair";
+                return response;
+            }
+            var repair = traders.GetTrader(new MongoId(request.Trader), sessionId)?.Repair;
+            if (repair == null || repair.Availability != true)
+            {
+                response.Error = "This trader does not repair";
+                return response;
+            }
+            double quality = repair.Quality ?? 0;
+            // The server's setting for wear at random, read from its own repair service; on, as it is by default, if it cannot be read.
+            bool random = true;
+            try
+            {
+                const BindingFlags Hidden = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+                var held = typeof(RepairService).GetFields(Hidden).FirstOrDefault(f => f.FieldType.Name == "RepairConfig")?.GetValue(service);
+                var setting = held?.GetType().GetProperty("ApplyRandomizeDurabilityLoss")?.GetValue(held);
+                if (setting is bool value)
+                {
+                    random = value;
+                }
+            }
+            catch (Exception)
+            {
+            }
+            bool armour = template.Properties.ArmorMaterial.HasValue;
+            var item = new Item
+            {
+                Id = new MongoId(),
+                Template = tpl,
+                Upd = new Upd { Repairable = new UpdRepairable { Durability = request.Durability, MaxDurability = request.MaxDurability } },
+            };
+            helper.UpdateItemDurability(item, template, armour, request.Points, false, quality, quality != 0.0 && random);
+            response.Durability = item.Upd.Repairable!.Durability ?? request.Durability;
+            response.MaxDurability = item.Upd.Repairable.MaxDurability ?? request.MaxDurability;
+            response.Ok = true;
+            Console.WriteLine("[ZeroMenuTime] Repair by trader " + request.Trader + ": " + request.Points.ToString("F1") + " point(s) on " + template.Name + ": "
+                              + request.Durability.ToString("F1") + "/" + request.MaxDurability.ToString("F1") + " -> "
+                              + response.Durability.ToString("F1") + "/" + response.MaxDurability.ToString("F1"));
+        }
+        catch (Exception e)
+        {
+            response.Error = e.GetType().Name + ": " + (e.InnerException?.Message ?? e.Message);
+            Console.WriteLine("[ZeroMenuTime] Repair by trader failed: " + e);
         }
         return response;
     }

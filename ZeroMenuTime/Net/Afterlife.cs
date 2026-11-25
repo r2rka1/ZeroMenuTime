@@ -26,7 +26,7 @@ namespace ZeroMenuTime
     public static class Afterlife
     {
         public const int ReviveCost = 100000;
-        private const string Roubles = "5449016a4bdc2d6f028b456f";
+        internal const string Roubles = "5449016a4bdc2d6f028b456f";
 
         /// <summary>Profile ids of the players who are ghosts now. Kept the same on every machine.</summary>
         public static readonly HashSet<string> Ghosts = new HashSet<string>();

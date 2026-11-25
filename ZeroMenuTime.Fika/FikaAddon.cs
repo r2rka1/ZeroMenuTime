@@ -24,7 +24,7 @@ namespace ZeroMenuTime.Fika
     /// The part of Zero Menu Time that talks to Fika. It is loaded only where Fika is installed, and
     /// it is the only place a Fika type is named: the rest of the mod works through <see cref="Net"/>.
     /// </summary>
-    [BepInPlugin("com.r2rka1.zeromenutime.fika", "r2rka1-ZeroMenuTime-Fika", "2.1.3")]
+    [BepInPlugin("com.r2rka1.zeromenutime.fika", "r2rka1-ZeroMenuTime-Fika", "2.1.4")]
     [BepInDependency("com.fika.core")]
     [BepInDependency("com.r2rka1.zeromenutime")]
     public class FikaAddon : BaseUnityPlugin
@@ -555,7 +555,16 @@ namespace ZeroMenuTime.Fika
             Kind = reader.GetString();
             From = reader.GetString();
             ToAll = reader.GetBool();
-            Body = reader.GetBytesWithLength();
+            // The length is a whole int: the library's own "bytes with length" keeps it in two bytes,
+            // which cut a body over 64 KB (a full stash) short on the way.
+            bool packed = reader.GetBool();
+            int length = reader.GetInt();
+            var bytes = new byte[length];
+            if (length > 0)
+            {
+                reader.GetBytes(bytes, length);
+            }
+            Body = packed ? Unpack(bytes) : bytes;
         }
 
         public readonly void Serialize(NetDataWriter writer)
@@ -563,7 +572,42 @@ namespace ZeroMenuTime.Fika
             writer.Put(Kind ?? "");
             writer.Put(From ?? "");
             writer.Put(ToAll);
-            writer.PutBytesWithLength(Body ?? new byte[0]);
+            var bytes = Body ?? new byte[0];
+            bool packed = bytes.Length > 1024;
+            if (packed)
+            {
+                bytes = Pack(bytes);
+            }
+            writer.Put(packed);
+            writer.Put(bytes.Length);
+            if (bytes.Length > 0)
+            {
+                writer.Put(bytes);
+            }
+        }
+
+        private static byte[] Pack(byte[] plain)
+        {
+            using (var packed = new System.IO.MemoryStream())
+            {
+                using (var deflate = new System.IO.Compression.DeflateStream(packed, System.IO.Compression.CompressionLevel.Fastest))
+                {
+                    deflate.Write(plain, 0, plain.Length);
+                }
+                return packed.ToArray();
+            }
+        }
+
+        private static byte[] Unpack(byte[] packed)
+        {
+            using (var plain = new System.IO.MemoryStream())
+            {
+                using (var deflate = new System.IO.Compression.DeflateStream(new System.IO.MemoryStream(packed), System.IO.Compression.CompressionMode.Decompress))
+                {
+                    deflate.CopyTo(plain);
+                }
+                return plain.ToArray();
+            }
         }
     }
 
