@@ -108,8 +108,9 @@ namespace ZeroMenuTime
                 }
             }
             var told = new JObject { ["StashId"] = _stash.Id.ToString(), ["StashTemplate"] = _stash.TemplateId.ToString(), ["Stash"] = items, ["Hideout"] = _hideout };
-            Net.Current.Send("zmt.stash", System.Text.Encoding.UTF8.GetBytes(told.ToString(Newtonsoft.Json.Formatting.None)), true);
-            Plugin.Log.LogInfo("Shared stash: told everyone (" + items.Count + " item(s))");
+            var body = System.Text.Encoding.UTF8.GetBytes(told.ToString(Newtonsoft.Json.Formatting.None));
+            Net.Current.Send("zmt.stash", body, true);
+            Plugin.Log.LogInfo("Shared stash: told everyone (" + items.Count + " item(s), " + body.Length + " bytes)");
         }
 
         /// <summary>On a client: the host says what the stash holds. Built once; after that the game's own moves keep it true.</summary>
