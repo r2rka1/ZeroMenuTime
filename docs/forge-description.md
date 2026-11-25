@@ -49,6 +49,7 @@ Needs **[Vagabond](https://sp-mod.com/mod/2642/vagabond)**. Report bugs in the *
 - **Crafting** runs on the world clock, also while you raid or sleep. Filter the recipe list by kind, by what you can make now, or by typing a name.
 - **Workbench**: the game's own weapon modding screen.
 - **Repair kits**: right-click a weapon or armour piece → Repair. Weapons need the Workbench, armour the Lavatory.
+- **Repairs at traders**: the same Repair choice in the room of Prapor, Skier or Mechanic, paid from the roubles you carry.
 - **Sealed cases** from airdrops: right-click → Unpack while in the hideout; the contents go to the stash. Locked cases, sealed boxes and locked crates are opened at the Workbench first.
 - **Stash** with a Sort choice. **Rest Space**: sleep, heal, save.
 - Bitcoin farm, Water Collector, Solar Power, Scav Case, Cultist Circle, Gym, Shooting Range, Weapon Stand, Place of Fame.
@@ -259,7 +260,6 @@ The full table is in the **[README](https://github.com/r2rka1/ZeroMenuTime#setti
 
 - **Vagabond**: required. **UI Fixes**, **Dynamic Maps**: supported.
 - **Fika** and its headless host: supported from 2.0, with the add-on zip. See the **Playing with friends** and **Headless host** tabs.
-- Custom traders are not placed on the maps yet.
-- Traders do not repair yet; repair kits do.
+- Traders of other mods are on no map until you place them in the settings (F12, Custom trader - NAME).
 - Peacekeeper has no real model or voice and stays a stand-in figure. The voice lines are in Russian.
 - More in the **[README](https://github.com/r2rka1/ZeroMenuTime#known-limits)**.

@@ -29,6 +29,8 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - **Quests** are accepted and handed in at the trader. Items a quest gives when you accept it, and the **reward items** when you hand it in, are **laid on the table** in front of you; experience and standing follow when the raid ends.
 - Mail from traders (quest rewards, insurance returns) waits **on the table**. Anything you leave there is still there next time.
 - If you own the 1.0 game, the traders are their **real models** and **speak a line** when you start to trade. See [Real trader models and voices](#real-trader-models-and-voices).
+- **Repairs at traders**: in the room of a trader who repairs (Prapor, Skier, Mechanic), right-click a weapon or armour piece you carry and choose **Repair**. The game's own repair window opens with that trader, at their price and quality, paid from the roubles you carry.
+- **Therapist treats you** for a price: health back to full, blacked-out limbs included.
 - Every trader stocks a few **field supplies** (basic meds, food, water, a surgical kit) and the **map of the area they stand in**, so you are never stranded.
 
 ### One hideout, behind real doors
@@ -42,7 +44,7 @@ Client and server mod for **SPT 4.1.6**. Requires **[Vagabond](https://sp-mod.co
 - **Weapon modding** at the Workbench with the game's own modding screen, vital parts included, using parts from your gear and the stash.
 - **Weapon Stand, Place of Fame, Equipment Stand** hold and display what you put on them.
 - **Stash** in the hideout, with a **Sort stash** choice on the Stash station. Things sent between maps by the BTR driver arrive there.
-- **Repair kits** work on what you carry: right-click a weapon or armour piece and choose **Repair** for the game's own repair window. The kits counted are those you carry, and those in the stash while you are in the hideout. As in the menus, weapons need the Workbench built and armour the Lavatory. Traders do not repair yet.
+- **Repair kits** work on what you carry: right-click a weapon or armour piece and choose **Repair** for the game's own repair window. The kits counted are those you carry, and those in the stash while you are in the hideout. As in the menus, weapons need the Workbench built and armour the Lavatory.
 - **Sealed cases** (the weapon case of an airdrop, locked crates once unlocked) can be unpacked in the hideout: right-click the case and choose **Unpack**. What was inside goes into the stash. A locked case with its key, a sealed box or a locked supply crate is first opened at the **Workbench** (under CRATES).
 - While you are inside, the hideout's stations **heal and feed you** at the game's own bonus rates, and every bot on the map is paused. The map's outdoor sounds are hushed down there, and the game's own **Hideout volume** setting applies.
 

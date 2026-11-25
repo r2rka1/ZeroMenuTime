@@ -994,20 +994,26 @@ namespace ZeroMenuTime
                     }
                     else if (what == "add" && parts.Length > 2)
                     {
-                        // stash add TEMPLATE: a new thing of that kind, made straight into the stash. For tests only.
-                        var made = Comfort.Common.Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), parts[2], null);
-                        var spot = stash.Grids[0].FindLocationForItem(made);
-                        var put = spot == null ? default : ItemManipulator.Add(made, spot, player.InventoryController, false);
-                        if (spot == null || put.Failed)
+                        // stash add TEMPLATE [COUNT]: new things of that kind, made straight into the stash. For tests only.
+                        int wanted = parts.Length > 3 ? (int)Number(parts[3]) : 1, added = 0;
+                        string why = "";
+                        for (int i = 0; i < wanted; i++)
                         {
-                            Report("FAILED could not add it: " + (spot == null ? "no room in the stash" : put.Error.ToString()));
-                        }
-                        else
-                        {
+                            var made = Comfort.Common.Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), parts[2], null);
+                            var spot = stash.Grids[0].FindLocationForItem(made);
+                            var put = spot == null ? default : ItemManipulator.Add(made, spot, player.InventoryController, false);
+                            if (spot == null || put.Failed)
+                            {
+                                why = spot == null ? "no room in the stash" : put.Error.ToString();
+                                break;
+                            }
                             put.Value.RaiseEvents(player.InventoryController, CommandStatus.Begin);
                             put.Value.RaiseEvents(player.InventoryController, CommandStatus.Succeed);
-                            Report("added " + HideoutStations.ItemName(parts[2]) + " to the stash");
+                            added++;
                         }
+                        Report(added == wanted
+                            ? "added " + (wanted > 1 ? wanted + " " : "") + HideoutStations.ItemName(parts[2]) + " to the stash"
+                            : "FAILED could not add it: " + why + " (added " + added + " of " + wanted + ")");
                     }
                     else if (what == "sort")
                     {
@@ -2362,6 +2368,25 @@ namespace ZeroMenuTime
                     {
                         EFT.UI.ItemUiContext.Instance.OpenRepairWindow(repairs, new DefaultItemContext(worn, EItemViewType.Inventory));
                         Report("repair window asked for");
+                    }
+                    else if (parts.Length > 3 && parts[2] == "trader")
+                    {
+                        // repair WORD trader POINTS: by the trader whose room this is, the way the Repair window does it.
+                        var trader = repairs.TraderRepairers.FirstOrDefault();
+                        if (trader == null)
+                        {
+                            Report("FAILED no trader repairs here (room of: " + (Repairs.RoomTrader() ?? "none") + ")");
+                            break;
+                        }
+                        int had = Afterlife.CarriedRoubles(player);
+                        var paid = trader.RepairItems(new RepairItem(worn.Id, Number(parts[3])), null);
+                        while (!paid.IsCompleted)
+                        {
+                            yield return null;
+                        }
+                        Report((paid.Result != null && paid.Result.Succeed ? "repaired by " + trader.LocalizedName + ": now " : "FAILED repair (" + (paid.Result != null ? paid.Result.Error : "no result") + "): now ")
+                               + part.Durability.ToString("F1") + "/" + part.MaxDurability.ToString("F1") + "; roubles " + had + " -> " + Afterlife.CarriedRoubles(player)
+                               + "; money the window counts: " + Repairs.RoublesAtHand().Sum(i => i.StackObjectsCount));
                     }
                     else if (parts.Length > 2 && kinds.Count > 0)
                     {
