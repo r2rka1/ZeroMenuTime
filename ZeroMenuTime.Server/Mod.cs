@@ -17,7 +17,7 @@ public class ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.r2rka1.zeromenutime";
     public string Name { get; init; } = "ZeroMenuTime";
     public string Author { get; init; } = "r2rka1";
-    public SemanticVersioning.Version Version { get; init; } = new("2.1.3");
+    public SemanticVersioning.Version Version { get; init; } = new("2.1.4");
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.6");
     public bool HasPrepatcher { get; init; }
     public string? Url { get; init; } = "https://github.com/r2rka1/ZeroMenuTime";
@@ -153,6 +153,11 @@ public class ZeroMenuTimeRouter(
         "/zeromenutime/repair/kit",
         (_, payload, sessionId, _, _) =>
             ValueTask.FromResult(jsonUtil.Serialize(Repairs.ByKit(sessionId, payload, profileHelper, repairService, repairHelper, templates)) ?? "{}")
+    ),
+    new RouteAction<TraderRepairRequest>(
+        "/zeromenutime/repair/trader",
+        (_, payload, sessionId, _, _) =>
+            ValueTask.FromResult(jsonUtil.Serialize(Repairs.ByTrader(sessionId, payload, traderHelper, repairService, repairHelper, templates)) ?? "{}")
     ),
     new RouteAction<TradeReport>(
         "/zeromenutime/trade",
